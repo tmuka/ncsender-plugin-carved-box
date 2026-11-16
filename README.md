@@ -4,17 +4,21 @@ An [ncSender](https://github.com/siganberg/ncSender) plugin that carves a round 
 
 ## Settings
 
-- **Box:** the outside **Diameter**, your measured **Stock Thickness** (each half is the full thickness), the **Wall**, the base's **Floor** and the lid's **Top**.
+- **Box:** the outside **Diameter**, your measured **Stock Thickness** (the base is the full thickness), the **Wall**, the base's **Floor**, the lid's **Top**, and the **Lid Height**: empty for the full thickness, or lower, when the lid's area is faced down first.
 - **Fit:** which half the **Lip** is on, its **Height** and **Width** (the inner part of the wall), and the **Clearance** each side: about 0.2–0.3 mm in wood (it moves with the weather), 0.1 mm in plastic. The other half's opening is widened by the Lip Width plus the Clearance, Lip Height plus the Clearance deep, so the halves meet on the shoulder outside the lip.
 - **Layout:** the halves side by side **Along X** or **Along Y**, the **Gap** of wood left between them and the **Margin** to the stock's edges; the origin (X0 Y0) at the stock's **front-left corner** or the **middle of the pair**. Z0 is the top of the stock. The stock needed is shown.
 - **Holding Tabs:** count, width and height on each outline.
+- **Magnets:** holes of a set diameter and depth facing each other where the halves meet, the same in both, evenly round the wall outside the lip. Glue the magnets in with opposite poles up so they pull together. They need a wall at least Lip Width + Clearance + the hole + 1.6 mm thick.
+- **Finger Notch:** a round scoop of a set width and depth in the base's rim at the front, to lift the lid by.
 - **Tool & Feeds:** a bit from ncSender's Tool Library (with a tool changer, the program starts with `M6 T`) or a typed size, and starting feeds from the bit, its flutes and the material, as QuickCut's.
 
 The previews show both halves on the stock, and the closed box cut through its middle: the lip in the other half's opening, the clearance drawn a little wider to be seen, the closed and inside heights.
 
+**Test Fit** cuts a small box with the same fit, only as deep inside as the lip needs: try it before the real one, and adjust the Clearance.
+
 ## What it cuts
 
-1. Each half's inside: a helix down in the middle, rings out to the wall, a pass at a time; the widened opening for the lip first on the half without it; the shoulder round the lip (a ramp along its ring, rings out past the outline) on the half with it.
+1. A lower lid's area, faced down to the Lid Height. Then each half's inside: a helix down in the middle, rings out to the wall, a pass at a time; the widened opening for the lip first on the half without it; the shoulder round the lip (a ramp along its ring, rings out past the outline) on the half with it; the magnet holes and the finger notch.
 2. Both outlines last, so the board stays stiff: a helical ramp, through the stock and 0.5 mm into the spoilboard, lifting over each tab on the last passes.
 
 Put the side of the board you want on the outside of the lid face down: the lid's top is the board's underside.

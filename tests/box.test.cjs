@@ -2,7 +2,7 @@
 // bit's center goes, at what depth, against what must be left standing.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { boxPlan, BOX_DEFAULTS } = require('../lib/box-plan.cjs');
+const { boxPlan, testFitInput, BOX_DEFAULTS } = require('../lib/box-plan.cjs');
 const { boxProgram } = require('../lib/box-gcode.cjs');
 
 const FEEDS = { feed: 1500, plunge: 400, rpm: 18000, delay: 2, doc: 2, stepoverPct: 40, toolNumber: 0 };
@@ -39,25 +39,36 @@ function simulate(gcode) {
 }
 
 // Is the bit's center at p allowed, near this half? (What must be left:
-// the wall, the lip, the floor or top, and the tabs.)
+// the wall, the lip, the floor or top, the tabs, round magnet holes and
+// the notch.)
 function allowed(plan, half, p) {
+  const o = plan.o, rb = o.bit / 2;
   // eps: the program's coordinates are to 0.001 mm, arc centers too.
-  const o = plan.o, rb = o.bit / 2, eps = 0.005, d = -p.z;
+  const eps = 0.005;
+  const top = half.name === 'lid' ? -plan.face : 0, d = top - p.z;
   const dist = Math.hypot(p.x - half.at.x, p.y - half.at.y);
-  if (d <= eps) return true;
-  if (dist >= plan.R + rb - eps) return d <= plan.cutDepth + eps;
+  if (-p.z <= eps) return true;
+  // A lid lower than the stock: its area faced down first.
+  if (half.name === 'lid' && plan.face > 0 && -p.z <= plan.face + eps && dist <= plan.R + rb + eps) return true;
+  if (dist >= plan.R + rb - eps) return d <= half.outline.depth + eps;
   const withLip = (o.lipOn === 'lid') === (half.name === 'lid');
-  const floor = o.stock - (half.name === 'lid' ? o.top : o.floor);
+  const floor = half.height - (half.name === 'lid' ? o.top : o.floor), meet = withLip ? o.lipHeight : 0;
   if (dist <= plan.Ri - rb + eps && d <= floor + eps) return true;
   if (withLip && dist >= plan.Ri + o.lipWidth + rb - eps && d <= o.lipHeight + eps) return true;
   if (!withLip && dist <= plan.rabbet - rb + eps && d <= plan.rabbetDepth + eps) return true;
+  for (const m of plan.magnetAt) {
+    if (Math.hypot(p.x - half.at.x - m.dx, p.y - half.at.y - m.dy) <= o.magnets.diameter / 2 - rb + eps && d <= meet + o.magnets.depth + eps) return true;
+  }
+  if (half.name === 'base' && plan.notch) {
+    if (Math.hypot(p.x - half.at.x - plan.notch.dx, p.y - half.at.y - plan.notch.dy) <= plan.notch.r - rb + eps && d <= meet + o.notch.depth + eps) return true;
+  }
   return false;
 }
 
-function check(input) {
+function check(input, extra) {
   const plan = boxPlan(input);
   assert.deepEqual(plan.problems, [], JSON.stringify(input));
-  const { gcode } = boxProgram(plan, FEEDS);
+  const { gcode } = boxProgram(plan, Object.assign({}, FEEDS, extra || {}));
   for (const l of gcode.split('\n')) {
     assert.ok(l.length <= 79, l);
     assert.doesNotMatch(l, /[!?~]/, l);
@@ -85,7 +96,7 @@ test('every floor and the shoulder are cleared all over', () => {
   const { plan, pts } = check({});
   const rb = plan.o.bit / 2;
   for (const half of plan.halves) {
-    const floor = plan.o.stock - (half.name === 'lid' ? plan.o.top : plan.o.floor);
+    const floor = (half.name === 'lid' ? plan.face : 0) + half.height - (half.name === 'lid' ? plan.o.top : plan.o.floor);
     const deep = pts.filter((p) => Math.abs(p.z + floor) < 1e-6 && Math.hypot(p.x - half.at.x, p.y - half.at.y) < plan.Ri);
     for (let r = 0; r < plan.Ri - 0.2; r += 1) for (let a = 0; a < 2 * Math.PI; a += 0.3) {
       const q = { x: half.at.x + r * Math.cos(a), y: half.at.y + r * Math.sin(a) };
@@ -97,10 +108,11 @@ test('every floor and the shoulder are cleared all over', () => {
 
 test('the tabs stay standing, and the outline goes through', () => {
   const { plan, pts } = check({});
-  const o = plan.o, rb = o.bit / 2, pr = plan.R + rb, tabTop = -(plan.cutDepth - o.tabs.height);
+  const o = plan.o, rb = o.bit / 2, pr = plan.R + rb;
   for (const half of plan.halves) {
+    const tabTop = half.outline.z0 - (half.outline.depth - o.tabs.height);
     const ring = pts.filter((p) => Math.abs(Math.hypot(p.x - half.at.x, p.y - half.at.y) - pr) < 1e-3);
-    assert.ok(ring.some((p) => Math.abs(p.z + plan.cutDepth) < 1e-6), half.name + ' cut through');
+    assert.ok(ring.some((p) => Math.abs(p.z - (half.outline.z0 - half.outline.depth)) < 1e-6), half.name + ' cut through');
     for (let k = 0; k < o.tabs.count; k++) {
       const c = Math.PI / 4 + 2 * Math.PI * k / o.tabs.count;
       const inTab = ring.filter((p) => {
@@ -122,4 +134,39 @@ test('numbers that make no box say why', () => {
   said({ gap: 3 }, /Gap must be at least/);
   said({ tabs: { count: 30, width: 10, height: 2 } }, /Too many or too wide tabs/);
   assert.equal(BOX_DEFAULTS.lipOn, 'base');
+});
+
+test('a lid lower than the stock, magnets and a finger notch', () => {
+  for (const lipOn of ['base', 'lid']) for (const layout of ['x', 'y']) {
+    const input = { lipOn, layout, diameter: 90, stock: 19, lidHeight: 12, wall: 12, lipWidth: 3,
+      magnets: { count: 3, diameter: 6.35, depth: 3.2 }, notch: { width: 12, depth: 4 } };
+    const { plan, pts } = check(input);
+    assert.equal(plan.closedHeight, 19 + 12 - 4);
+    // Each magnet hole goes its full depth in both halves.
+    for (const half of plan.halves) {
+      const meet = (plan.o.lipOn === 'lid') === (half.name === 'lid') ? plan.o.lipHeight : 0;
+      const bottom = (half.name === 'lid' ? -plan.face : 0) - meet - 3.2;
+      for (const m of plan.magnetAt) {
+        assert.ok(pts.some((p) => Math.abs(p.z - bottom) < 1e-6 && Math.hypot(p.x - half.at.x - m.dx, p.y - half.at.y - m.dy) < plan.o.magnets.diameter / 2), half.name + ' magnet hole too shallow');
+      }
+    }
+  }
+});
+
+test('the test fit: a small box with the same fit', () => {
+  const plan = boxPlan(testFitInput({}));
+  assert.deepEqual(plan.problems, []);
+  assert.ok(plan.o.diameter < 50);
+  assert.ok(plan.rabbetDepth < plan.o.stock - plan.o.top);
+  const { gcode } = check(testFitInput({ lipOn: 'lid', bit: 6.35, gap: 20 }), { label: 'Test fit' });
+  assert.match(gcode, /^\(Test fit: a base and a lid/m);
+});
+
+test('magnets and a notch that don\'t fit say why', () => {
+  const said = (o, re) => assert.ok(boxPlan(o).problems.some((p) => re.test(p)), JSON.stringify(o) + ' ' + boxPlan(o).problems);
+  said({ magnets: { count: 4, diameter: 8, depth: 3 } }, /Magnet holes too wide/);
+  said({ wall: 14, magnets: { count: 4, diameter: 3, depth: 3 } }, /wider than the bit/);
+  said({ notch: { width: 30, depth: 3 } }, /Finger notch too wide/);
+  said({ lidHeight: 25 }, /Lid Height can't be more/);
+  said({ lidHeight: 6, top: 6 }, /Top must be between/);
 });
