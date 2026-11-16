@@ -1,0 +1,16 @@
+{
+  "name": "ncsender-plugin-carved-box",
+  "version": "0.1.0",
+  "license": "GPL-3.0-only",
+  "description": "ncSender plugin: carve a two-part box with a lid from one board",
+  "private": true,
+  "scripts": {
+    "test": "node .scripts/inline.cjs --check && node --test tests/*.cjs",
+    "inline": "node .scripts/inline.cjs",
+    "sync-quickcut": "node .scripts/sync-quickcut.cjs",
+    "build": "bash .scripts/build.sh"
+  },
+  "devDependencies": {
+    "ncsender-unit-input": "github:tmuka/ncsender-unit-input#v0.1.5"
+  }
+}

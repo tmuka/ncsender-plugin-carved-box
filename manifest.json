@@ -1,0 +1,28 @@
+{
+  "id": "com.tmuka.carved-box",
+  "name": "Carved Box",
+  "version": "0.1.0",
+  "minAppVersion": "2.0.88",
+  "configUi": "config.html",
+  "icon": "icon.png",
+  "author": "tmuka",
+  "repository": "https://github.com/tmuka/ncsender-plugin-carved-box",
+  "description": "Carve a round box with a lid from one board: the base and the lid side by side, each pocketed to its wall, floor and top, a lip on one half that slides into the other with a set clearance, and the outlines cut free with tabs. Starting feeds from your bit and material, as QuickCut's.",
+  "category": "gcode-generator",
+  "platforms": {
+    "v2": "2.0.88",
+    "pro-v2": "2.0.149"
+  },
+  "events": [],
+  "permissions": [
+    "gcode.modify"
+  ],
+  "toolMenu": [
+    {
+      "id": "open-config",
+      "label": "Carved Box",
+      "icon": "icon.png",
+      "clientOnly": true
+    }
+  ]
+}
