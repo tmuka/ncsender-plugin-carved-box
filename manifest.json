@@ -1,7 +1,7 @@
 {
   "id": "com.tmuka.carved-box",
   "name": "Carved Box",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "minAppVersion": "2.0.88",
   "configUi": "config.html",
   "icon": "icon.png",

@@ -2075,6 +2075,7 @@ if (typeof module !== 'undefined' && module.exports) {
     // The lid as high as the stock: nothing faced away.
     var a = autoSizes(Object.assign({}, planOf(v).o, { cornerRadius: own, lidHeight: null }), v.material, state.imperial);
     a.lidHeight = v.stock > 0 ? v.stock : null;
+    state.lidOwn = false;
     AUTO.forEach(function (x) {
       var mm = x[1](a), kind = FIELDS.filter(function (f) { return f[0] === x[0]; })[0][2];
       if (mm == null) return;
@@ -2639,6 +2640,8 @@ if (typeof module !== 'undefined' && module.exports) {
     // On for a first try; as it was saved after that.
     state.autoSizes = typeof saved.autoSizes === 'boolean' ? saved.autoSizes : !Object.keys(saved).length;
     state.cornerOwn = typeof saved.cornerOwn === 'number' ? saved.cornerOwn : typeof saved.cornerRadius === 'number' ? saved.cornerRadius : null;
+    // A Lid Height that's the stock's thickness follows it; one typed lower stays.
+    state.lidOwn = typeof saved.lidHeight === 'number' && !(Math.abs(saved.lidHeight - saved.stock) < 1e-3);
   }
   function wire() {
     // Lengths and feeds in any unit (1/4", 6.35mm, 60ipm, 12mm + 1/8in):
@@ -2671,6 +2674,8 @@ if (typeof module !== 'undefined' && module.exports) {
         if (e.isTrusted && f[0] === 'cb-bit') $('cb-tool').value = '';
         if (e.isTrusted && AUTO.some(function (x) { return x[0] === f[0]; })) state.autoSizes = false;
         if (e.isTrusted && f[0] === 'cb-corner') { var cr = read('cb-corner', 'length'); if (cr != null && !isNaN(cr)) state.cornerOwn = cr; }
+        if (e.isTrusted && f[0] === 'cb-lid-h') state.lidOwn = !!String($('cb-lid-h').value).trim();
+        if (f[0] === 'cb-stock' && !state.lidOwn && String($('cb-lid-h').value).trim()) { var st = read('cb-stock', 'length'); if (st > 0) show('cb-lid-h', st, 'length'); }
         soon();
       });
       $(f[0]).addEventListener('change', function () { if (f[0] === 'cb-bit' && state.feedsAuto) { fillFeeds(); update(true); } });

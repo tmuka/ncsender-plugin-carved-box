@@ -1,9 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.2.1: Help, Stock button, taller lips
 - Help (top right): getting started, how the lid fits, Test Fit and Auto Sizes, with your box's and its test fit's previews. The README has the same, with screenshots.
 - Stock Thickness: a Stock button puts in Spoilboard Toolbox's stock thickness, when Spoilboard Toolbox is installed and on. Hidden otherwise.
-- Auto Sizes sets the Lid Height to the stock's thickness, so none of the lid's stock is faced away.
+- Auto Sizes sets the Lid Height to the stock's thickness, so none of the lid's stock is faced away. Typed lower, it stays; otherwise it follows the Stock Thickness.
 - Auto Sizes: the Lip Width is half the Wall, and in wood (MDF, softwood, hardwood) the Lip Height is at least 1/4" when the box is deep enough. For edges it thickens the wall before lowering the lip. Before, edges could bring a lip down to about 3/32".
 - Edges: no Outside Seam by default (Auto Sizes too), and a bigger Lead-In (1.5 mm, 1/16") so the lid finds its way on more easily.
 
