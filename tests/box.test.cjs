@@ -450,3 +450,49 @@ test('a V-bit\'s flat tip counts in how far it reaches: the stock and the other 
     }
   }
 });
+
+test('regular polygons: a flat side to the front, any side count, with everything on', () => {
+  for (const sides of [3, 5, 6, 8]) for (const layout of ['x', 'y']) for (const lipOn of ['base', 'lid']) {
+    const input = { shape: 'poly', sides, flats: sides === 3 ? 110 : 90, cornerRadius: 12, layout, lipOn, origin: sides === 5 ? 'center' : 'front-left',
+      wall: 12, magnets: { count: 4, diameter: 6.35, depth: 3.2 }, notch: { width: 14, depth: 4 }, finish: 0.3 };
+    const { plan } = check(input);
+    // Turned over onto the base, the lid's magnets land on the base's.
+    const flip = layout === 'y' ? (m) => ({ dx: m.dx, dy: -m.dy }) : (m) => ({ dx: -m.dx, dy: m.dy });
+    for (const m of plan.magnetAt.map(flip)) assert.ok(plan.magnetAt.some((b) => Math.hypot(b.dx - m.dx, b.dy - m.dy) < 1e-6), sides + ' sides: magnets don\'t meet');
+    // The outline the same turned over (the shape is symmetric across the flip).
+    const S = plan.shape;
+    for (let k = 0; k < 40; k++) {
+      const p = loopPoint(shapeLoop(S, 0), loopLength(shapeLoop(S, 0)) * k / 40), q = flip({ dx: p.x, dy: p.y });
+      assert.ok(Math.abs(shapeDistance(S, 0, q.dx, q.dy)) < 1e-6, sides + ' sides: not the same turned over');
+    }
+    // The notch at the middle of the front flat.
+    assert.ok(Math.abs(shapeDistance(S, 0, plan.notch.dx, plan.notch.dy)) < 1e-6);
+    assert.equal(layout === 'y' ? plan.notch.dy : plan.notch.dx, 0);
+    // The stock fits the halves (an odd polygon reaches further one way).
+    const st = plan.stock;
+    for (const h of plan.halves) {
+      assert.ok(h.at.x + plan.ext.minX - st.x0 >= plan.o.margin - 1e-9 && st.x0 + st.w - (h.at.x + plan.ext.maxX) >= plan.o.margin - 1e-9);
+      assert.ok(h.at.y + plan.ext.minY - st.y0 >= plan.o.margin - 1e-9 && st.y0 + st.h - (h.at.y + plan.ext.maxY) >= plan.o.margin - 1e-9);
+    }
+  }
+  // Floors cleared all over, and edges and corners on a hexagon.
+  const hex = { shape: 'poly', sides: 6, flats: 90, cornerRadius: 10, wall: 10, corners: { diameter: 6.35, radius: 3.175 },
+    edges: { bit: 'v', angle: 60, diameter: 12.7, vtip: 0.3, outside: 1, inside: 0.5, pocket: 0 } };
+  const { plan, pts } = check(hex);
+  const rb = plan.o.bit / 2;
+  for (const half of plan.halves) {
+    const floor = half.height - (half.name === 'lid' ? plan.o.top : plan.o.floor);
+    const deep = pts.filter((p) => Math.abs(p.z + floor) < 1e-6);
+    for (let qx = plan.ext.minX; qx <= plan.ext.maxX; qx += 1.5) for (let qy = plan.ext.minY; qy <= plan.ext.maxY; qy += 1.5) {
+      if (shapeDistance(plan.shape, plan.tInside - 3.175, qx, qy) > -0.2) continue;
+      let near = Infinity;
+      for (const p of deep) near = Math.min(near, Math.hypot(p.x - half.at.x - qx, p.y - half.at.y - qy));
+      assert.ok(near <= rb + 0.3, half.name + ' hexagon floor left at ' + qx + ',' + qy);
+    }
+  }
+  const more = { toolNumber: 3, feed: 1000, plunge: 300, rpm: 16000, doc: 2 };
+  checkEdges(plan, boxProgram(plan, Object.assign({}, FEEDS, { edges: more }), 'edges').gcode);
+  const said = (o, re) => assert.ok(boxPlan(o).problems.some((p) => re.test(p)), JSON.stringify(o) + ' ' + boxPlan(o).problems);
+  said({ shape: 'poly', sides: 2, flats: 80 }, /3 to 12 sides/);
+  said({ shape: 'poly', sides: 6, flats: 80, cornerRadius: 1 }, /Corner Radius must be at least/);
+});

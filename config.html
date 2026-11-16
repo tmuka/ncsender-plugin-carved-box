@@ -100,7 +100,7 @@
 <div class="cb-wrapper">
   <div class="cb-header">
     <h2>Carved Box</h2>
-    <span class="cb-sub">A box with a lid, round or rectangular, carved side by side from one board.</span>
+    <span class="cb-sub">A box with a lid, round, rectangular or many-sided, carved side by side from one board.</span>
     <span class="cb-unit" id="cb-unit">METRIC (MM)</span>
   </div>
 
@@ -115,12 +115,14 @@
       <h3><span class="cb-grow">Box</span><span class="cb-auto-label">Auto Sizes</span><label class="cb-switch" title="Fill in the wall, floor, top, lip, clearance, gap, margin, tabs, notch, magnet count and edges for this size, stock, bit and material."><input type="checkbox" id="cb-auto" aria-label="Auto Sizes"><span></span></label></h3>
       <div class="cb-field"><label>Shape</label>
         <div class="cb-seg" id="cb-shape" role="radiogroup" aria-label="Shape">
-          <button type="button" role="radio" data-v="circle">Round</button><button type="button" role="radio" data-v="rect">Rectangle</button>
+          <button type="button" role="radio" data-v="circle">Round</button><button type="button" role="radio" data-v="rect">Rectangle</button><button type="button" role="radio" data-v="poly">Polygon</button>
         </div>
       </div>
       <div class="cb-row" id="cb-size-rect">
         <div class="cb-field"><label for="cb-length">X Length</label><input class="cb-input" id="cb-length" data-unit="length" title="The outside, along X."></div>
         <div class="cb-field"><label for="cb-width">Y Width</label><input class="cb-input" id="cb-width" data-unit="length" title="The outside, along Y."></div>
+        <div class="cb-field"><label for="cb-sides">Sides</label><input class="cb-input" id="cb-sides" title="3 to 12: 6 for a hexagon, 8 for an octagon. A flat side faces the front."></div>
+        <div class="cb-field"><label for="cb-flats">Across Flats</label><input class="cb-input" id="cb-flats" data-unit="length" title="The outside, from one flat side to the one across (or, with an odd number, to the corner across)."></div>
         <div class="cb-field"><label for="cb-corner">Corner Radius</label><input class="cb-input" id="cb-corner" data-unit="length" title="Of the outside corners. The inside's are smaller by the wall, and at least half the bit."></div>
       </div>
       <div class="cb-row">
@@ -672,8 +674,10 @@ if (typeof module !== 'undefined' && module.exports) {
  * cx, cy, r, a0, a1, len } (a1 > a0). Every loop starts on +X, at the
  * middle of the right side, so loops of one shape line up there.
  *
- * shape: { kind: 'circle', r } or { kind: 'rect', hx, hy, cr } (half the
- * length along X and the width along Y, the corner radius). mm.
+ * shape: { kind: 'circle', r }, { kind: 'rect', hx, hy, cr } (half the
+ * length along X and the width along Y, the corner radius), or { kind:
+ * 'poly', n, a, cr, rot } (a regular polygon: n sides, a the apothem, half
+ * across the flats, the corner radius, rot the angle of a corner). mm.
  */
 
 // The outline moved t out (in, t < 0): null when there's nothing left.
@@ -686,6 +690,7 @@ function shapeLoop(shape, t) {
     if (!(r > 1e-6)) return null;
     return [arcSeg(0, 0, r, 0, Math.PI), arcSeg(0, 0, r, Math.PI, 2 * Math.PI)];
   }
+  if (shape.kind === 'poly') { var pl = polyLoop(shape, t); return pl && startAtPlusX(pl); }
   var hx = shape.hx + t, hy = shape.hy + t, cr = Math.max(0, Math.min(shape.cr + t, hx, hy));
   if (hx < -1e-9 || hy < -1e-9) return null;
   hx = Math.max(0, hx); hy = Math.max(0, hy);
@@ -703,14 +708,94 @@ function shapeLoop(shape, t) {
   line(hx, -iy, hx, 0);
   return segs;
 }
+// A regular polygon moved t: its corners' centers stay put while their
+// radius cr + t lasts, then the corners are sharp, the sides moved t.
+function polyLoop(shape, t) {
+  var n = shape.n, a = shape.a + t, r = Math.max(0, Math.min(shape.cr + t, a)), half = Math.PI / n;
+  if (!(a > 1e-6)) return null;
+  var c = (a - r) / Math.cos(half), segs = [], corners = [];
+  for (var k = 0; k < n; k++) {
+    var th = shape.rot + 2 * Math.PI * k / n, cx = c * Math.cos(th), cy = c * Math.sin(th);
+    // From the side before it to the side after it, CCW.
+    corners.push({ cx: cx, cy: cy, a0: th - half, a1: th + half });
+  }
+  corners.forEach(function(k, i) {
+    var p = function(ang) { return { x: k.cx + r * Math.cos(ang), y: k.cy + r * Math.sin(ang) }; };
+    if (r > 1e-9) segs.push(arcSeg(k.cx, k.cy, r, k.a0, k.a1));
+    var q = corners[(i + 1) % n], e = p(k.a1), f = { x: q.cx + r * Math.cos(q.a0), y: q.cy + r * Math.sin(q.a0) };
+    var len = Math.hypot(f.x - e.x, f.y - e.y);
+    if (len > 1e-9) segs.push({ type: 'line', x0: e.x, y0: e.y, x1: f.x, y1: f.y, len: len });
+  });
+  return segs;
+}
+// A closed CCW loop round the middle, started where it crosses +X.
+function startAtPlusX(loop) {
+  var at = loopAt(loop, 0);
+  if (at === null || at < 1e-9) return loop;
+  var len = loopLength(loop);
+  return loopPart(loop, at, len).concat(loopPart(loop, 0, at));
+}
+// How far along a loop round the middle the ray from the middle at angle
+// ang crosses it; null when it doesn't.
+function loopAt(loop, ang) {
+  var at = 0, best = null, dx = Math.cos(ang), dy = Math.sin(ang);
+  for (var i = 0; i < loop.length && best === null; i++) {
+    var s = loop[i];
+    if (s.type === 'line') {
+      // Where (x, y) on the line is on the ray: cross product 0, dot > 0.
+      var c0 = s.x0 * dy - s.y0 * dx, c1 = s.x1 * dy - s.y1 * dx;
+      if ((c0 > 0) !== (c1 > 0) || Math.abs(c1) < 1e-12) {
+        var f = Math.abs(c0 - c1) < 1e-15 ? 0 : c0 / (c0 - c1), x = s.x0 + (s.x1 - s.x0) * f, y = s.y0 + (s.y1 - s.y0) * f;
+        if (x * dx + y * dy > 0 && f >= -1e-12 && f <= 1 + 1e-12) best = at + s.len * Math.max(0, Math.min(1, f));
+      }
+    } else {
+      for (var k = 0; k <= 64 && best === null; k++) {
+        var f0 = k / 64, f1 = (k + 1) / 64;
+        if (f1 > 1) break;
+        var p0 = segAt(s, f0), p1 = segAt(s, f1), d0 = p0.x * dy - p0.y * dx, d1 = p1.x * dy - p1.y * dx;
+        if ((d0 > 0) !== (d1 > 0) || Math.abs(d1) < 1e-12) {
+          // Narrowed down by halves.
+          for (var j = 0; j < 40; j++) { var fm = (f0 + f1) / 2, pm = segAt(s, fm), dm = pm.x * dy - pm.y * dx; if ((dm > 0) === (d0 > 0)) { f0 = fm; d0 = dm; } else f1 = fm; }
+          var pq = segAt(s, f1);
+          if (pq.x * dx + pq.y * dy > 0) best = at + s.len * f1;
+        }
+      }
+    }
+    at += s.len;
+  }
+  return best;
+}
+// The loop's extent: { minX, maxX, minY, maxY }.
+function loopExtent(loop) {
+  var e = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
+  var take = function(p) { e.minX = Math.min(e.minX, p.x); e.maxX = Math.max(e.maxX, p.x); e.minY = Math.min(e.minY, p.y); e.maxY = Math.max(e.maxY, p.y); };
+  loop.forEach(function(s) {
+    take(segAt(s, 0)); take(segAt(s, 1));
+    // An arc's extremes, where it passes the axes' directions.
+    if (s.type === 'arc') for (var q = Math.ceil(s.a0 / (Math.PI / 2) - 1e-9); q * Math.PI / 2 <= s.a1 + 1e-9; q++) {
+      var ang = q * Math.PI / 2;
+      take({ x: s.cx + s.r * Math.cos(ang), y: s.cy + s.r * Math.sin(ang) });
+    }
+  });
+  return e;
+}
 function arcSeg(cx, cy, r, a0, a1) { return { type: 'arc', cx: cx, cy: cy, r: r, a0: a0, a1: a1, len: r * (a1 - a0) }; }
 
 // How far in the outline can go before nothing's left.
-function shapeDeepest(shape) { return shape.kind === 'circle' ? shape.r : Math.min(shape.hx, shape.hy); }
+function shapeDeepest(shape) { return shape.kind === 'circle' ? shape.r : shape.kind === 'poly' ? shape.a : Math.min(shape.hx, shape.hy); }
 
 // The signed distance from (x, y) to the outline moved t: < 0 inside.
 function shapeDistance(shape, t, x, y) {
   if (shape.kind === 'circle') return Math.hypot(x, y) - (shape.r + t);
+  if (shape.kind === 'poly') {
+    // In the sector of the nearest side: its distance, or past its end, the corner's.
+    var pr = Math.max(0, Math.min(shape.cr + t, shape.a + t)), ap = shape.a + t - pr, half = Math.PI / shape.n, w = 2 * half;
+    var ph = Math.atan2(y, x) - (shape.rot + half);
+    ph = ph - w * Math.round(ph / w);
+    var rho = Math.hypot(x, y), lx = rho * Math.cos(ph), ly = Math.abs(rho * Math.sin(ph)), hh = Math.max(0, ap) * Math.tan(half);
+    var dx = lx - ap, dy = ly - hh;
+    return (dy > 0 ? Math.hypot(Math.max(dx, 0), dy) : dx) - pr;
+  }
   var r = Math.max(0, shape.cr + t), qx = Math.abs(x) - (shape.hx + t - r), qy = Math.abs(y) - (shape.hy + t - r);
   return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r;
 }
@@ -751,7 +836,7 @@ function loopPoint(loop, s) {
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { shapeLoop: shapeLoop, shapeDeepest: shapeDeepest, shapeDistance: shapeDistance,
-    loopLength: loopLength, loopPart: loopPart, loopPoint: loopPoint };
+    loopLength: loopLength, loopPart: loopPart, loopPoint: loopPoint, loopAt: loopAt, loopExtent: loopExtent };
 }
 /* END lib/box-shape.cjs */
 /* BEGIN lib/box-plan.cjs */
@@ -759,8 +844,9 @@ if (typeof module !== 'undefined' && module.exports) {
  * Carved Box: the plan of a two-part box, base and lid, carved side by
  * side out of one board. All lengths in mm.
  *
- * The box is round (Diameter) or a rectangle (Length along X, Width along
- * Y, Corner Radius). The base is the full thickness of the stock; the lid
+ * The box is round (Diameter), a rectangle (Length along X, Width along
+ * Y, Corner Radius) or a regular polygon (Sides, the size across the
+ * Flats, Corner Radius; a flat side to the front). The base is the full thickness of the stock; the lid
  * is too, unless a Lid Height under it is set, when the lid's area is
  * faced down first. Each half's inside is pocketed from the top face,
  * leaving the Wall all round and the Floor (base) or Top (lid)
@@ -798,7 +884,7 @@ if (typeof module !== 'undefined' && module.exports) {
 // none; finishDir: 'conventional' (the wood on the bit's left, as the
 // spindle turns clockwise) or 'climb' (on its right).
 var DEFAULTS = {
-  shape: 'circle', diameter: 80, length: 120, width: 80, cornerRadius: 10,
+  shape: 'circle', diameter: 80, length: 120, width: 80, cornerRadius: 10, sides: 6, flats: 80,
   stock: 19, lidHeight: null, wall: 6, floor: 4, top: 4,
   lipOn: 'base', lipHeight: 4, lipWidth: 3, clearance: 0.2,
   gap: 12, layout: 'x', origin: 'front-left', margin: 5,
@@ -810,10 +896,18 @@ function boxPlan(input) {
   var o = Object.assign({}, DEFAULTS, input || {});
   var problems = [], notes = [];
   var need = function(ok, msg) { if (!ok) problems.push(msg); };
-  var rect = o.shape === 'rect', rb = o.bit / 2, w = o.wall, T = o.stock;
+  var rect = o.shape === 'rect', poly = o.shape === 'poly', cornered = rect || poly, rb = o.bit / 2, w = o.wall, T = o.stock;
+  // A polygon with a flat side to the front (-Y; along Y, -X), so it's the
+  // same turned over across the line between the halves.
+  var n = Math.round(o.sides), polyRot = (o.layout === 'y' ? Math.PI : -Math.PI / 2) - Math.PI / n;
   var S = rect ? { kind: 'rect', hx: o.length / 2, hy: o.width / 2, cr: Math.max(0, Math.min(o.cornerRadius || 0, o.length / 2, o.width / 2)) }
+    : poly ? { kind: 'poly', n: n, a: o.flats / 2, cr: Math.max(0, Math.min(o.cornerRadius || 0, o.flats / 2)), rot: polyRot }
     : { kind: 'circle', r: o.diameter / 2 };
-  var halfX = rect ? S.hx : S.r, halfY = rect ? S.hy : S.r, deep = shapeDeepest(S);
+  var outlineAt0 = (rect ? o.length > 0 && o.width > 0 : poly ? o.flats > 0 && n >= 3 && n <= 12 : o.diameter > 0) ? shapeLoop(S, 0) : null;
+  // How far the outline reaches each way from the middle (an odd polygon's
+  // not the same up as down).
+  var ext = outlineAt0 ? loopExtent(outlineAt0) : { minX: -1, maxX: 1, minY: -1, maxY: 1 };
+  var halfX = (ext.maxX - ext.minX) / 2, halfY = (ext.maxY - ext.minY) / 2, deep = shapeDeepest(S);
   var lidH = o.lidHeight > 0 ? o.lidHeight : T, face = Math.max(0, T - lidH);
   var lipOnLid = o.lipOn === 'lid';
   // The outline moved in to the inside, the widened opening, the lip's outside.
@@ -822,8 +916,9 @@ function boxPlan(input) {
   var height = { base: T, lid: lidH }, under = { base: o.floor, lid: o.top };
   var lipHalf = lipOnLid ? 'lid' : 'base', rabbetHalf = lipOnLid ? 'base' : 'lid';
 
-  if (rect) {
-    need(o.length > 0 && o.width > 0, 'Length and Width must be more than 0');
+  if (rect) need(o.length > 0 && o.width > 0, 'Length and Width must be more than 0');
+  if (poly) need(o.flats > 0 && o.sides >= 3 && o.sides <= 12 && o.sides === Math.round(o.sides), 'A polygon needs 3 to 12 sides and a size across the flats');
+  if (cornered) {
     need((o.cornerRadius || 0) >= 0, 'Corner Radius can\'t be negative');
     // Under this, the bit leaves the opening's corners rounder than the
     // lip's, and the lip binds there.
@@ -879,7 +974,7 @@ function boxPlan(input) {
     // it: turned over between the halves, the lid's land on the base's.
     var mid = shapeLoop(S, tRabbet / 2), alongY = o.layout === 'y';
     if (mid) {
-      var L = loopLength(mid), front = alongY ? L / 2 : 0.75 * L;
+      var L = loopLength(mid), front = loopAt(mid, alongY ? Math.PI : -Math.PI / 2) || 0;
       for (var k = 0; k < o.magnets.count; k++) {
         var p = loopPoint(mid, (front + (k + 0.5) * L / o.magnets.count) % L);
         magnetAt.push({ dx: p.x, dy: p.y });
@@ -899,7 +994,7 @@ function boxPlan(input) {
     need(rn > rb + 0.1, 'Finger notch must be wider than the bit');
     need(rn <= rim - 0.8, 'Finger notch too wide for the wall outside the ' + (lipOnLid ? 'opening' : 'lip'));
     need(o.notch.depth > 0 && meet.base + o.notch.depth <= T - o.floor, 'Finger notch depth must be more than 0 and above the floor');
-    var front = o.layout === 'y' ? { x: -halfX, y: 0 } : { x: 0, y: -halfY };
+    var front = o.layout === 'y' ? { x: ext.minX, y: 0 } : { x: 0, y: ext.minY };
     magnetAt.forEach(function(m) {
       need(Math.hypot(m.dx - front.x, m.dy - front.y) >= rn + o.magnets.diameter / 2 + 1, 'The finger notch runs into a magnet hole: use fewer magnets or a narrower notch');
     });
@@ -931,7 +1026,7 @@ function boxPlan(input) {
     need(tip >= 0 && (!vbit || tip < ed.diameter), 'Edges: the tip diameter must be 0 or more, and less than the bit\'s');
     // An inside pocket's corners are at least the bit's radius: an edge
     // there follows them.
-    var shapeFor = function(t) { return rect ? { kind: 'rect', hx: S.hx, hy: S.hy, cr: Math.max(S.cr, rb - t) } : S; };
+    var shapeFor = function(t) { return cornered ? Object.assign({}, S, { cr: Math.max(S.cr, rb - t) }) : S; };
     var add = function(h, t, u, z0, d, what) {
       if (d > 0) edgeAt[h].push({ op: 'edge', shape: u < 0 ? shapeFor(t) : S, t: t + u * tip / 2, u: u, at: t, z0: z0, depth: d, width: width(d), what: what });
     };
@@ -997,7 +1092,7 @@ function boxPlan(input) {
       var depth = height[h] - under[h] - (h === rabbetHalf ? rabbetDepth : 0);
       need(rc <= depth - 0.5, 'Corners: the radius is too big for the ' + h + '\'s inside');
       var floorZ = (h === 'lid' ? -face : 0) - (height[h] - under[h]);
-      cornerAt[h].push({ op: 'corner', shape: rect ? { kind: 'rect', hx: S.hx, hy: S.hy, cr: Math.max(S.cr, rb - tInside) } : S,
+      cornerAt[h].push({ op: 'corner', shape: cornered ? Object.assign({}, S, { cr: Math.max(S.cr, rb - tInside) }) : S,
         t: tInside - cn.diameter / 2, z0: floorZ + rc, depth: rc, what: 'floor corners rounded' });
     });
   }
@@ -1009,7 +1104,7 @@ function boxPlan(input) {
   var lid = o.layout === 'y' ? { x: 0, y: 2 * halfY + o.gap } : { x: 2 * halfX + o.gap, y: 0 };
   var stockW = 2 * halfX + lid.x + 2 * m, stockH = 2 * halfY + lid.y + 2 * m;
   // Origin: the stock's front-left corner, or the middle of the pair.
-  var shift = o.origin === 'center' ? { x: -(lid.x / 2), y: -(lid.y / 2) } : { x: m + halfX, y: m + halfY };
+  var shift = o.origin === 'center' ? { x: -(lid.x + ext.minX + ext.maxX) / 2, y: -(lid.y + ext.minY + ext.maxY) / 2 } : { x: m - ext.minX, y: m - ext.minY };
   base = { x: base.x + shift.x, y: base.y + shift.y };
   lid = { x: lid.x + shift.x, y: lid.y + shift.y };
 
@@ -1039,11 +1134,11 @@ function boxPlan(input) {
       outline: { op: 'profile', t: 0, z0: -face, depth: lidH + o.through, tabs: o.tabs, what: 'outline' } }
   ];
   return {
-    o: o, problems: problems, notes: notes, shape: S, halfX: halfX, halfY: halfY,
+    o: o, problems: problems, notes: notes, shape: S, halfX: halfX, halfY: halfY, ext: ext,
     tInside: tInside, tRabbet: tRabbet, tLip: tLip, rabbetDepth: rabbetDepth, lidHeight: lidH, face: face,
     halves: halves, magnetAt: magnetAt, notch: notchCut, edges: edgeAt, corners: cornerAt,
     // The stock needed: its size and front-left corner.
-    stock: { w: stockW, h: stockH, x0: shift.x - m - halfX, y0: shift.y - m - halfY },
+    stock: { w: stockW, h: stockH, x0: shift.x + ext.minX - m, y0: shift.y + ext.minY - m },
     // Closed: both halves, less the lip's height where they overlap.
     closedHeight: T + lidH - o.lipHeight,
     insideHeight: (T - o.floor) + (lidH - o.top) - o.lipHeight
@@ -1058,7 +1153,7 @@ function testFitInput(input) {
   var half = o.wall + Math.max(10, 2 * o.bit), deep = o.lipHeight + o.clearance + 2;
   var cr = Math.min(o.cornerRadius || 0, half);
   return Object.assign({}, o, {
-    diameter: 2 * half, length: 2 * half, width: 2 * half, cornerRadius: cr,
+    diameter: 2 * half, length: 2 * half, width: 2 * half, flats: 2 * half, cornerRadius: cr,
     lidHeight: null, magnets: null, notch: null, edges: null, corners: null,
     floor: Math.max(1, o.stock - deep), top: Math.max(1, o.stock - deep)
   });
@@ -1078,7 +1173,7 @@ function testFitInput(input) {
 var CLEARANCE = { mdf: 0.15, softwood: 0.25, hardwood: 0.2, hdpe: 0.15, acrylic: 0.1, polycarbonate: 0.1, aluminum: 0.05, foam: 0.2 };
 function autoSizes(input, material, imperial) {
   var o = Object.assign({}, DEFAULTS, input || {});
-  var rect = o.shape === 'rect', small = rect ? Math.min(o.length, o.width) : o.diameter;
+  var rect = o.shape === 'rect', poly = o.shape === 'poly', small = rect ? Math.min(o.length, o.width) : poly ? o.flats : o.diameter;
   var T = o.stock, lidH = o.lidHeight > 0 ? o.lidHeight : T, b = o.bit;
   // To the grid: the nearest step, or (up) the next one.
   var grid = function(v) { return imperial ? (v < 1 ? 0.127 : 25.4 / 32) : (v < 1 ? 0.05 : 0.5); };
@@ -1093,7 +1188,7 @@ function autoSizes(input, material, imperial) {
   a.lipHeight = half(clamp(depth * 0.3, 2, 8));
   a.margin = half(5);
   a.gap = upHalf(Math.max(8, 2 * b + 2));
-  var round = rect ? 2 * (o.length + o.width) : Math.PI * o.diameter;
+  var round = rect ? 2 * (o.length + o.width) : poly ? o.sides * o.flats * Math.tan(Math.PI / o.sides) : Math.PI * o.diameter;
   if (o.tabs) a.tabs = { count: clamp(Math.round(round / 90), 3, 8), width: half(Math.max(5, 1.5 * b)), height: half(clamp(T * 0.08, 1, 3)) };
   if (o.magnets) a.magnets = Object.assign({}, o.magnets, { count: rect ? 4 : clamp(Math.round(round / 80), 3, 6) });
   if (o.notch) a.notch = { width: half(clamp(small * 0.18, 10, 20)), depth: half(clamp(a.lipHeight, 3, 6)) };
@@ -1105,7 +1200,7 @@ function autoSizes(input, material, imperial) {
   var smaller = function(d) { return d > 0.3 ? half(d * 0.7) : 0; };
   for (var k = 0; k < 80; k++) {
     a.lipWidth = half(clamp(a.wall * 0.4, 1.5, 3.5));
-    if (rect) a.cornerRadius = Math.max(o.cornerRadius || 0, upHalf(a.wall - a.lipWidth - a.clearance + b / 2));
+    if (rect || poly) a.cornerRadius = Math.max(o.cornerRadius || 0, upHalf(a.wall - a.lipWidth - a.clearance + b / 2));
     plan = boxPlan(Object.assign({}, o, a));
     if (!plan.problems.length) break;
     var p = plan.problems[0], ed = a.edges;
@@ -1132,6 +1227,7 @@ function autoSizes(input, material, imperial) {
 if (typeof module !== 'undefined' && module.exports) {
   var shapeLib = require('./box-shape.cjs');
   var shapeLoop = shapeLib.shapeLoop, shapeDeepest = shapeLib.shapeDeepest, loopLength = shapeLib.loopLength, loopPoint = shapeLib.loopPoint;
+  var loopAt = shapeLib.loopAt, loopExtent = shapeLib.loopExtent;
   module.exports = { boxPlan: boxPlan, testFitInput: testFitInput, autoSizes: autoSizes, BOX_DEFAULTS: DEFAULTS };
 }
 /* END lib/box-plan.cjs */
@@ -1339,7 +1435,9 @@ function boxProgram(plan, f, only) {
   // The header: what it is, how it's set up.
   var unit = 'mm';
   comment((f.label || 'Carved Box') + ': a base and a lid, ' + (plan.shape.kind === 'rect'
-    ? o.length + ' x ' + o.width + unit + ', corners ' + +n3(plan.shape.cr) + unit : o.diameter + unit + ' across'));
+    ? mm3(o.length) + ' x ' + mm3(o.width) + unit + ', corners ' + mm3(plan.shape.cr) + unit
+    : plan.shape.kind === 'poly' ? plan.shape.n + ' sides, ' + mm3(o.flats) + unit + ' across, corners ' + mm3(plan.shape.cr) + unit
+    : mm3(o.diameter) + unit + ' across'));
   comment('Stock ' + mm3(o.stock) + unit + ' thick, at least ' + n3(plan.stock.w) + ' x ' + n3(plan.stock.h) + unit);
   comment('Wall ' + mm3(o.wall) + ', floor ' + mm3(o.floor) + ', top ' + mm3(o.top) + unit);
   comment('Lip on the ' + o.lipOn + ': ' + mm3(o.lipHeight) + ' high, ' + mm3(o.lipWidth) + ' wide, ' + mm3(o.clearance) + unit + ' clearance');
@@ -1455,7 +1553,7 @@ if (typeof module !== 'undefined' && module.exports) {
   // Every setting, in mm (and mm/min): [field, key, kind, default, optional].
   var FIELDS = [
     ['cb-diameter', 'diameter', 'length', 80], ['cb-length', 'length', 'length', 120], ['cb-width', 'width', 'length', 80],
-    ['cb-corner', 'cornerRadius', 'length', 10], ['cb-stock', 'stock', 'length', 19], ['cb-wall', 'wall', 'length', 6],
+    ['cb-corner', 'cornerRadius', 'length', 10], ['cb-sides', 'sides', 'count', 6], ['cb-flats', 'flats', 'length', 80], ['cb-stock', 'stock', 'length', 19], ['cb-wall', 'wall', 'length', 6],
     ['cb-floor', 'floor', 'length', 4], ['cb-top-t', 'top', 'length', 4], ['cb-lid-h', 'lidHeight', 'length', null, true],
     ['cb-lip-h', 'lipHeight', 'length', 4], ['cb-lip-w', 'lipWidth', 'length', 3], ['cb-clear', 'clearance', 'length', 0.2],
     ['cb-gap', 'gap', 'length', 12], ['cb-margin', 'margin', 'length', 5],
@@ -1496,7 +1594,7 @@ if (typeof module !== 'undefined' && module.exports) {
       if (mm == null) return;
       show(x[0], mm, kind);
     });
-    if (v.shape === 'rect' && a.cornerRadius != null && Math.abs(a.cornerRadius - v.cornerRadius) > 1e-6) show('cb-corner', a.cornerRadius, 'length');
+    if (v.shape !== 'circle' && a.cornerRadius != null && Math.abs(a.cornerRadius - v.cornerRadius) > 1e-6) show('cb-corner', a.cornerRadius, 'length');
   }
   // Fields under a switch, and the switch.
   var GROUPS = [['cb-tab-fields', 'cb-tabs-on'], ['cb-mag-fields', 'cb-mag-on'], ['cb-notch-fields', 'cb-notch-on'], ['cb-finish-fields', 'cb-finish-on'], ['cb-corner-fields', 'cb-corners-on'], ['cb-edge-fields', 'cb-edges-on']];
@@ -1528,7 +1626,8 @@ if (typeof module !== 'undefined' && module.exports) {
     // Fields not in use (the other shape's, the other edge bit's, under a
     // switch that's off) don't stop the program.
     var seg = function (id) { var on = ROOT.querySelector('#' + id + ' button.on'); return on ? on.dataset.v : null; };
-    var unused = (seg('cb-shape') === 'rect' ? ['cb-diameter'] : ['cb-length', 'cb-width', 'cb-corner'])
+    var shp = seg('cb-shape');
+    var unused = (shp === 'rect' ? ['cb-diameter', 'cb-sides', 'cb-flats'] : shp === 'poly' ? ['cb-diameter', 'cb-length', 'cb-width'] : ['cb-length', 'cb-width', 'cb-corner', 'cb-sides', 'cb-flats'])
       .concat(seg('cb-ebit') === 'round' ? ['cb-eangle', 'cb-ediam', 'cb-evtip'] : ['cb-erad', 'cb-etip']);
     var off = function (id) {
       return unused.indexOf(id) >= 0 || GROUPS.some(function (g) { return !$(g[1]).checked && $(g[0]).contains($(id)); });
@@ -1552,7 +1651,7 @@ if (typeof module !== 'undefined' && module.exports) {
   }
   function planOf(v) {
     return boxPlan({
-      shape: v.shape, diameter: v.diameter, length: v.length, width: v.width, cornerRadius: v.cornerRadius, stock: v.stock, lidHeight: v.lidHeight, wall: v.wall, floor: v.floor, top: v.top,
+      shape: v.shape, diameter: v.diameter, length: v.length, width: v.width, sides: v.sides, flats: v.flats, cornerRadius: v.cornerRadius, stock: v.stock, lidHeight: v.lidHeight, wall: v.wall, floor: v.floor, top: v.top,
       magnets: v.magOn ? { count: Math.round(v.magCount), diameter: v.magDiameter, depth: v.magDepth } : null,
       notch: v.notchOn ? { width: v.notchWidth, depth: v.notchDepth } : null,
       lipOn: v.lipOn, lipHeight: v.lipHeight, lipWidth: v.lipWidth, clearance: v.clearance,
@@ -1633,7 +1732,7 @@ if (typeof module !== 'undefined' && module.exports) {
   // The closed box cut through its middle: the base, the lid turned over on
   // it, the lip in its rabbet (the clearance shown at least 0.4 mm wide).
   function sideView(plan) {
-    var o = plan.o, T = o.stock, LH = plan.lidHeight, R = plan.halfX, Ri = R + plan.tInside, c = Math.max(o.clearance, 0.4);
+    var o = plan.o, T = o.stock, LH = plan.lidHeight, R = loopPoint(shapeLoop(plan.shape, 0), 0).x, Ri = R + plan.tInside, c = Math.max(o.clearance, 0.4);
     var lipBase = o.lipOn !== 'lid', s = 90 / (2 * R), pad = 5;
     var hTot = T + LH - o.lipHeight, X = function (x) { return pad + (x + R) * s; }, Y = function (y) { return pad + (hTot - y) * s; };
     // One wall's section, x from inner to outer (a side: +1 right, -1 left).
@@ -1691,7 +1790,7 @@ if (typeof module !== 'undefined' && module.exports) {
     out += '<line class="cb-dim-line" x1="' + xr + '" y1="' + Y(0) + '" x2="' + xr + '" y2="' + Y(hTot) + '"/>' +
       '<text class="cb-dim" x="' + (xr + 1) + '" y="' + ((Y(0) + Y(hTot)) / 2) + '" transform="rotate(-90 ' + (xr + 1) + ' ' + ((Y(0) + Y(hTot)) / 2) + ')" dy="-1">' + fmt(plan.closedHeight) + ' ' + unit() + ' closed</text>';
     out += '<text class="cb-dim" x="' + X(0) + '" y="' + ((Y(o.floor) + Y(hTot - o.top)) / 2 + 2) + '">' + fmt(plan.insideHeight) + ' ' + unit() + ' inside</text>';
-    out += '<text class="cb-dim" x="' + X(0) + '" y="' + (Y(0) + 4.5) + '">' + (plan.shape.kind === 'rect' ? fmt(o.length) + ' × ' + fmt(o.width) : 'Ø ' + fmt(o.diameter)) + ' ' + unit() + ' · lip on the ' + o.lipOn + '</text>';
+    out += '<text class="cb-dim" x="' + X(0) + '" y="' + (Y(0) + 4.5) + '">' + (plan.shape.kind === 'rect' ? fmt(o.length) + ' × ' + fmt(o.width) : plan.shape.kind === 'poly' ? plan.shape.n + ' sides, ' + fmt(o.flats) : 'Ø ' + fmt(o.diameter)) + ' ' + unit() + ' · lip on the ' + o.lipOn + '</text>';
     $('cb-side').setAttribute('viewBox', '0 0 ' + (90 + 2 * pad + 8) + ' ' + (hTot * s + 2 * pad + 6).toFixed(2));
     $('cb-side').innerHTML = out;
   }
@@ -1979,7 +2078,9 @@ if (typeof module !== 'undefined' && module.exports) {
     GROUPS.forEach(function (g) {
       ROOT.querySelectorAll('#' + g[0] + ' .cb-input, #' + g[0] + ' .cb-select, #' + g[0] + ' .cb-seg button').forEach(function (el) { el.disabled = !$(g[1]).checked; });
     });
-    $('cb-size-round').hidden = v.shape === 'rect'; $('cb-size-rect').hidden = v.shape !== 'rect';
+    $('cb-size-round').hidden = v.shape !== 'circle'; $('cb-size-rect').hidden = v.shape === 'circle';
+    ['cb-length', 'cb-width'].forEach(function (id) { $(id).closest('.cb-field').hidden = v.shape !== 'rect'; });
+    ['cb-sides', 'cb-flats'].forEach(function (id) { $(id).closest('.cb-field').hidden = v.shape !== 'poly'; });
     showPickers();
     if (save) { clearTimeout(saveTimer); saveTimer = setTimeout(persist, 400); }
   }
@@ -2005,7 +2106,7 @@ if (typeof module !== 'undefined' && module.exports) {
         : corners ? boxProgram(plan, Object.assign(feedsOf(v), { corners: cornerFeeds(v), label: 'Carved Box corners' }), 'corners')
         : boxProgram(plan, Object.assign(feedsOf(v), { label: test ? 'Test fit' : 'Carved Box' }));
     } catch (e) { alert('Carved Box: ' + e.message + '.'); return; }
-    var name = 'CarvedBox-' + (test ? 'TestFit-' : edges ? 'Edges-' : corners ? 'Corners-' : '') + (test ? '' : v.shape === 'rect' ? round(v.length / K(), 2) + 'x' + round(v.width / K(), 2) + '-' : 'D' + round(v.diameter / K(), 2) + '-') + 'T' + round(v.stock / K(), 2) + '-' + unit() + '.nc';
+    var name = 'CarvedBox-' + (test ? 'TestFit-' : edges ? 'Edges-' : corners ? 'Corners-' : '') + (test ? '' : v.shape === 'rect' ? round(v.length / K(), 2) + 'x' + round(v.width / K(), 2) + '-' : v.shape === 'poly' ? v.sides + 'gon' + round(v.flats / K(), 2) + '-' : 'D' + round(v.diameter / K(), 2) + '-') + 'T' + round(v.stock / K(), 2) + '-' + unit() + '.nc';
     btn.disabled = true; btn.textContent = 'Generating\u2026';
     try {
       var r = await fetch(BASE_URL + '/api/gcode-files/load-temp', { method: 'POST', headers: { 'Content-Type': 'application/json' },
