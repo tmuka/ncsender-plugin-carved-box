@@ -2448,9 +2448,12 @@ if (typeof module !== 'undefined' && module.exports) {
     var R0 = loopPoint(shapeLoop(P0.shape, 0), 0).x, s = 90 / (2 * R0), pad = 5, hTot = P0.closedHeight;
     var X = function (x) { return pad + (x + R0) * s; }, Y = function (y) { return pad + (hTot - y - lift) * s; };
     var out = '';
+    // Each nested box drawn a little up off the floor below it (at least
+    // 1.5 px), so it doesn't run into it.
+    var w = el.getBoundingClientRect().width, px = w > 0 ? (90 + 2 * pad + 8) / w / s : 0.3;
     boxes.forEach(function (plan) {
       out += boxSection(plan);
-      lift += plan.o.floor;
+      lift += plan.o.floor + Math.max(1.5 * px, 0.3);
     });
     lift = 0;
     var plan = P0, o = P0.o, R = R0;
