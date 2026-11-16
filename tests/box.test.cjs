@@ -378,23 +378,26 @@ test('the margin is from the stock\'s edges to the outsides of the cuts', () => 
   }
 });
 
-test('the finishing pass: roughing leaves the allowance, a climbing lap cleans each wall', () => {
-  for (const lipOn of ['base', 'lid']) for (const shape of [{}, { shape: 'rect', length: 120, width: 80, cornerRadius: 10 }]) for (const extra of [{}, { corners: { diameter: 6.35, radius: 3.175 } }, { lidHeight: 14 }]) {
+test('the finishing pass: roughing leaves the allowance, a lap cleans each wall, conventional or climb', () => {
+  for (const lipOn of ['base', 'lid']) for (const shape of [{}, { shape: 'rect', length: 120, width: 80, cornerRadius: 10 }]) for (const extra of [{}, { corners: { diameter: 6.35, radius: 3.175 } }, { lidHeight: 14, finishDir: 'climb' }, { finishDir: 'climb' }]) {
     const input = Object.assign({ lipOn, finish: 0.3 }, shape, extra);
+    // Spindle clockwise: conventional has the wood on the bit's left
+    // (clockwise, G2, round a pocket's wall; G3 round the lip's), climb on its right.
+    const climb = input.finishDir === 'climb', pocketG = climb ? 3 : 2, lipG = climb ? 2 : 3;
     const { plan, pts } = check(input);
     const rb = plan.o.bit / 2, fin = 0.3, eps = 0.005;
     for (const h of plan.halves) {
       const withLip = (lipOn === 'lid') === (h.name === 'lid'), top = h.name === 'lid' ? -plan.face : 0;
       const near = pts.filter((p) => p.z < top - 1e-6 && Math.hypot(p.x - h.at.x, p.y - h.at.y) < Math.max(plan.halfX, plan.halfY) * 1.5);
       const at = (p, t) => shapeDistance(plan.shape, t, p.x - h.at.x, p.y - h.at.y);
-      const walls = [[plan.tInside - rb, (p) => withLip || top - p.z > plan.rabbetDepth + eps, 2]];
-      if (!withLip) walls.push([plan.tRabbet - rb, (p) => top - p.z <= plan.rabbetDepth + eps, 2]);
-      else walls.push([plan.tLip + rb, (p) => top - p.z <= plan.o.lipHeight + eps, 3]);
-      for (const [t, here, finishG] of walls) {
-        const inward = finishG === 2;
+      const walls = [[plan.tInside - rb, (p) => withLip || top - p.z > plan.rabbetDepth + eps, pocketG, true]];
+      if (!withLip) walls.push([plan.tRabbet - rb, (p) => top - p.z <= plan.rabbetDepth + eps, pocketG, true]);
+      else walls.push([plan.tLip + rb, (p) => top - p.z <= plan.o.lipHeight + eps, lipG, false]);
+      for (const [t, here, finishG, inward] of walls) {
         // Between the allowance and the wall: only the finishing laps (and their lead-ins).
         const between = near.filter((p) => here(p) && (inward ? at(p, t) > -fin + eps && at(p, t) < eps : at(p, t) < fin - eps && at(p, t) > -eps));
-        assert.ok(between.every((p) => p.g === finishG || p.g === 1), h.name + ' roughed into the allowance at ' + t.toFixed(2) + ': ' + JSON.stringify(between.find((p) => p.g !== finishG && p.g !== 1)));
+        // Roughing (G3) only outside the allowance; with a G3 finish, only on the wall itself.
+        assert.ok(between.every((p) => p.g === finishG || p.g === 1 || Math.abs(at(p, t)) < eps), h.name + ' roughed into the allowance at ' + t.toFixed(2) + ': ' + JSON.stringify(between.find((p) => p.g !== finishG && p.g !== 1)));
         assert.ok(between.some((p) => p.g === finishG && Math.abs(at(p, t)) < eps), h.name + ' wall at ' + t.toFixed(2) + ' not finished (G' + finishG + ')');
       }
     }
@@ -418,5 +421,32 @@ test('every move sideways is at the machine\'s safe height, after a tool change 
     const m6 = lines.findIndex((l) => /^M6/.test(l));
     if (m6 >= 0) { assert.match(lines[m6 + 1], /G21 G90/); assert.match(lines[m6 + 2], /^G53 G0 Z/); }
     simulate(g).forEach((p) => assert.ok(!(p.sideways && p.z < SAFE), 'sideways move under safe height'));
+  }
+});
+
+test('a V-bit\'s flat tip counts in how far it reaches: the stock and the other half stay clear', () => {
+  for (const [tip, angle] of [[3, 90], [8, 60], [0.3, 90]]) {
+    const edges = { bit: 'v', angle, diameter: 12.7, vtip: tip, outside: 1, inside: 0, pocket: 0 };
+    // A lowered lid with the lip on it: its seam far below the top, the
+    // waste round it cleared; no margin; the Gap at the least it takes.
+    let input = { lipOn: 'lid', lidHeight: 14, wall: 12, lipWidth: 3, margin: 0, edges }, gap = 12;
+    while (boxPlan({ ...input, gap }).problems.some((p) => /Gap/.test(p))) gap += 0.25;
+    input = { ...input, gap };
+    const plan = boxPlan(input);
+    assert.deepEqual(plan.problems, [], JSON.stringify(input));
+    const g = boxProgram(plan, Object.assign({}, FEEDS, { edges: { toolNumber: 3, feed: 1000, plunge: 300, rpm: 16000, doc: 2 } })).gcode;
+    const tan = Math.tan(angle * Math.PI / 360), st = plan.stock;
+    // Each edge pass: the bit at its widest up to the stock top (its flat
+    // tip, the cone, no wider than the bit) inside the stock and off the
+    // other half's outline cut.
+    for (const p of simulate(g.slice(g.indexOf('M6 T3'))).filter((q) => q.z < 0)) {
+      const own = plan.halves.reduce((m, n) => Math.hypot(p.x - m.at.x, p.y - m.at.y) <= Math.hypot(p.x - n.at.x, p.y - n.at.y) ? m : n);
+      const other = plan.halves.find((h) => h !== own);
+      const e = plan.edges[own.name].find((x) => Math.abs(shapeDistance(x.shape, x.t, p.x - own.at.x, p.y - own.at.y)) < 0.01);
+      if (!e) continue;
+      const r = Math.min(tip / 2 + (0 - p.z) * tan, 12.7 / 2);
+      assert.ok(p.x - r >= st.x0 - 0.01 && p.x + r <= st.x0 + st.w + 0.01 && p.y - r >= st.y0 - 0.01 && p.y + r <= st.y0 + st.h + 0.01, 'edge bit past the stock (tip ' + tip + ')');
+      assert.ok(shapeDistance(plan.shape, plan.o.bit, p.x - other.at.x, p.y - other.at.y) >= r - 0.01, own.name + '\'s edge bit into the ' + other.name + ' (tip ' + tip + ')');
+    }
   }
 });
