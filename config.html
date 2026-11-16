@@ -950,6 +950,7 @@ function boxProgram(plan, f, only) {
   var doc = Math.max(0.05, f.doc);
   var L = [], minutes = 0, x = 0, y = 0, z = clear;
   var n3 = function(v) { var s = v.toFixed(3); return s === '-0.000' ? '0.000' : s; };
+  var mm3 = function(v) { return +(+v).toFixed(3); };
   var comment = function(s) { L.push('(' + s.replace(/[()!?~]/g, '').slice(0, 77) + ')'); };
 
   function rapid(px, py) { L.push('G0 X' + n3(px) + ' Y' + n3(py)); x = px; y = py; }
@@ -1093,19 +1094,19 @@ function boxProgram(plan, f, only) {
   var unit = 'mm';
   comment((f.label || 'Carved Box') + ': a base and a lid, ' + (plan.shape.kind === 'rect'
     ? o.length + ' x ' + o.width + unit + ', corners ' + +n3(plan.shape.cr) + unit : o.diameter + unit + ' across'));
-  comment('Stock ' + o.stock + unit + ' thick, at least ' + n3(plan.stock.w) + ' x ' + n3(plan.stock.h) + unit);
-  comment('Wall ' + o.wall + ', floor ' + o.floor + ', top ' + o.top + unit);
-  comment('Lip on the ' + o.lipOn + ': ' + o.lipHeight + ' high, ' + o.lipWidth + ' wide, ' + o.clearance + unit + ' clearance');
+  comment('Stock ' + mm3(o.stock) + unit + ' thick, at least ' + n3(plan.stock.w) + ' x ' + n3(plan.stock.h) + unit);
+  comment('Wall ' + mm3(o.wall) + ', floor ' + mm3(o.floor) + ', top ' + mm3(o.top) + unit);
+  comment('Lip on the ' + o.lipOn + ': ' + mm3(o.lipHeight) + ' high, ' + mm3(o.lipWidth) + ' wide, ' + mm3(o.clearance) + unit + ' clearance');
   if (plan.face > 0) comment('Lid ' + n3(plan.lidHeight) + unit + ' high: its area faced down ' + n3(plan.face) + unit + ' first');
-  if (plan.magnetAt.length) comment('Magnets: ' + plan.magnetAt.length + ' holes ' + o.magnets.diameter + unit + ' wide, ' + o.magnets.depth + unit + ' deep, both halves');
-  if (plan.notch) comment('Finger notch in the base, ' + o.notch.width + unit + ' wide, ' + o.notch.depth + unit + ' deep');
+  if (plan.magnetAt.length) comment('Magnets: ' + plan.magnetAt.length + ' holes ' + mm3(o.magnets.diameter) + unit + ' wide, ' + mm3(o.magnets.depth) + unit + ' deep, both halves');
+  if (plan.notch) comment('Finger notch in the base, ' + mm3(o.notch.width) + unit + ' wide, ' + mm3(o.notch.depth) + unit + ' deep');
   comment('Closed ' + n3(plan.closedHeight) + unit + ' high, ' + n3(plan.insideHeight) + unit + ' inside');
   comment('Origin: ' + (o.origin === 'center' ? 'the middle of the pair' : 'the stock\'s front-left corner') + '; Z0: top of the stock');
-  if (only !== 'edges') comment('Bit ' + o.bit + unit + ', feed ' + Math.round(f.feed) + ', plunge ' + Math.round(f.plunge) + unit + '/min, ' + n3(doc) + unit + ' a pass');
-  if (o.tabs) comment('Tabs: ' + o.tabs.count + ' x ' + o.tabs.width + unit + ' wide, ' + o.tabs.height + unit + ' high');
+  if (only !== 'edges') comment('Bit ' + mm3(o.bit) + unit + ', feed ' + Math.round(f.feed) + ', plunge ' + Math.round(f.plunge) + unit + '/min, ' + n3(doc) + unit + ' a pass');
+  if (o.tabs) comment('Tabs: ' + o.tabs.count + ' x ' + mm3(o.tabs.width) + unit + ' wide, ' + mm3(o.tabs.height) + unit + ' high');
   if (o.edges && plan.edges.base.length + plan.edges.lid.length) {
     var ed = o.edges, eb = ed.bit === 'round' ? 'a ' + ed.radius + unit + ' roundover bit' : 'a ' + ed.angle + ' degree V-bit';
-    comment('Edges: outside seam ' + (ed.outside || 0) + unit + ', inside rim ' + (ed.inside || 0) + unit + ' down');
+    comment('Edges: outside seam ' + mm3((ed.outside || 0)) + unit + ', inside rim ' + mm3((ed.inside || 0)) + unit + ' down');
     if (only === 'edges') comment('Just the edges, after the box: ' + eb + ', Z0 on the stock top');
     else if (f.edges) comment('Edges cut last, with ' + eb + ' (T' + f.edges.toolNumber + ')');
     else comment('Edges not in this program: cut them after it with Edges Only');
@@ -1216,7 +1217,7 @@ if (typeof module !== 'undefined' && module.exports) {
     var text = String($(id).value || '').trim();
     if (!text) return null;
     if (kind === 'count') { var n = Number(text); return isFinite(n) ? n : NaN; }
-    var v = NcUnitInput.parseUnitValue(text, state.imperial, kind === 'feed' ? 'feed' : 'length');
+    var v = NcUnitInput.textToMm(text, state.imperial, kind === 'feed' ? 'feed' : 'length');
     return v === null ? NaN : v;
   }
   function show(id, mm, kind) { $(id).value = mm == null ? '' : kind === 'count' ? String(mm) : String(round(mm / K(), kind === 'feed' ? 1 : null)); }
@@ -1516,7 +1517,9 @@ if (typeof module !== 'undefined' && module.exports) {
   function restore() {
     var saved = (initialConfig && initialConfig.v) || {};
     state.v = saved;
-    FIELDS.forEach(function (f) { var x = saved[f[1]]; show(f[0], typeof x === 'number' && isFinite(x) ? x : f[3], f[2]); });
+    // A default length on an inch machine: a round inch size (6 mm: 1/4).
+    var byDefault = function (f) { return state.imperial && f[2] === 'length' && f[3] > 0 ? NcUnitInput.roundInches(f[3] / 25.4) * 25.4 : f[3]; };
+    FIELDS.forEach(function (f) { var x = saved[f[1]]; show(f[0], typeof x === 'number' && isFinite(x) ? x : byDefault(f), f[2]); });
     SEGS.forEach(function (s) {
       var want = saved[s[1]] || s[2];
       ROOT.querySelectorAll('#' + s[0] + ' button').forEach(function (b) { var on = b.dataset.v === want; b.classList.toggle('on', on); b.setAttribute('aria-checked', String(on)); });
@@ -1530,6 +1533,10 @@ if (typeof module !== 'undefined' && module.exports) {
     state.feedsAuto = saved.feedsAuto !== false;
   }
   function wire() {
+    // Lengths and feeds in any unit (1/4", 6.35mm, 60ipm, 12mm + 1/8in):
+    // shown in the shop's units on Enter or leaving the field; Up / Down
+    // step them.
+    NcUnitInput.wireUnitFields(ROOT, { imperial: function () { return state.imperial; } });
     SEGS.forEach(function (s) {
       ROOT.querySelectorAll('#' + s[0] + ' button').forEach(function (b) {
         b.addEventListener('click', function () {
