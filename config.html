@@ -227,6 +227,23 @@
     </div>
 
     <div class="cb-card">
+      <h3><span class="cb-grow">Floor Corners</span><label class="cb-switch"><input type="checkbox" id="cb-corners-on" aria-label="Floor corners"><span></span></label></h3>
+      <div class="cb-edge-fields" id="cb-corner-fields">
+        <div class="cb-row cb-row-2">
+          <div class="cb-field"><label for="cb-ctool">Corner Bit</label><select class="cb-select" id="cb-ctool" title="A ball or bowl bit from ncSender's Tool Library, so the program can change to it; or type its size."><option value="">Type its size</option></select></div>
+          <div class="cb-field"><label for="cb-cdiam">Bit Diameter</label><input class="cb-input" id="cb-cdiam" data-unit="length" title="Across the bit."></div>
+        </div>
+        <div class="cb-row">
+          <div class="cb-field"><label for="cb-crad">Corner Radius</label><input class="cb-input" id="cb-crad" data-unit="length" title="The round on the bit's end, and so in the floor's corners: half the diameter for a ball bit, less for a bowl bit."></div>
+          <div class="cb-field"><label for="cb-cfeed">Corner Feed</label><input class="cb-input" id="cb-cfeed" data-unit="feed"></div>
+          <div class="cb-field"><label for="cb-crpm">Corner RPM</label><input class="cb-input" id="cb-crpm"></div>
+        </div>
+      </div>
+      <p class="cb-hint" id="cb-corner-note"></p>
+      <div><button type="button" class="cb-btn cb-btn-quiet" id="cb-corners-only" title="Just the floor corners, as their own program: run it after the box, with the corner bit in and Z zeroed on the stock top (X Y as for the box).">Corners Only</button></div>
+    </div>
+
+    <div class="cb-card">
       <h3><span class="cb-grow">Edges</span><label class="cb-switch"><input type="checkbox" id="cb-edges-on" aria-label="Edges"><span></span></label></h3>
       <div class="cb-edge-fields" id="cb-edge-fields">
         <div class="cb-row cb-row-2">
@@ -758,14 +775,16 @@ if (typeof module !== 'undefined' && module.exports) {
 // tip: the diameter of its flat end), outside (the seam), inside (the
 // lead-in: the lip's outer edge, the opening's), pocket (each pocket's
 // top edge: the lip's inner edge, the step's in the other half): how far
-// down each edge is cut, 0 for none }.
+// down each edge is cut, 0 for none }. corners: { diameter, radius }: a
+// ball (radius half the diameter) or bowl bit rounding each pocket's
+// floor corners.
 var DEFAULTS = {
   shape: 'circle', diameter: 80, length: 120, width: 80, cornerRadius: 10,
   stock: 19, lidHeight: null, wall: 6, floor: 4, top: 4,
   lipOn: 'base', lipHeight: 4, lipWidth: 3, clearance: 0.2,
   gap: 12, layout: 'x', origin: 'front-left', margin: 5,
   bit: 3.175, through: 0.5, tabs: { count: 4, width: 6, height: 1.5 },
-  magnets: null, notch: null, edges: null
+  magnets: null, notch: null, edges: null, corners: null
 };
 
 function boxPlan(input) {
@@ -940,6 +959,25 @@ function boxPlan(input) {
     need(Math.max(reachOut.base, reachOut.lid) + 1 <= o.gap - o.bit, 'The outside seam\'s bit reaches too far for the Gap: make the Gap wider');
   }
 
+  // Rounded floor corners: the box's bit stops the corner's radius short
+  // of the wall for that last bit of each pocket; a ball or bowl bit then
+  // goes round the wall down to the floor, its side on the wall, its
+  // rounded end leaving the cove.
+  var cornerAt = { base: [], lid: [] }, cn = o.corners, rc = 0;
+  if (cn && (cn.radius > 0 || cn.diameter > 0)) {
+    rc = cn.radius;
+    need(cn.diameter > 0 && rc > 0 && 2 * rc <= cn.diameter + 1e-9, 'Corners: give the bit\'s diameter, and its corner radius (half the diameter for a ball bit)');
+    need(deep + tInside > cn.diameter / 2 + 0.5, 'Corners: the inside is too small for the corner bit');
+    need(deep + tInside - rc > rb + 0.1, 'Corners: the inside is too small for the box\'s bit to clear the floor inside the rounded corners');
+    ['base', 'lid'].forEach(function(h) {
+      var depth = height[h] - under[h] - (h === rabbetHalf ? rabbetDepth : 0);
+      need(rc <= depth - 0.5, 'Corners: the radius is too big for the ' + h + '\'s inside');
+      var floorZ = (h === 'lid' ? -face : 0) - (height[h] - under[h]);
+      cornerAt[h].push({ op: 'corner', shape: rect ? { kind: 'rect', hx: S.hx, hy: S.hy, cr: Math.max(S.cr, rb - tInside) } : S,
+        t: tInside - cn.diameter / 2, z0: floorZ + rc, depth: rc, what: 'floor corners rounded' });
+    });
+  }
+
   // Where the halves go: side by side along X (base first) or Y (base in front).
   var m = o.margin + rb, base = { x: 0, y: 0 };
   var lid = o.layout === 'y' ? { x: 0, y: 2 * halfY + o.gap } : { x: 2 * halfX + o.gap, y: 0 };
@@ -954,7 +992,11 @@ function boxPlan(input) {
     var waste = Math.max(2 * rb, reachOut[name] + 1);
     if (name === 'lid' && face > 1e-9) cuts.push({ op: 'pocket', t: waste, dx: 0, dy: 0, z0: 0, depth: face, what: 'faced down to the lid height' });
     if (name === rabbetHalf) cuts.push({ op: 'pocket', t: tRabbet, dx: 0, dy: 0, z0: z0, depth: rabbetDepth, what: 'opening widened for the lip' });
-    cuts.push({ op: 'pocket', t: tInside, dx: 0, dy: 0, z0: z0, depth: height[name] - under[name], what: 'inside' });
+    var inDepth = height[name] - under[name];
+    if (rc > 0) {
+      cuts.push({ op: 'pocket', t: tInside, dx: 0, dy: 0, z0: z0, depth: inDepth - rc, what: 'inside' });
+      cuts.push({ op: 'pocket', t: tInside - rc, dx: 0, dy: 0, z0: z0 - (inDepth - rc), depth: rc, what: 'inside, its floor short of the corners' });
+    } else cuts.push({ op: 'pocket', t: tInside, dx: 0, dy: 0, z0: z0, depth: inDepth, what: 'inside' });
     // The shoulder: the wall top outside the lip, down by the Lip Height,
     // out past the outline into the waste.
     if (name === lipHalf) cuts.push({ op: 'ring', tIn: tLip, tOut: waste, dx: 0, dy: 0, z0: z0, depth: o.lipHeight, what: 'shoulder round the lip' });
@@ -973,7 +1015,7 @@ function boxPlan(input) {
   return {
     o: o, problems: problems, notes: notes, shape: S, halfX: halfX, halfY: halfY,
     tInside: tInside, tRabbet: tRabbet, tLip: tLip, rabbetDepth: rabbetDepth, lidHeight: lidH, face: face,
-    halves: halves, magnetAt: magnetAt, notch: notchCut, edges: edgeAt,
+    halves: halves, magnetAt: magnetAt, notch: notchCut, edges: edgeAt, corners: cornerAt,
     // The stock needed: its size and front-left corner.
     stock: { w: stockW, h: stockH, x0: shift.x - m - halfX, y0: shift.y - m - halfY },
     // Closed: both halves, less the lip's height where they overlap.
@@ -991,7 +1033,7 @@ function testFitInput(input) {
   var cr = Math.min(o.cornerRadius || 0, half);
   return Object.assign({}, o, {
     diameter: 2 * half, length: 2 * half, width: 2 * half, cornerRadius: cr,
-    lidHeight: null, magnets: null, notch: null, edges: null,
+    lidHeight: null, magnets: null, notch: null, edges: null, corners: null,
     floor: Math.max(1, o.stock - deep), top: Math.max(1, o.stock - deep)
   });
 }
@@ -1077,10 +1119,12 @@ if (typeof module !== 'undefined' && module.exports) {
 
 // f: { feed, plunge, rpm, delay, doc, stepoverPct, toolNumber, clear, label,
 // edges } (mm, mm/min, seconds; clear: how high to lift between cuts).
-// f.edges: { toolNumber, feed, plunge, rpm, delay, doc }: the edge bit's,
-// for a program that changes to it (M6) and cuts the plan's edges last;
-// null leaves them out. only: 'edges' for just the edges, as their own
-// program (the edge bit in, Z zeroed on the stock top as for the box).
+// f.corners, f.edges: { toolNumber, feed, plunge, rpm, delay, doc }: the
+// floor corners' ball or bowl bit's, the edge bit's, for a program that
+// changes to each (M6) and cuts the plan's corners, then its edges, after
+// the box; null leaves them out. only: 'corners' or 'edges' for just
+// those, as their own program (that bit in, Z zeroed on the stock top as
+// for the box).
 function boxProgram(plan, f, only) {
   var o = plan.o, rb = o.bit / 2, clear = f.clear || 5;
   var step = Math.max(0.05, Math.min(o.bit * (f.stepoverPct || 40) / 100, o.bit * 0.9));
@@ -1246,64 +1290,75 @@ function boxProgram(plan, f, only) {
   if (plan.notch) comment('Finger notch in the base, ' + mm3(o.notch.width) + unit + ' wide, ' + mm3(o.notch.depth) + unit + ' deep');
   comment('Closed ' + n3(plan.closedHeight) + unit + ' high, ' + n3(plan.insideHeight) + unit + ' inside');
   comment('Origin: ' + (o.origin === 'center' ? 'the middle of the pair' : 'the stock\'s front-left corner') + '; Z0: top of the stock');
-  if (only !== 'edges') comment('Bit ' + mm3(o.bit) + unit + ', feed ' + Math.round(f.feed) + ', plunge ' + Math.round(f.plunge) + unit + '/min, ' + n3(doc) + unit + ' a pass');
+  if (!only) comment('Bit ' + mm3(o.bit) + unit + ', feed ' + Math.round(f.feed) + ', plunge ' + Math.round(f.plunge) + unit + '/min, ' + n3(doc) + unit + ' a pass');
   if (o.tabs) comment('Tabs: ' + o.tabs.count + ' x ' + mm3(o.tabs.width) + unit + ' wide, ' + mm3(o.tabs.height) + unit + ' high');
-  if (o.edges && plan.edges.base.length + plan.edges.lid.length) {
-    var ed = o.edges, eb = ed.bit === 'round' ? 'a ' + ed.radius + unit + ' roundover bit' : 'a ' + ed.angle + ' degree V-bit';
-    comment('Edges down: seam ' + mm3(ed.outside || 0) + ', lead-in ' + mm3(ed.inside || 0) + ', pocket ' + mm3(ed.pocket || 0) + unit);
-    if (only === 'edges') comment('Just the edges, after the box: ' + eb + ', Z0 on the stock top');
-    else if (f.edges) comment('Edges cut last, with ' + eb + ' (T' + f.edges.toolNumber + ')');
-    else comment('Edges not in this program: cut them after it with Edges Only');
-  }
+  // The bits after the box's: a ball or bowl bit for the floor corners,
+  // then the edge bit; each after a tool change (M6), or (only) on its
+  // own.
+  var co = o.corners, ed = o.edges;
+  var SECOND = [
+    { key: 'corners', name: 'Corners', one: 'corner', cuts: plan.corners, f: f.corners,
+      bit: co && 'a ' + mm3(co.diameter) + unit + (2 * co.radius >= co.diameter - 1e-9 ? ' ball bit' : ' bowl bit, ' + mm3(co.radius) + unit + ' corners'),
+      about: co && 'Floor corners rounded ' + mm3(co.radius) + unit },
+    { key: 'edges', name: 'Edges', one: 'edge', cuts: plan.edges, f: f.edges,
+      bit: ed && (ed.bit === 'round' ? 'a ' + mm3(ed.radius) + unit + ' roundover bit' : 'a ' + mm3(ed.angle) + ' degree V-bit'),
+      about: ed && 'Edges down: seam ' + mm3(ed.outside || 0) + ', lead-in ' + mm3(ed.inside || 0) + ', pocket ' + mm3(ed.pocket || 0) + unit }
+  ].filter(function(g) { return g.cuts.base.length + g.cuts.lid.length > 0; });
+  var mine = SECOND.filter(function(g) { return only ? g.key === only : g.f; });
+  SECOND.forEach(function(g) {
+    if (only && only !== g.key) return;
+    comment(g.about);
+    if (only === g.key) { comment('Just the ' + g.name.toLowerCase() + ', after the box; Z0 on the stock top'); comment('With ' + g.bit); }
+    else if (!only && g.f) comment(g.name + ' after the box, with ' + g.bit + ' (T' + g.f.toolNumber + ')');
+    else if (!only) comment(g.name + ' not in this program: cut them after it with ' + g.name + ' Only');
+  });
   L.push('');
   L.push('G21 ; Metric units', 'G17 ; XY plane selection', 'G90 ; Absolute positioning', 'G94 ; Feed rate per minute', '');
   L.push('G53 G0 Z0 ; Move to machine Z0');
-  var ef = f.edges || f, sf = only === 'edges' ? ef : f;
-  if (only !== 'edges' && f.toolNumber > 0) L.push('M6 T' + f.toolNumber + ' ; Tool change');
-  if (only === 'edges' && ef.toolNumber > 0) L.push('M6 T' + ef.toolNumber + ' ; Tool change: the edge bit');
-  if (sf.rpm > 0) {
-    L.push('M3 S' + Math.round(sf.rpm) + ' ; Start spindle');
-    if (sf.delay > 0) L.push('G4 P' + +(+sf.delay).toFixed(1) + ' ; Wait for the spindle');
-  }
-  L.push('G0 Z' + n3(clear));
-
-  var boxCuts = only !== 'edges', edgeCuts = (only === 'edges' || f.edges) && (plan.edges.base.length + plan.edges.lid.length) > 0;
-  if (boxCuts) {
-  plan.halves.forEach(function(h) {
-    h.cuts.forEach(function(cut) {
-      comment(cap(h.name) + ': ' + cut.what);
-      (cut.op === 'pocket' ? pocket : ring)(h.at.x + (cut.dx || 0), h.at.y + (cut.dy || 0), cut);
-    });
-  });
-  plan.halves.forEach(function(h) {
-    comment(cap(h.name) + ': outline' + (h.outline.tabs ? ', with tabs' : ''));
-    profile(h.at.x, h.at.y, h.outline);
-  });
-  }
-  if (edgeCuts) {
-    if (boxCuts) {
+  var spun = false;
+  function startBit(g, change) {
+    var sf = g ? g.f : f;
+    if (change) {
       L.push('', 'G53 G0 Z0 ; Move to machine Z0');
-      if (f.rpm > 0) L.push('M5 ; Stop spindle');
-      L.push('M6 T' + ef.toolNumber + ' ; Tool change: the edge bit');
-      if (ef.rpm > 0) {
-        L.push('M3 S' + Math.round(ef.rpm) + ' ; Start spindle');
-        if (ef.delay > 0) L.push('G4 P' + +(+ef.delay).toFixed(1) + ' ; Wait for the spindle');
-      }
-      L.push('G0 Z' + n3(clear));
+      if (spun) L.push('M5 ; Stop spindle');
     }
-    f = Object.assign({}, f, { feed: ef.feed, plunge: ef.plunge });
-    doc = Math.max(0.05, ef.doc || doc);
+    if (sf.toolNumber > 0) L.push('M6 T' + sf.toolNumber + ' ; Tool change' + (g ? ': the ' + g.one + ' bit' : ''));
+    if (sf.rpm > 0) {
+      L.push('M3 S' + Math.round(sf.rpm) + ' ; Start spindle');
+      if (sf.delay > 0) L.push('G4 P' + +(+sf.delay).toFixed(1) + ' ; Wait for the spindle');
+      spun = true;
+    } else spun = false;
+    L.push('G0 Z' + n3(clear));
+  }
+
+  if (!only) {
+    startBit(null, false);
     plan.halves.forEach(function(h) {
-      plan.edges[h.name].forEach(function(e) {
+      h.cuts.forEach(function(cut) {
+        comment(cap(h.name) + ': ' + cut.what);
+        (cut.op === 'pocket' ? pocket : ring)(h.at.x + (cut.dx || 0), h.at.y + (cut.dy || 0), cut);
+      });
+    });
+    plan.halves.forEach(function(h) {
+      comment(cap(h.name) + ': outline' + (h.outline.tabs ? ', with tabs' : ''));
+      profile(h.at.x, h.at.y, h.outline);
+    });
+  }
+  mine.forEach(function(g, i) {
+    startBit(g, !only || i > 0);
+    f = Object.assign({}, f, { feed: g.f.feed, plunge: g.f.plunge });
+    doc = Math.max(0.05, g.f.doc || doc);
+    plan.halves.forEach(function(h) {
+      g.cuts[h.name].forEach(function(e) {
         comment(cap(h.name) + ': ' + e.what);
         var loop = shapeLoop(e.shape, e.t);
         cutLoops(h.at.x, h.at.y, [loop], e.z0, e.depth, Math.max(0.2, loopLength(loop) * 0.05));
       });
     });
-  }
+  });
 
   L.push('', 'G53 G0 Z0 ; Return to machine Z0');
-  if (sf.rpm > 0 || (edgeCuts && ef.rpm > 0)) L.push('M5 ; Stop spindle');
+  if (spun) L.push('M5 ; Stop spindle');
   L.push('M30 ; Program end');
   return { gcode: L.join('\n') + '\n', minutes: minutes };
 }
@@ -1343,7 +1398,9 @@ if (typeof module !== 'undefined' && module.exports) {
     ['cb-delay', 'delay', 'count', 2],
     ['cb-eangle', 'edgeAngle', 'count', 90], ['cb-ediam', 'edgeDiameter', 'length', 12.7], ['cb-erad', 'edgeRadius', 'length', 3.175], ['cb-etip', 'edgeTip', 'length', 3.175],
     ['cb-eout', 'edgeOut', 'length', 1.5, true], ['cb-ein', 'edgeIn', 'length', 0.5, true], ['cb-epk', 'edgePocket', 'length', 0, true],
-    ['cb-efeed', 'edgeFeed', 'feed', 1500], ['cb-erpm', 'edgeRpm', 'count', 18000]
+    ['cb-efeed', 'edgeFeed', 'feed', 1500], ['cb-erpm', 'edgeRpm', 'count', 18000],
+    ['cb-cdiam', 'cornerDiameter', 'length', 6.35], ['cb-crad', 'cornerBitRadius', 'length', 3.175],
+    ['cb-cfeed', 'cornerFeed', 'feed', 1500], ['cb-crpm', 'cornerRpm', 'count', 18000]
   ];
   // What Auto Sizes fills in: [field, its value from autoSizes()]. Typing
   // in one sets it by hand (Auto Sizes off); Corner Radius stays yours
@@ -1369,13 +1426,14 @@ if (typeof module !== 'undefined' && module.exports) {
     if (v.shape === 'rect' && a.cornerRadius > v.cornerRadius + 1e-6) show('cb-corner', a.cornerRadius, 'length');
   }
   // Fields under a switch, and the switch.
-  var GROUPS = [['cb-tab-fields', 'cb-tabs-on'], ['cb-mag-fields', 'cb-mag-on'], ['cb-notch-fields', 'cb-notch-on'], ['cb-edge-fields', 'cb-edges-on']];
+  var GROUPS = [['cb-tab-fields', 'cb-tabs-on'], ['cb-mag-fields', 'cb-mag-on'], ['cb-notch-fields', 'cb-notch-on'], ['cb-corner-fields', 'cb-corners-on'], ['cb-edge-fields', 'cb-edges-on']];
   // Feeds that must be in range: [field, ok, what's wrong].
   var RANGES = [
     ['cb-feed', function (x) { return x >= 25; }, 'must be at least 25 mm/min (1 in/min)'], ['cb-plunge', function (x) { return x >= 10; }, 'must be at least 10 mm/min (0.4 in/min)'],
     ['cb-doc', function (x) { return x >= 0.05; }, 'must be at least 0.05 mm (0.002 in)'], ['cb-stepover', function (x) { return x >= 1 && x <= 90; }, 'must be between 1 and 90'],
     ['cb-rpm', function (x) { return x >= 0; }, 'can\u2019t be negative'], ['cb-delay', function (x) { return x >= 0; }, 'can\u2019t be negative'],
-    ['cb-efeed', function (x) { return x >= 25; }, 'must be at least 25 mm/min (1 in/min)'], ['cb-erpm', function (x) { return x >= 0; }, 'can\u2019t be negative']
+    ['cb-efeed', function (x) { return x >= 25; }, 'must be at least 25 mm/min (1 in/min)'],
+    ['cb-cfeed', function (x) { return x >= 25; }, 'must be at least 25 mm/min (1 in/min)'], ['cb-crpm', function (x) { return x >= 0; }, 'can\u2019t be negative'], ['cb-erpm', function (x) { return x >= 0; }, 'can\u2019t be negative']
   ];
   var SEGS = [['cb-ebit', 'edgeBit', 'v'], ['cb-shape', 'shape', 'circle'], ['cb-lip-on', 'lipOn', 'base'], ['cb-layout', 'layout', 'x'], ['cb-origin', 'origin', 'front-left']];
   var K = function () { return state.imperial ? 25.4 : 1; };
@@ -1413,6 +1471,7 @@ if (typeof module !== 'undefined' && module.exports) {
     RANGES.forEach(function (r) { var id = r[0], key = FIELDS.filter(function (f) { return f[0] === id; })[0][1]; if (!errs[id] && !off(id) && !r[1](v[key])) errs[id] = r[2]; });
     v.tabsOn = $('cb-tabs-on').checked; v.magOn = $('cb-mag-on').checked; v.notchOn = $('cb-notch-on').checked;
     v.edgesOn = $('cb-edges-on').checked; v.edgeTool = $('cb-etool').value;
+    v.cornersOn = $('cb-corners-on').checked; v.cornerTool = $('cb-ctool').value;
     v.tool = $('cb-tool').value;
     v.material = $('cb-material').value; v.style = $('cb-style').value; v.flutes = +$('cb-flutes').value;
     return { v: v, errs: errs };
@@ -1425,7 +1484,8 @@ if (typeof module !== 'undefined' && module.exports) {
       lipOn: v.lipOn, lipHeight: v.lipHeight, lipWidth: v.lipWidth, clearance: v.clearance,
       gap: v.gap, layout: v.layout, origin: v.origin, margin: v.margin, bit: v.bit,
       tabs: v.tabsOn ? { count: Math.round(v.tabCount), width: v.tabWidth, height: v.tabHeight } : null,
-      edges: v.edgesOn ? { bit: v.edgeBit === 'round' ? 'round' : 'v', angle: v.edgeAngle, diameter: v.edgeDiameter, radius: v.edgeRadius, tip: v.edgeTip, outside: v.edgeOut || 0, inside: v.edgeIn || 0, pocket: v.edgePocket || 0 } : null
+      edges: v.edgesOn ? { bit: v.edgeBit === 'round' ? 'round' : 'v', angle: v.edgeAngle, diameter: v.edgeDiameter, radius: v.edgeRadius, tip: v.edgeTip, outside: v.edgeOut || 0, inside: v.edgeIn || 0, pocket: v.edgePocket || 0 } : null,
+      corners: v.cornersOn ? { diameter: v.cornerDiameter, radius: v.cornerBitRadius } : null
     });
   }
   // The edge bit's feeds; its T number when the program can change to it.
@@ -1434,10 +1494,16 @@ if (typeof module !== 'undefined' && module.exports) {
     return { toolNumber: state.changer && t ? t.n : 0, feed: v.edgeFeed, plunge: Math.min(v.plunge, v.edgeFeed), rpm: v.edgeRpm, delay: v.delay, doc: v.doc };
   }
   function edgesInBox(v) { return !!(state.changer && toolEntry(v.edgeTool)); }
+  // The corner bit's, likewise.
+  function cornerFeeds(v) {
+    var t = toolEntry(v.cornerTool);
+    return { toolNumber: state.changer && t ? t.n : 0, feed: v.cornerFeed, plunge: Math.min(v.plunge, v.cornerFeed), rpm: v.cornerRpm, delay: v.delay, doc: v.doc };
+  }
+  function cornersInBox(v) { return !!(v.cornersOn && state.changer && toolEntry(v.cornerTool)); }
   function feedsOf(v) {
-    var t = toolEntry(v.tool);
+    var t = toolEntry(v.tool), more = edgesInBox(v) || cornersInBox(v);
     return { feed: v.feed, plunge: v.plunge, rpm: v.rpm, delay: v.delay, doc: v.doc, stepoverPct: v.stepoverPct,
-             toolNumber: (state.atc || edgesInBox(v)) && t ? t.n : 0, edges: edgesInBox(v) ? edgeFeeds(v) : null };
+             toolNumber: (state.atc || more) && t ? t.n : 0, edges: edgesInBox(v) ? edgeFeeds(v) : null, corners: cornersInBox(v) ? cornerFeeds(v) : null };
   }
 
   // ---------- Previews ----------
@@ -1462,6 +1528,10 @@ if (typeof module !== 'undefined' && module.exports) {
       if (withLip) out += path('cb-wood-dark', 0, cx, cy) + path('cb-wood', plan.tLip, cx, cy);
       else out += path('cb-wood-dark', plan.tRabbet, cx, cy);
       out += path('cb-cut', plan.tInside, cx, cy);
+      // Rounded floor corners: a band as wide as the cove.
+      plan.corners[h.name].forEach(function (k) {
+        out += '<path class="cb-edge" stroke-width="' + Math.max(0.4, o.corners.radius * s).toFixed(2) + '" d="' + shapePath(k.shape, plan.tInside - o.corners.radius / 2, cx, cy, s) + '"/>';
+      });
       // Chamfers and roundovers: a band as wide as each takes off the top.
       plan.edges[h.name].forEach(function (e) {
         out += '<path class="cb-edge" stroke-width="' + Math.max(0.4, e.width * s).toFixed(2) + '" d="' + shapePath(S, e.at - e.u * e.width / 2, cx, cy, s) + '"/>';
@@ -1521,6 +1591,7 @@ if (typeof module !== 'undefined' && module.exports) {
     };
     var lipH = lipBase ? 'base' : 'lid', rabH = lipBase ? 'lid' : 'base';
     var eSeamL = edgeOf(lipH, 'outside seam edge'), eSeamR = edgeOf(rabH, 'outside seam edge'), eOpen = edgeOf(rabH, 'opening edge');
+    var fl = o.corners && plan.corners.base.length ? { depth: o.corners.radius, width: o.corners.radius, R: o.corners.radius } : null;
     var eLipOut = edgeOf(lipH, 'lip\'s outer edge'), eLipIn = edgeOf(lipH, 'lip\'s inner edge'), eStep = edgeOf(rabH, 'step\'s inner edge');
     var out = '';
     [1, -1].forEach(function (side) {
@@ -1528,16 +1599,16 @@ if (typeof module !== 'undefined' && module.exports) {
       // The base, 0 to T (its top at T); the lid's rim at T - lipHeight when the lip is on the base.
       var shoulder = lipBase ? T - o.lipHeight : T, lidRim = shoulder;
       if (lipBase) {
-        out += poly([[f(Ri), o.floor], [f(Ri), T, eLipIn], [f(Ri + o.lipWidth), T, eLipOut], [f(Ri + o.lipWidth), shoulder], [f(R), shoulder, eSeamL], [f(R), 0], [0, 0], [0, o.floor]], 'cb-wood');
+        out += poly([[f(Ri), o.floor, fl], [f(Ri), T, eLipIn], [f(Ri + o.lipWidth), T, eLipOut], [f(Ri + o.lipWidth), shoulder], [f(R), shoulder, eSeamL], [f(R), 0], [0, 0], [0, o.floor]], 'cb-wood');
         // The lid, upside down on the shoulder: its rabbet round the lip.
         var top = lidRim + LH, rab = Ri + o.lipWidth + c;
-        out += poly([[f(Ri), top - o.top], [f(Ri), lidRim + o.lipHeight + c, eStep], [f(rab), lidRim + o.lipHeight + c], [f(rab), lidRim, eOpen], [f(R), lidRim, eSeamR], [f(R), top], [0, top], [0, top - o.top]], 'cb-wood-dark');
+        out += poly([[f(Ri), top - o.top, fl], [f(Ri), lidRim + o.lipHeight + c, eStep], [f(rab), lidRim + o.lipHeight + c], [f(rab), lidRim, eOpen], [f(R), lidRim, eSeamR], [f(R), top], [0, top], [0, top - o.top]], 'cb-wood-dark');
       } else {
         // Lip on the lid: the base's opening is widened; the lid's lip hangs down into it.
         var rabB = Ri + o.lipWidth + c, rimB = T;
-        out += poly([[f(Ri), o.floor], [f(Ri), T - o.lipHeight - c, eStep], [f(rabB), T - o.lipHeight - c], [f(rabB), T, eOpen], [f(R), T, eSeamR], [f(R), 0], [0, 0], [0, o.floor]], 'cb-wood');
+        out += poly([[f(Ri), o.floor, fl], [f(Ri), T - o.lipHeight - c, eStep], [f(rabB), T - o.lipHeight - c], [f(rabB), T, eOpen], [f(R), T, eSeamR], [f(R), 0], [0, 0], [0, o.floor]], 'cb-wood');
         var top2 = T + LH - o.lipHeight;
-        out += poly([[f(Ri), top2 - o.top], [f(Ri), rimB - o.lipHeight, eLipIn], [f(Ri + o.lipWidth), rimB - o.lipHeight, eLipOut], [f(Ri + o.lipWidth), rimB], [f(R), rimB, eSeamL], [f(R), top2], [0, top2], [0, top2 - o.top]], 'cb-wood-dark');
+        out += poly([[f(Ri), top2 - o.top, fl], [f(Ri), rimB - o.lipHeight, eLipIn], [f(Ri + o.lipWidth), rimB - o.lipHeight, eLipOut], [f(Ri + o.lipWidth), rimB], [f(R), rimB, eSeamL], [f(R), top2], [0, top2], [0, top2 - o.top]], 'cb-wood-dark');
       }
     });
     // Height and inside height.
@@ -1575,7 +1646,8 @@ if (typeof module !== 'undefined' && module.exports) {
       state.tools = (tools || []).filter(function (t) { return t.diameter > 0 && t.type !== 'probe' && t.type !== 'pen' && t.type !== 'drag-knife'; })
         .map(function (t) {
           return { n: state.toolById ? t.toolId : t.toolNumber, slot: state.toolById && t.toolNumber > 0 ? t.toolNumber : 0, mm: t.diameter, name: t.name || '',
-                   notes: (t.metadata && t.metadata.notes) || '', flutes: (t.metadata && t.metadata.flutes) || 0, vAngle: vBitOf(t) };
+                   notes: (t.metadata && t.metadata.notes) || '', flutes: (t.metadata && t.metadata.flutes) || 0, vAngle: vBitOf(t),
+                   type: t.type || '', cornerR: (t.dimensions && t.dimensions.corner_radius) || 0 };
         })
         .filter(function (t) { return t.n > 0; })
         // In the magazine first, by slot; the tool in the spindle first; then by number.
@@ -1583,7 +1655,7 @@ if (typeof module !== 'undefined' && module.exports) {
       var opts = state.tools.map(function (t) {
         return '<option value="' + t.n + '">T' + t.n + (t.name ? ' ' + t.name.replace(/</g, '&lt;') : '') + ' (' + fmt(t.mm) + ' ' + unit() + ')</option>';
       }).join('');
-      [['cb-tool', 'tool', 'Type a size'], ['cb-etool', 'edgeTool', 'Type its size']].forEach(function (x) {
+      [['cb-tool', 'tool', 'Type a size'], ['cb-etool', 'edgeTool', 'Type its size'], ['cb-ctool', 'cornerTool', 'Type its size']].forEach(function (x) {
         var sel = $(x[0]), keep = sel.value || state.v[x[1]] || '';
         sel.innerHTML = '<option value="">' + x[2] + '</option>' + opts;
         if (toolEntry(keep)) sel.value = String(keep);
@@ -1599,7 +1671,8 @@ if (typeof module !== 'undefined' && module.exports) {
   // prefer: the tools listed first (the edge bit's: V-bits, roundovers).
   var PICKERS = {
     'cb-tool': { none: 'Type a size', prefer: null },
-    'cb-etool': { none: 'Type its size', prefer: function (t) { return t.vAngle != null || /round\s*-?over/i.test(t.name); } }
+    'cb-etool': { none: 'Type its size', prefer: function (t) { return t.vAngle != null || /round\s*-?over/i.test(t.name); } },
+    'cb-ctool': { none: 'Type its size', prefer: function (t) { return t.type === 'ball' || t.cornerR > 0 || /\b(ball|bowl|bull|core\s*box|round\s*nose)/i.test(t.name); } }
   };
   var pop = { id: null, active: 0, items: [] };
   function wirePickers() {
@@ -1730,6 +1803,17 @@ if (typeof module !== 'undefined' && module.exports) {
   }
   // An edge bit from the Tool Library: a V-bit sets the kind and angle; a
   // bit named roundover sets the kind.
+  // A corner bit from the Tool Library: its diameter; a ball's radius is
+  // half that, a bowl bit's from the table (else left as it was).
+  function pickCornerTool() {
+    var t = toolEntry($('cb-ctool').value);
+    if (t) {
+      show('cb-cdiam', t.mm, 'length');
+      if (t.type === 'ball' || /\bball/i.test(t.name)) show('cb-crad', t.mm / 2, 'length');
+      else if (t.cornerR > 0) show('cb-crad', t.cornerR, 'length');
+    }
+    update(true);
+  }
   function pickEdgeTool() {
     var t = toolEntry($('cb-etool').value);
     if (t && t.vAngle != null) { setSeg('cb-ebit', 'v'); if (t.vAngle) $('cb-eangle').value = String(t.vAngle); show('cb-ediam', t.mm, 'length'); }
@@ -1776,6 +1860,7 @@ if (typeof module !== 'undefined' && module.exports) {
       var warns = plan.notes.slice();
       if (!(v.rpm > 0)) warns.push('Spindle RPM 0: the program won\u2019t start the spindle.');
       if (v.edgesOn && !(v.edgeRpm > 0)) warns.push('Edge RPM 0: the edges are cut with the spindle off.');
+      if (v.cornersOn && !(v.cornerRpm > 0)) warns.push('Corner RPM 0: the corners are cut with the spindle off.');
       note.textContent = 'About ' + (minutes < 1.5 ? '1 min' : Math.round(minutes) + ' min') + '. Closed: ' + fmt(plan.closedHeight) + ' ' + unit() +
         ' high, ' + fmt(plan.insideHeight) + ' ' + unit() + ' inside.' + (warns.length ? ' ' + warns.join(' ') : '');
       if (warns.length) note.classList.add('cb-warn');
@@ -1788,6 +1873,13 @@ if (typeof module !== 'undefined' && module.exports) {
       : state.changer ? 'Pick the edge bit from the Tool Library to have the program change to it; or cut the edges with Edges Only after the box.'
       : 'No tool changer is set up in ncSender: cut the box, put the edge bit in, zero Z on the stock top (keep X Y), and run Edges Only.';
     $('cb-edges-only').disabled = !!(errKeys.length || plan.problems.length || !anyEdges);
+    var ct = toolEntry(v.cornerTool);
+    $('cb-corner-note').textContent = !v.cornersOn ? ''
+      : cornersInBox(v) ? 'Cut after the outlines' + (anyEdges && v.edgesOn ? ', before the edges' : '') + ': the program changes to T' + ct.n + '. The box\u2019s bit leaves the floor ' + fmt(v.cornerBitRadius) + ' ' + unit() + ' short of the walls for it.' +
+        (toolEntry(v.tool) ? '' : ' Pick the box\u2019s bit from the Tool Library too, so the program starts by changing back to it.')
+      : state.changer ? 'Pick the corner bit from the Tool Library to have the program change to it; or cut the corners with Corners Only after the box.'
+      : 'No tool changer is set up in ncSender: cut the box, put the corner bit in, zero Z on the stock top (keep X Y), and run Corners Only.';
+    $('cb-corners-only').disabled = !!(errKeys.length || plan.problems.length || !(plan.corners.base.length + plan.corners.lid.length));
     $('cb-ev-fields').hidden = v.edgeBit === 'round'; $('cb-eround-fields').hidden = v.edgeBit !== 'round';
     $('cb-generate').disabled = $('cb-testfit').disabled = !!(errKeys.length || plan.problems.length || tooBig);
     if (!errKeys.length) { try { topView(plan); sideView(plan); } catch (e) {} }
@@ -1809,17 +1901,19 @@ if (typeof module !== 'undefined' && module.exports) {
   // 'edges', just the edges, as their own program.
   async function generate(kind) {
     update(false);
-    var test = kind === 'test', edges = kind === 'edges';
-    if (!lastPlan || $(edges ? 'cb-edges-only' : 'cb-generate').disabled) return;
-    var v = lastPlan.v, btn = $(test ? 'cb-testfit' : edges ? 'cb-edges-only' : 'cb-generate'), label = btn.textContent;
+    var test = kind === 'test', edges = kind === 'edges', corners = kind === 'corners';
+    var btn = $(test ? 'cb-testfit' : edges ? 'cb-edges-only' : corners ? 'cb-corners-only' : 'cb-generate');
+    if (!lastPlan || btn.disabled) return;
+    var v = lastPlan.v, label = btn.textContent;
     var plan = test ? boxPlan(testFitInput(lastPlan.plan.o)) : lastPlan.plan;
     if (plan.problems.length) { alert('Carved Box: the test fit can\u2019t be cut: ' + plan.problems[0]); return; }
     var res;
     try {
       res = edges ? boxProgram(plan, Object.assign(feedsOf(v), { edges: edgeFeeds(v), label: 'Carved Box edges' }), 'edges')
+        : corners ? boxProgram(plan, Object.assign(feedsOf(v), { corners: cornerFeeds(v), label: 'Carved Box corners' }), 'corners')
         : boxProgram(plan, Object.assign(feedsOf(v), { label: test ? 'Test fit' : 'Carved Box' }));
     } catch (e) { alert('Carved Box: ' + e.message + '.'); return; }
-    var name = 'CarvedBox-' + (test ? 'TestFit-' : edges ? 'Edges-' : '') + (test ? '' : v.shape === 'rect' ? round(v.length / K(), 2) + 'x' + round(v.width / K(), 2) + '-' : 'D' + round(v.diameter / K(), 2) + '-') + 'T' + round(v.stock / K(), 2) + '-' + unit() + '.nc';
+    var name = 'CarvedBox-' + (test ? 'TestFit-' : edges ? 'Edges-' : corners ? 'Corners-' : '') + (test ? '' : v.shape === 'rect' ? round(v.length / K(), 2) + 'x' + round(v.width / K(), 2) + '-' : 'D' + round(v.diameter / K(), 2) + '-') + 'T' + round(v.stock / K(), 2) + '-' + unit() + '.nc';
     btn.disabled = true; btn.textContent = 'Generating\u2026';
     try {
       var r = await fetch(BASE_URL + '/api/gcode-files/load-temp', { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1845,6 +1939,7 @@ if (typeof module !== 'undefined' && module.exports) {
     });
     $('cb-tabs-on').checked = saved.tabsOn !== false;
     $('cb-edges-on').checked = !!saved.edgesOn;
+    $('cb-corners-on').checked = !!saved.cornersOn;
     $('cb-mag-on').checked = !!saved.magOn; $('cb-notch-on').checked = !!saved.notchOn;
     if (saved.material) $('cb-material').value = saved.material;
     $('cb-style').value = saved.style || 'average';
@@ -1880,9 +1975,11 @@ if (typeof module !== 'undefined' && module.exports) {
       $(f[0]).addEventListener('change', function () { if (f[0] === 'cb-bit' && state.feedsAuto) { fillFeeds(); update(true); } });
     });
     $('cb-auto').addEventListener('change', function () { state.autoSizes = $('cb-auto').checked; update(true); });
-    ['cb-tabs-on', 'cb-mag-on', 'cb-notch-on', 'cb-edges-on'].forEach(function (id) { $(id).addEventListener('change', function () { update(true); }); });
+    ['cb-tabs-on', 'cb-mag-on', 'cb-notch-on', 'cb-corners-on', 'cb-edges-on'].forEach(function (id) { $(id).addEventListener('change', function () { update(true); }); });
     $('cb-testfit').addEventListener('click', function () { generate('test'); });
     $('cb-edges-only').addEventListener('click', function () { generate('edges'); });
+    $('cb-corners-only').addEventListener('click', function () { generate('corners'); });
+    $('cb-ctool').addEventListener('change', pickCornerTool);
     $('cb-etool').addEventListener('change', pickEdgeTool);
     ['cb-material', 'cb-style', 'cb-flutes'].forEach(function (id) { $(id).addEventListener('change', function () { fillFeeds(); update(true); }); });
     $('cb-tool').addEventListener('change', pickTool);

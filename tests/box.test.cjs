@@ -56,7 +56,10 @@ function allowed(plan, half, p) {
   if (at(rb) >= -eps) return d <= half.outline.depth + eps;
   const withLip = (o.lipOn === 'lid') === (half.name === 'lid');
   const floor = half.height - (half.name === 'lid' ? o.top : o.floor), meet = withLip ? o.lipHeight : 0;
-  if (at(plan.tInside - rb) <= eps && d <= floor + eps) return true;
+  // Rounded floor corners: the box's bit stays the radius off the wall
+  // for that last bit of the pocket (the corner bit's to cut).
+  const rc = o.corners ? o.corners.radius : 0;
+  if (at(plan.tInside - rb) <= eps && d <= floor + eps && (d <= floor - rc + eps || at(plan.tInside - rc - rb) <= eps)) return true;
   if (withLip && at(plan.tLip + rb) >= -eps && d <= o.lipHeight + eps) return true;
   if (!withLip && at(plan.tRabbet - rb) <= eps && d <= plan.rabbetDepth + eps) return true;
   for (const m of plan.magnetAt) {
@@ -320,4 +323,37 @@ test('Auto Sizes: a box that fits together for any size, stock, bit and material
     check(Object.assign({}, input, a));
   }
   assert.equal(autoSizes({}, 'acrylic').clearance, 0.1);
+});
+
+test('rounded floor corners: a ball or bowl bit after the box, or on its own', () => {
+  const CF = { toolNumber: 8, feed: 1200, plunge: 300, rpm: 16000, doc: 1.5 }, EF = { toolNumber: 7, feed: 1200, plunge: 300, rpm: 16000, doc: 2 };
+  for (const lipOn of ['base', 'lid']) for (const shape of [{}, { shape: 'rect', length: 130, width: 90, cornerRadius: 12 }]) {
+    for (const corners of [{ diameter: 6.35, radius: 3.175 }, { diameter: 12.7, radius: 3.175 }]) {
+      const input = Object.assign({ lipOn, wall: 10, lidHeight: 15, corners, edges: { bit: 'v', angle: 90, diameter: 12.7, outside: 1, inside: 0.5, pocket: 0 } }, shape);
+      const { plan, gcode: box } = check(input);
+      // The box's own bit leaves the coves (check holds it), the corner bit cuts them.
+      const all = boxProgram(plan, Object.assign({}, FEEDS, { corners: CF, edges: EF })).gcode;
+      const c = all.indexOf('M6 T8'), e = all.indexOf('M6 T7');
+      assert.ok(c > 0 && e > c, 'corner bit, then edge bit');
+      assert.equal(all.slice(0, all.indexOf('(Floor corners')), box.slice(0, box.indexOf('(Floor corners')));
+      for (const g of [all.slice(c, e), boxProgram(plan, Object.assign({}, FEEDS, { corners: CF }), 'corners').gcode]) {
+        const pts = simulate(g).filter((p) => p.z < 0);
+        for (const p of pts) {
+          assert.ok(!p.rapid, 'rapid below the top');
+          const ok = plan.halves.some((h) => plan.corners[h.name].some((k) => Math.abs(shapeDistance(k.shape, k.t, p.x - h.at.x, p.y - h.at.y)) < 0.005 && p.z >= k.z0 - k.depth - 1e-6));
+          assert.ok(ok, 'corner bit off its loop or below the floor: ' + JSON.stringify(p));
+        }
+        for (const h of plan.halves) for (const k of plan.corners[h.name]) {
+          assert.ok(pts.some((p) => Math.abs(p.z - (k.z0 - k.depth)) < 1e-6 && Math.abs(shapeDistance(k.shape, k.t, p.x - h.at.x, p.y - h.at.y)) < 0.005), h.name + ' corners not down to the floor');
+          // Its side on the wall, its end on the floor.
+          assert.ok(Math.abs(k.t + corners.diameter / 2 - plan.tInside) < 1e-9);
+        }
+      }
+      assert.match(boxProgram(plan, Object.assign({}, FEEDS, { corners: CF }), 'corners').gcode, /^M6 T8/m);
+    }
+  }
+  const said = (o, re) => assert.ok(boxPlan(o).problems.some((p) => re.test(p)), JSON.stringify(o) + ' ' + boxPlan(o).problems);
+  said({ corners: { diameter: 6, radius: 4 } }, /half the diameter for a ball/);
+  said({ corners: { diameter: 80, radius: 3 } }, /inside is too small for the corner bit/);
+  said({ stock: 12, corners: { diameter: 12.7, radius: 6.35 } }, /radius is too big for the/);
 });
