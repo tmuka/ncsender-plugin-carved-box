@@ -24,6 +24,11 @@
   @media (min-width: 1200px) and (orientation: landscape) {
     .cb-body { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
   }
+  /* Wide: three columns, the previews, the cards used most, the rest. */
+  @media (min-width: 1600px) and (orientation: landscape) {
+    .cb-body { grid-template-columns: minmax(0, 0.9fr) minmax(0, 2fr); }
+    .cb-body .cb-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  }
   .cb-card { background: var(--color-surface-muted, color-mix(in srgb, var(--color-text-primary) 4%, var(--color-surface))); border: 1px solid var(--color-border); border-radius: 10px; padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 10px; }
   .cb-card h3 { margin: 0; font-size: 0.95rem; font-weight: 700; display: flex; align-items: center; gap: 8px; }
   .cb-card h3 .cb-grow { flex: 1; }
@@ -55,7 +60,11 @@
   .cb-switch input:checked + span::after { transform: translateX(16px); }
   .cb-hint { font-size: 0.8rem; color: var(--color-text-secondary); }
   .cb-link { background: none !important; border: none !important; padding: 0 !important; margin: 0 !important; color: var(--color-accent) !important; font: inherit !important; font-size: 0.8rem !important; cursor: pointer; text-decoration: underline; }
-  .cb-previews, .cb-cards { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  .cb-previews, .cb-cards, .cb-settings { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  .cb-start-row { display: flex; gap: 8px; align-items: center; }
+  .cb-start-row .cb-select, .cb-start-row .cb-name { flex: 1; min-width: 0; }
+  .cb-input.cb-name { text-align: left; font-family: inherit; }
+  .cb-btn.cb-btn-small { height: 36px; padding: 0 14px !important; }
   .cb-view { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 10px; padding: 8px; }
   .cb-view-title { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-secondary); text-align: center; margin-bottom: 4px; }
   .cb-view svg { width: 100%; height: auto; max-height: 34vh; display: block; }
@@ -133,7 +142,21 @@
       <div class="cb-view"><div class="cb-view-title">Side view · the lid on the base, cut through the middle</div><svg id="cb-side" viewBox="0 0 100 40"></svg></div>
     </div>
 
-    <div class="cb-cards">
+    <div class="cb-settings">
+    <div class="cb-cards" id="cb-main">
+    <div class="cb-card">
+      <h3>Start</h3>
+      <div class="cb-start-row">
+        <select class="cb-select" id="cb-preset" aria-label="Presets and your saved settings"></select>
+        <button type="button" class="cb-btn cb-btn-quiet cb-btn-small" id="cb-preset-load">Load</button>
+      </div>
+      <div class="cb-start-row">
+        <input class="cb-input cb-name" id="cb-save-name" maxlength="40" placeholder="Name these settings" aria-label="Name for your saved settings">
+        <button type="button" class="cb-btn cb-btn-quiet cb-btn-small" id="cb-save">Save</button>
+        <button type="button" class="cb-btn cb-btn-quiet cb-btn-small" id="cb-delete">Delete</button>
+      </div>
+      <p class="cb-hint" id="cb-start-hint"></p>
+    </div>
     <div class="cb-card">
       <h3><span class="cb-grow">Box</span><span class="cb-auto-label">Auto Sizes</span><label class="cb-switch" title="Fill in the wall, floor, top, lid height (the stock's thickness), lip, clearance, gap, margin, tabs, notch, magnet count and edges for this size, stock, bit and material."><input type="checkbox" id="cb-auto" aria-label="Auto Sizes"><span></span></label></h3>
       <div class="cb-field"><label>Shape</label>
@@ -160,7 +183,32 @@
       </div>
       <p class="cb-hint" id="cb-auto-hint"></p>
     </div>
-
+    <div class="cb-card">
+      <h3>Tool &amp; Feeds</h3>
+      <div class="cb-row cb-row-2">
+        <div class="cb-field"><label for="cb-tool">Tool</label><select class="cb-select" id="cb-tool" title="A bit from ncSender's Tool Library, or type its size."><option value="">Type a size</option></select></div>
+        <div class="cb-field"><label for="cb-bit">Bit Diameter</label><input class="cb-input" id="cb-bit" data-unit="length"></div>
+      </div>
+      <div class="cb-row">
+        <div class="cb-field"><label for="cb-material">Material</label><select class="cb-select" id="cb-material">
+          <option value="mdf">MDF / Plywood</option><option value="softwood">Softwood</option><option value="hardwood">Hardwood</option>
+          <option value="hdpe">HDPE / UHMW</option><option value="acrylic">Acrylic</option><option value="polycarbonate">Polycarbonate</option>
+          <option value="aluminum">Aluminum</option><option value="foam">Foam / tooling board</option></select></div>
+        <div class="cb-field"><label for="cb-style">Feeds Style</label><select class="cb-select" id="cb-style"><option value="conservative">Conservative</option><option value="average">Average</option><option value="aggressive">Aggressive</option></select></div>
+        <div class="cb-field"><label for="cb-flutes">Flutes</label><select class="cb-select" id="cb-flutes"><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
+      </div>
+      <div class="cb-row">
+        <div class="cb-field"><label for="cb-feed">Feed Rate</label><input class="cb-input" id="cb-feed" data-unit="feed"></div>
+        <div class="cb-field"><label for="cb-plunge">Plunge Rate</label><input class="cb-input" id="cb-plunge" data-unit="feed"></div>
+        <div class="cb-field"><label for="cb-doc">Depth of Cut</label><input class="cb-input" id="cb-doc" data-unit="length" title="How deep each pass goes."></div>
+      </div>
+      <div class="cb-row">
+        <div class="cb-field"><label for="cb-stepover">Stepover (%)</label><input class="cb-input" id="cb-stepover"></div>
+        <div class="cb-field"><label for="cb-rpm">Spindle RPM</label><input class="cb-input" id="cb-rpm"></div>
+        <div class="cb-field"><label for="cb-delay">Delay (s)</label><input class="cb-input" id="cb-delay" title="Wait after starting the spindle."></div>
+      </div>
+      <p class="cb-hint"><span id="cb-feeds-note"></span> <button type="button" class="cb-link" id="cb-refill">Starting feeds</button></p>
+    </div>
     <div class="cb-card">
       <h3>Fit</h3>
       <div class="cb-field"><label>Lip On</label>
@@ -175,7 +223,6 @@
       </div>
       <p class="cb-hint">The lip stands up round the opening of one half and slides into a widened opening in the other; they meet on the shoulder outside it.</p>
     </div>
-
     <div class="cb-card">
       <h3>Layout</h3>
       <div class="cb-row">
@@ -203,17 +250,8 @@
       </div>
       <p class="cb-hint" id="cb-stock-need"></p>
     </div>
-
-    <div class="cb-card">
-      <h3><span class="cb-grow">Nested Set</span><label class="cb-switch"><input type="checkbox" id="cb-nest-on" aria-label="Nested set"><span></span></label></h3>
-      <div class="cb-row" id="cb-nest-fields">
-        <div class="cb-field"><label for="cb-nest-n">Boxes</label><input class="cb-input" id="cb-nest-n" title="How many boxes, 2 to 5: each fits inside the one before."></div>
-        <div class="cb-field"><label for="cb-nest-gap">Nest Gap</label><input class="cb-input" id="cb-nest-gap" data-unit="length" title="Room round each box inside the one before it, each side and over it."></div>
-        <div class="cb-field"><label for="cb-nest-cut">Cut</label><select class="cb-select" id="cb-nest-cut"><option value="0">The whole set</option></select></div>
-      </div>
-      <p class="cb-hint" id="cb-nest-hint"></p>
     </div>
-
+    <div class="cb-cards" id="cb-more">
     <div class="cb-card">
       <h3><span class="cb-grow">Holding Tabs</span><label class="cb-switch"><input type="checkbox" id="cb-tabs-on" aria-label="Holding tabs"><span></span></label></h3>
       <div class="cb-row" id="cb-tab-fields">
@@ -223,53 +261,6 @@
       </div>
       <p class="cb-hint">The outlines are cut after the insides, a little into the spoilboard, leaving tabs to hold the halves (through the corner and edge bits' cuts too).</p>
     </div>
-
-    <div class="cb-card">
-      <h3><span class="cb-grow">Magnets</span><label class="cb-switch"><input type="checkbox" id="cb-mag-on" aria-label="Magnets"><span></span></label></h3>
-      <div class="cb-row" id="cb-mag-fields">
-        <div class="cb-field"><label for="cb-mag-n">Count</label><input class="cb-input" id="cb-mag-n" title="Holes in each half, evenly round."></div>
-        <div class="cb-field"><label for="cb-mag-d">Hole Diameter</label><input class="cb-input" id="cb-mag-d" data-unit="length" title="The magnet's diameter plus a little for glue."></div>
-        <div class="cb-field"><label for="cb-mag-depth">Hole Depth</label><input class="cb-input" id="cb-mag-depth" data-unit="length" title="The magnet's thickness plus a little: they sit flush."></div>
-      </div>
-      <p class="cb-hint">Holes facing each other where the halves meet, the same in both. Glue the magnets in with opposite poles up, so they pull together.</p>
-    </div>
-
-    <div class="cb-card">
-      <h3><span class="cb-grow">Finger Notch</span><label class="cb-switch"><input type="checkbox" id="cb-notch-on" aria-label="Finger notch"><span></span></label></h3>
-      <div class="cb-row cb-row-2" id="cb-notch-fields">
-        <div class="cb-field"><label for="cb-notch-w">Width</label><input class="cb-input" id="cb-notch-w" data-unit="length"></div>
-        <div class="cb-field"><label for="cb-notch-d">Depth</label><input class="cb-input" id="cb-notch-d" data-unit="length"></div>
-      </div>
-      <p class="cb-hint">A scoop in the base's rim at the front, to lift the lid by.</p>
-    </div>
-
-    <div class="cb-card">
-      <h3>Tool &amp; Feeds</h3>
-      <div class="cb-row cb-row-2">
-        <div class="cb-field"><label for="cb-tool">Tool</label><select class="cb-select" id="cb-tool" title="A bit from ncSender's Tool Library, or type its size."><option value="">Type a size</option></select></div>
-        <div class="cb-field"><label for="cb-bit">Bit Diameter</label><input class="cb-input" id="cb-bit" data-unit="length"></div>
-      </div>
-      <div class="cb-row">
-        <div class="cb-field"><label for="cb-material">Material</label><select class="cb-select" id="cb-material">
-          <option value="mdf">MDF / Plywood</option><option value="softwood">Softwood</option><option value="hardwood">Hardwood</option>
-          <option value="hdpe">HDPE / UHMW</option><option value="acrylic">Acrylic</option><option value="polycarbonate">Polycarbonate</option>
-          <option value="aluminum">Aluminum</option><option value="foam">Foam / tooling board</option></select></div>
-        <div class="cb-field"><label for="cb-style">Feeds Style</label><select class="cb-select" id="cb-style"><option value="conservative">Conservative</option><option value="average">Average</option><option value="aggressive">Aggressive</option></select></div>
-        <div class="cb-field"><label for="cb-flutes">Flutes</label><select class="cb-select" id="cb-flutes"><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
-      </div>
-      <div class="cb-row">
-        <div class="cb-field"><label for="cb-feed">Feed Rate</label><input class="cb-input" id="cb-feed" data-unit="feed"></div>
-        <div class="cb-field"><label for="cb-plunge">Plunge Rate</label><input class="cb-input" id="cb-plunge" data-unit="feed"></div>
-        <div class="cb-field"><label for="cb-doc">Depth of Cut</label><input class="cb-input" id="cb-doc" data-unit="length" title="How deep each pass goes."></div>
-      </div>
-      <div class="cb-row">
-        <div class="cb-field"><label for="cb-stepover">Stepover (%)</label><input class="cb-input" id="cb-stepover"></div>
-        <div class="cb-field"><label for="cb-rpm">Spindle RPM</label><input class="cb-input" id="cb-rpm"></div>
-        <div class="cb-field"><label for="cb-delay">Delay (s)</label><input class="cb-input" id="cb-delay" title="Wait after starting the spindle."></div>
-      </div>
-      <p class="cb-hint"><span id="cb-feeds-note"></span> <button type="button" class="cb-link" id="cb-refill">Starting feeds</button></p>
-    </div>
-
     <div class="cb-card">
       <h3><span class="cb-grow">Finishing Pass</span><label class="cb-switch"><input type="checkbox" id="cb-finish-on" aria-label="Finishing pass"><span></span></label></h3>
       <div class="cb-row" id="cb-finish-fields">
@@ -282,24 +273,6 @@
       </div>
       <p class="cb-hint">The roughing leaves the Allowance on the walls (the pockets', the opening's, the lip's); then the box's bit goes once round each for a cleaner wall. Conventional (the wood on the bit's left, as the spindle turns) is gentler and left the cleaner walls in pine; climb (on its right) can shear some woods and plastics cleaner.</p>
     </div>
-
-    <div class="cb-card">
-      <h3><span class="cb-grow">Floor Corners</span><label class="cb-switch"><input type="checkbox" id="cb-corners-on" aria-label="Floor corners"><span></span></label></h3>
-      <div class="cb-edge-fields" id="cb-corner-fields">
-        <div class="cb-row cb-row-2">
-          <div class="cb-field"><label for="cb-ctool">Corner Bit</label><select class="cb-select" id="cb-ctool" title="A ball or bowl bit from ncSender's Tool Library, so the program can change to it; or type its size."><option value="">Type its size</option></select></div>
-          <div class="cb-field"><label for="cb-cdiam">Bit Diameter</label><input class="cb-input" id="cb-cdiam" data-unit="length" title="Across the bit."></div>
-        </div>
-        <div class="cb-row">
-          <div class="cb-field"><label for="cb-crad">Corner Radius</label><input class="cb-input" id="cb-crad" data-unit="length" title="The round on the bit's end, and so in the floor's corners: half the diameter for a ball bit, less for a bowl bit."></div>
-          <div class="cb-field"><label for="cb-cfeed">Corner Feed</label><input class="cb-input" id="cb-cfeed" data-unit="feed"></div>
-          <div class="cb-field"><label for="cb-crpm">Corner RPM</label><input class="cb-input" id="cb-crpm"></div>
-        </div>
-      </div>
-      <p class="cb-hint" id="cb-corner-note"></p>
-      <div><button type="button" class="cb-btn cb-btn-quiet" id="cb-corners-only" title="Just the floor corners, as their own program: run it after the box, with the corner bit in and Z zeroed on the stock top (X Y as for the box).">Corners Only</button></div>
-    </div>
-
     <div class="cb-card">
       <h3><span class="cb-grow">Edges</span><label class="cb-switch"><input type="checkbox" id="cb-edges-on" aria-label="Edges"><span></span></label></h3>
       <div class="cb-edge-fields" id="cb-edge-fields">
@@ -333,6 +306,49 @@
       <p class="cb-hint" id="cb-edge-note"></p>
       <div><button type="button" class="cb-btn cb-btn-quiet" id="cb-edges-only" title="Just the edges, as their own program: run it after the box, with the edge bit in and Z zeroed on the stock top (X Y as for the box).">Edges Only</button></div>
     </div>
+    <div class="cb-card">
+      <h3><span class="cb-grow">Finger Notch</span><label class="cb-switch"><input type="checkbox" id="cb-notch-on" aria-label="Finger notch"><span></span></label></h3>
+      <div class="cb-row cb-row-2" id="cb-notch-fields">
+        <div class="cb-field"><label for="cb-notch-w">Width</label><input class="cb-input" id="cb-notch-w" data-unit="length"></div>
+        <div class="cb-field"><label for="cb-notch-d">Depth</label><input class="cb-input" id="cb-notch-d" data-unit="length"></div>
+      </div>
+      <p class="cb-hint">A scoop in the base's rim at the front, to lift the lid by.</p>
+    </div>
+    <div class="cb-card">
+      <h3><span class="cb-grow">Magnets</span><label class="cb-switch"><input type="checkbox" id="cb-mag-on" aria-label="Magnets"><span></span></label></h3>
+      <div class="cb-row" id="cb-mag-fields">
+        <div class="cb-field"><label for="cb-mag-n">Count</label><input class="cb-input" id="cb-mag-n" title="Holes in each half, evenly round."></div>
+        <div class="cb-field"><label for="cb-mag-d">Hole Diameter</label><input class="cb-input" id="cb-mag-d" data-unit="length" title="The magnet's diameter plus a little for glue."></div>
+        <div class="cb-field"><label for="cb-mag-depth">Hole Depth</label><input class="cb-input" id="cb-mag-depth" data-unit="length" title="The magnet's thickness plus a little: they sit flush."></div>
+      </div>
+      <p class="cb-hint">Holes facing each other where the halves meet, the same in both. Glue the magnets in with opposite poles up, so they pull together.</p>
+    </div>
+    <div class="cb-card">
+      <h3><span class="cb-grow">Floor Corners</span><label class="cb-switch"><input type="checkbox" id="cb-corners-on" aria-label="Floor corners"><span></span></label></h3>
+      <div class="cb-edge-fields" id="cb-corner-fields">
+        <div class="cb-row cb-row-2">
+          <div class="cb-field"><label for="cb-ctool">Corner Bit</label><select class="cb-select" id="cb-ctool" title="A ball or bowl bit from ncSender's Tool Library, so the program can change to it; or type its size."><option value="">Type its size</option></select></div>
+          <div class="cb-field"><label for="cb-cdiam">Bit Diameter</label><input class="cb-input" id="cb-cdiam" data-unit="length" title="Across the bit."></div>
+        </div>
+        <div class="cb-row">
+          <div class="cb-field"><label for="cb-crad">Corner Radius</label><input class="cb-input" id="cb-crad" data-unit="length" title="The round on the bit's end, and so in the floor's corners: half the diameter for a ball bit, less for a bowl bit."></div>
+          <div class="cb-field"><label for="cb-cfeed">Corner Feed</label><input class="cb-input" id="cb-cfeed" data-unit="feed"></div>
+          <div class="cb-field"><label for="cb-crpm">Corner RPM</label><input class="cb-input" id="cb-crpm"></div>
+        </div>
+      </div>
+      <p class="cb-hint" id="cb-corner-note"></p>
+      <div><button type="button" class="cb-btn cb-btn-quiet" id="cb-corners-only" title="Just the floor corners, as their own program: run it after the box, with the corner bit in and Z zeroed on the stock top (X Y as for the box).">Corners Only</button></div>
+    </div>
+    <div class="cb-card">
+      <h3><span class="cb-grow">Nested Set</span><label class="cb-switch"><input type="checkbox" id="cb-nest-on" aria-label="Nested set"><span></span></label></h3>
+      <div class="cb-row" id="cb-nest-fields">
+        <div class="cb-field"><label for="cb-nest-n">Boxes</label><input class="cb-input" id="cb-nest-n" title="How many boxes, 2 to 5: each fits inside the one before."></div>
+        <div class="cb-field"><label for="cb-nest-gap">Nest Gap</label><input class="cb-input" id="cb-nest-gap" data-unit="length" title="Room round each box inside the one before it, each side and over it."></div>
+        <div class="cb-field"><label for="cb-nest-cut">Cut</label><select class="cb-select" id="cb-nest-cut"><option value="0">The whole set</option></select></div>
+      </div>
+      <p class="cb-hint" id="cb-nest-hint"></p>
+    </div>
+    </div>
     </div>
   </div>
 
@@ -341,6 +357,7 @@
     <div class="cb-card">
       <h3>Getting started</h3>
       <ol>
+        <li>For a quick start, pick a <b>preset</b> in the <b>Start</b> card and press <b>Load</b>: it sets the box's shape, size and options. <b>Save</b> your own settings there under a name, to load again later.</li>
         <li>Measure your board and type its <b>Stock Thickness</b> (or tap <b>Stock</b> beside it, with Spoilboard Toolbox). The base is the full thickness; so is the lid, unless you lower its Lid Height.</li>
         <li>Pick the <b>Shape</b> and type its outside size.</li>
         <li>In <b>Tool &amp; Feeds</b>, pick the bit from the Tool Library and the <b>Material</b>. The feeds fill in for them.</li>
@@ -2226,7 +2243,7 @@ if (typeof module !== 'undefined' && module.exports) {
   var ROOT = document.querySelector('.cb-wrapper');
   var state = {
     imperial: false, atc: false, changer: false, autoSizes: false, safeZ: null, toolById: false, tools: [], maxFeedMm: null, maxPlungeMm: null, spindleMax: null, spindleMin: null,
-    feedsAuto: true, v: {}
+    feedsAuto: true, v: {}, saved: []
   };
   // Every setting, in mm (and mm/min): [field, key, kind, default, optional].
   var FIELDS = [
@@ -2857,10 +2874,79 @@ if (typeof module !== 'undefined' && module.exports) {
     return (o.shape === 'rect' ? fmt(o.length) + ' × ' + fmt(o.width) : o.shape === 'poly' ? o.sides + ' sides, ' + fmt(o.flats) : o.shape === 'oval' ? 'oval ' + fmt(o.length) + ' × ' + fmt(o.width)
       : o.shape === 'heart' ? 'heart ' + fmt(o.length) + ' × ' + fmt(o.width) : 'Ø ' + fmt(o.diameter));
   }
+  // Everything the dialog keeps, as saved.
+  function settingsNow() {
+    var v = Object.assign({}, lastPlan ? lastPlan.v : collect().v, { feedsAuto: state.feedsAuto, autoSizes: state.autoSizes, cornerOwn: state.cornerOwn });
+    v.lidHeight = state.lidOwn ? v.lidHeight : null;
+    return v;
+  }
+
+  // ---------- Start: presets, and your own saved settings ----------
+  // A preset sets the box and its options (Auto Sizes fills in the rest
+  // for your stock, bit and material); saved settings bring back all.
+  var PRESET_BASE = { autoSizes: true, cut: 'both', grain: false, nestOn: false, tabsOn: true, finishOn: true, magOn: false, notchOn: false, edgesOn: false, cornersOn: false, lidHeight: null };
+  var PRESETS = [
+    { name: 'Ring box, round 2"', v: { shape: 'circle', diameter: 50.8, notchOn: true } },
+    { name: 'Trinket box, round 3"', v: { shape: 'circle', diameter: 76.2 } },
+    { name: 'Keepsake box, 6" \u00d7 4", magnets', v: { shape: 'rect', length: 152.4, width: 101.6, cornerRadius: 12.7, magOn: true, magCount: 4, notchOn: true } },
+    { name: 'Hexagon box, 4"', v: { shape: 'poly', sides: 6, flats: 101.6, cornerRadius: 6.35 } },
+    { name: 'Oval box, 6" \u00d7 4"', v: { shape: 'oval', length: 152.4, width: 101.6 } },
+    { name: 'Heart box, 5"', v: { shape: 'heart', length: 127, width: 120, cornerRadius: 12.7 } },
+    { name: 'Nested set of 3, round 5"', v: { shape: 'circle', diameter: 127, nestOn: true, nestCount: 3, nestGap: 1.5, nestCut: 0 } }
+  ];
+  function renderStart(pick) {
+    var sel = $('cb-preset'), esc = function (t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); };
+    sel.innerHTML = '<option value="">Presets and your saved settings\u2026</option><optgroup label="Presets">' +
+      PRESETS.map(function (p, i) { return '<option value="p' + i + '">' + esc(p.name) + '</option>'; }).join('') + '</optgroup>' +
+      (state.saved.length ? '<optgroup label="Your saved settings">' + state.saved.map(function (p, i) { return '<option value="s' + i + '">' + esc(p.name) + '</option>'; }).join('') + '</optgroup>' : '');
+    sel.value = pick || '';
+    startButtons();
+  }
+  function startButtons() {
+    var v = $('cb-preset').value, name = $('cb-save-name').value.trim();
+    $('cb-preset-load').disabled = !v;
+    $('cb-delete').disabled = v.charAt(0) !== 's';
+    $('cb-save').disabled = !name;
+    $('cb-start-hint').textContent = v.charAt(0) === 'p' ? 'Load sets the box\u2019s shape, size and options, and turns Auto Sizes on; your stock, bit and feeds stay.'
+      : v.charAt(0) === 's' ? 'Load brings back everything saved with these settings. Save with the same name to replace them.'
+      : 'Start from a preset, or save these settings to come back to.';
+  }
+  function loadStart() {
+    var v = $('cb-preset').value, i = +v.slice(1);
+    if (!v) return;
+    var now = settingsNow(), from = v.charAt(0) === 'p' ? Object.assign({}, now, PRESET_BASE, PRESETS[i].v) : Object.assign({}, state.saved[i].v);
+    // A preset's corners are its own; saved settings say theirs.
+    if (v.charAt(0) === 'p') from.cornerOwn = PRESETS[i].v.cornerRadius != null ? PRESETS[i].v.cornerRadius : null;
+    restore(from);
+    [['cb-tool', 'tool'], ['cb-etool', 'edgeTool'], ['cb-ctool', 'cornerTool']].forEach(function (x) { $(x[0]).value = toolEntry(from[x[1]]) ? String(from[x[1]]) : ''; });
+    if (v.charAt(0) === 's') { $('cb-save-name').value = state.saved[i].name; }
+    showPickers();
+    if (state.feedsAuto && v.charAt(0) === 'p') fillFeeds();
+    update(true);
+    startButtons();
+  }
+  function saveStart() {
+    var name = $('cb-save-name').value.trim();
+    if (!name) return;
+    update(false);
+    var at = state.saved.map(function (p) { return p.name.toLowerCase(); }).indexOf(name.toLowerCase()), entry = { name: name, v: settingsNow() };
+    if (at >= 0) state.saved[at] = entry; else { state.saved.push(entry); at = state.saved.length - 1; }
+    persist();
+    renderStart('s' + at);
+    $('cb-start-hint').textContent = 'Saved as \u201c' + name + '\u201d.';
+  }
+  function deleteStart() {
+    var v = $('cb-preset').value;
+    if (v.charAt(0) !== 's') return;
+    var gone = state.saved.splice(+v.slice(1), 1)[0];
+    persist();
+    renderStart('');
+    $('cb-start-hint').textContent = 'Deleted \u201c' + gone.name + '\u201d.';
+  }
+
   function persist() {
     if (!lastPlan) return;
-    var v = Object.assign({}, lastPlan.v, { feedsAuto: state.feedsAuto, autoSizes: state.autoSizes, cornerOwn: state.cornerOwn });
-    fetch(BASE_URL + '/api/plugins/' + PLUGIN + '/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ v: v }) }).catch(function () {});
+    fetch(BASE_URL + '/api/plugins/' + PLUGIN + '/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ v: settingsNow(), saved: state.saved }) }).catch(function () {});
   }
   // The box, or (test) a small one with the same fit to try it first.
   // kind: 'box'; 'test', a small box with the same fit to try it first;
@@ -2893,8 +2979,8 @@ if (typeof module !== 'undefined' && module.exports) {
     } finally { btn.disabled = false; btn.textContent = label; }
   }
 
-  function restore() {
-    var saved = (initialConfig && initialConfig.v) || {};
+  function restore(from) {
+    var saved = from || (initialConfig && initialConfig.v) || {};
     state.v = saved;
     // A default length on an inch machine: a round inch size (6 mm: 1/4).
     var byDefault = function (f) { return state.imperial && f[2] === 'length' && f[3] > 0 ? NcUnitInput.roundInches(f[3] / 25.4) * 25.4 : f[3]; };
@@ -2965,6 +3051,12 @@ if (typeof module !== 'undefined' && module.exports) {
     ['cb-tabs-on', 'cb-mag-on', 'cb-notch-on', 'cb-finish-on', 'cb-corners-on', 'cb-edges-on', 'cb-nest-on'].forEach(function (id) { $(id).addEventListener('change', function () { update(true); }); });
     $('cb-testfit').addEventListener('click', function () { generate('test'); });
     $('cb-help-btn').addEventListener('click', function () { showHelp($('cb-help').hidden); });
+    $('cb-preset').addEventListener('change', function () { var v = $('cb-preset').value; if (v.charAt(0) === 's') $('cb-save-name').value = state.saved[+v.slice(1)].name; startButtons(); });
+    $('cb-save-name').addEventListener('input', startButtons);
+    $('cb-save-name').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); saveStart(); } });
+    $('cb-preset-load').addEventListener('click', loadStart);
+    $('cb-save').addEventListener('click', saveStart);
+    $('cb-delete').addEventListener('click', deleteStart);
     $('cb-grain').addEventListener('change', function () { update(true); });
     $('cb-nest-cut').addEventListener('change', function () { update(true); });
     $('cb-edges-only').addEventListener('click', function () { generate('edges'); });
@@ -3060,8 +3152,10 @@ if (typeof module !== 'undefined' && module.exports) {
       var lab = el.closest('.cb-field').querySelector('label');
       if (lab && !/\(/.test(lab.textContent)) lab.textContent += ' (' + (el.dataset.unit === 'feed' ? unit() + '/min' : unit()) + ')';
     });
+    state.saved = (initialConfig && Array.isArray(initialConfig.saved) ? initialConfig.saved : []).filter(function (p) { return p && p.name && p.v; });
     restore();
     wire();
+    renderStart('');
     if (state.feedsAuto && !(initialConfig && initialConfig.v && initialConfig.v.feed)) fillFeeds();
     update(false);
     wireStockThickness();

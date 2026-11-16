@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+- Start: presets to begin from (ring, trinket, keepsake with magnets, hexagon, oval, heart, nested set), and your own settings saved under a name to load again.
+- Three columns on a wide screen (the previews, the cards used most, the rest), two on a tall one; the cards ordered from most used to least.
 - Cut the base or the lid on its own board (Layout → Cut), the lid's from a thinner Lid Board if you like.
 - Grain Match: the base and the lid from the two leaves of a resawn board, the lid cut where it lands on the base, so the grain runs on across the seam.
 - Nested Set: 2 to 5 boxes, each fitting inside the one before, all in one program on one board, or one at a time from boards as thick as each needs.
