@@ -23,15 +23,16 @@ function simulate(gcode) {
     if (g === 0 || g === 1) {
       const n = Math.max(1, Math.ceil(Math.hypot(nx - x, ny - y, nz - z) / 0.5));
       const rapid = g === 0 && (nx !== x || ny !== y || nz < z);
-      for (let k = 1; k <= n; k++) pts.push({ x: x + (nx - x) * k / n, y: y + (ny - y) * k / n, z: z + (nz - z) * k / n, rapid });
+      for (let k = 1; k <= n; k++) pts.push({ x: x + (nx - x) * k / n, y: y + (ny - y) * k / n, z: z + (nz - z) * k / n, rapid, g });
     } else if (g === 2 || g === 3) {
       const cx = x + w.I, cy = y + w.J, r = Math.hypot(x - cx, y - cy);
       let a0 = Math.atan2(y - cy, x - cx), a1 = Math.atan2(ny - cy, nx - cx);
       if (g === 3 && a1 <= a0 + 1e-9) a1 += 2 * Math.PI;
+      if (g === 2 && a1 >= a0 - 1e-9) a1 -= 2 * Math.PI;
       const n = Math.max(2, Math.ceil(Math.abs(a1 - a0) * r / 0.5));
       for (let k = 1; k <= n; k++) {
         const a = a0 + (a1 - a0) * k / n;
-        pts.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a), z: z + (nz - z) * k / n, rapid: false });
+        pts.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a), z: z + (nz - z) * k / n, rapid: false, g });
       }
     }
     x = nx; y = ny; z = nz;
@@ -218,7 +219,7 @@ function checkEdges(plan, gcode) {
     assert.ok(on.length || above, 'edge bit off its edges: ' + JSON.stringify(p));
     // Below an edge's top, the bit's bottom stays on the air side: a
     // V-bit's point on the edge, a roundover bit's flat end beside it.
-    const ed = plan.o.edges, half = ed.bit === 'round' ? ed.tip / 2 : 0;
+    const ed = plan.o.edges, half = ((ed.bit === 'round' ? ed.tip : ed.vtip) || 0) / 2;
     for (const { h, e } of on) {
       if (p.z >= e.z0 - 1e-6) continue;
       const out = e.u * shapeDistance(e.shape, e.at, p.x - h.at.x, p.y - h.at.y);
@@ -371,4 +372,28 @@ test('the margin is from the stock\'s edges to the outsides of the cuts', () => 
     // Snug: the outline's outside on the margin.
     assert.ok(Math.abs(minX - st.x0 - m) < 0.01 || Math.abs(minY - st.y0 - m) < 0.01 || plan.edges.base.length, 'more stock than the margin');
   }
+});
+
+test('the finishing pass: roughing leaves the allowance, a climbing lap cleans each wall', () => {
+  for (const lipOn of ['base', 'lid']) for (const shape of [{}, { shape: 'rect', length: 120, width: 80, cornerRadius: 10 }]) for (const extra of [{}, { corners: { diameter: 6.35, radius: 3.175 } }, { lidHeight: 14 }]) {
+    const input = Object.assign({ lipOn, finish: 0.3 }, shape, extra);
+    const { plan, pts } = check(input);
+    const rb = plan.o.bit / 2, fin = 0.3, eps = 0.005;
+    for (const h of plan.halves) {
+      const withLip = (lipOn === 'lid') === (h.name === 'lid'), top = h.name === 'lid' ? -plan.face : 0;
+      const near = pts.filter((p) => p.z < top - 1e-6 && Math.hypot(p.x - h.at.x, p.y - h.at.y) < Math.max(plan.halfX, plan.halfY) * 1.5);
+      const at = (p, t) => shapeDistance(plan.shape, t, p.x - h.at.x, p.y - h.at.y);
+      const walls = [[plan.tInside - rb, (p) => withLip || top - p.z > plan.rabbetDepth + eps, 2]];
+      if (!withLip) walls.push([plan.tRabbet - rb, (p) => top - p.z <= plan.rabbetDepth + eps, 2]);
+      else walls.push([plan.tLip + rb, (p) => top - p.z <= plan.o.lipHeight + eps, 3]);
+      for (const [t, here, finishG] of walls) {
+        const inward = finishG === 2;
+        // Between the allowance and the wall: only the finishing laps (and their lead-ins).
+        const between = near.filter((p) => here(p) && (inward ? at(p, t) > -fin + eps && at(p, t) < eps : at(p, t) < fin - eps && at(p, t) > -eps));
+        assert.ok(between.every((p) => p.g === finishG || p.g === 1), h.name + ' roughed into the allowance at ' + t.toFixed(2) + ': ' + JSON.stringify(between.find((p) => p.g !== finishG && p.g !== 1)));
+        assert.ok(between.some((p) => p.g === finishG && Math.abs(at(p, t)) < eps), h.name + ' wall at ' + t.toFixed(2) + ' not finished (G' + finishG + ')');
+      }
+    }
+  }
+  assert.ok(boxPlan({ finish: 2 }).problems.some((p) => /Finish Allowance/.test(p)));
 });
