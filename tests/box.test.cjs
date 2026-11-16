@@ -105,9 +105,10 @@ test('rectangles: long either way, square, a slot-like inside, rounded right out
   check({ shape: 'rect', length: 120, width: 80, cornerRadius: 10, bit: 6.35, wall: 9, lipWidth: 3, gap: 20, tabs: null });
 });
 
-test('every floor is cleared all over', () => {
-  for (const input of [{}, { shape: 'rect', length: 110, width: 70, cornerRadius: 8 }, { shape: 'rect', length: 60, width: 60, cornerRadius: 30 }]) {
-    const { plan, pts } = check(input);
+test('every floor is cleared all over, at any stepover', () => {
+  for (const [input, stepoverPct] of [[{}, 40], [{ shape: 'rect', length: 110, width: 70, cornerRadius: 8 }, 40], [{ shape: 'rect', length: 60, width: 60, cornerRadius: 30 }, 40],
+    [{}, 75], [{}, 90], [{ shape: 'rect', length: 60, width: 60, cornerRadius: 10 }, 90], [{ diameter: 50 }, 60]]) {
+    const { plan, pts } = check(input, { stepoverPct });
     const rb = plan.o.bit / 2, S = plan.shape;
     for (const half of plan.halves) {
       const floor = (half.name === 'lid' ? plan.face : 0) + half.height - (half.name === 'lid' ? plan.o.top : plan.o.floor);
@@ -122,15 +123,17 @@ test('every floor is cleared all over', () => {
 });
 
 test('the tabs stay standing, and the outline goes through', () => {
-  for (const input of [{}, { shape: 'rect', length: 120, width: 60, cornerRadius: 6, tabs: { count: 6, width: 6, height: 1.5 } }]) {
+  for (const input of [{}, { shape: 'rect', length: 120, width: 60, cornerRadius: 6, tabs: { count: 6, width: 6, height: 1.5 } },
+    { diameter: 150, tabs: { count: 8, width: 6, height: 1.5 } }, { diameter: 150, tabs: { count: 12, width: 6, height: 0.5 } }]) {
     const { plan, pts } = check(input);
     const o = plan.o, rb = o.bit / 2, loop = shapeLoop(plan.shape, rb), len = loopLength(loop);
     for (const half of plan.halves) {
-      const tabTop = half.outline.z0 - (half.outline.depth - o.tabs.height);
+      // Height from the half's bottom.
+      const tabTop = half.outline.z0 - half.height + o.tabs.height;
       const ring = pts.filter((p) => Math.abs(shapeDistance(plan.shape, rb, p.x - half.at.x, p.y - half.at.y)) < 1e-3);
       assert.ok(ring.some((p) => Math.abs(p.z - (half.outline.z0 - half.outline.depth)) < 1e-6), half.name + ' cut through');
       for (let k = 0; k < o.tabs.count; k++) {
-        const c = loopPoint(loop, len * (1 / 8 + k / o.tabs.count));
+        const c = loopPoint(loop, len * (k + 0.5) / o.tabs.count);
         const inTab = ring.filter((p) => Math.hypot(p.x - half.at.x - c.x, p.y - half.at.y - c.y) < o.tabs.width / 2 - 0.05);
         assert.ok(inTab.length > 0 && inTab.every((p) => p.z >= tabTop - 1e-6), half.name + ' tab ' + k + ' cut away');
       }
@@ -192,4 +195,57 @@ test('magnets and a notch that don\'t fit say why', () => {
   said({ shape: 'rect', magnets: { count: 3, diameter: 6, depth: 3 }, wall: 12 }, /even number of magnets/);
   said({ shape: 'rect', width: 0 }, /Length and Width/);
   said({ wall: 12, magnets: { count: 12, diameter: 6.35, depth: 3 }, notch: { width: 16, depth: 3 } }, /runs into a magnet hole/);
+});
+
+// The edge bit's path: on each edge's loop, never deeper than the edge,
+// rapids above the stock.
+function checkEdges(plan, gcode) {
+  for (const l of gcode.split('\n')) {
+    assert.ok(l.length <= 79, l);
+    assert.doesNotMatch(l, /[!?~]/, l);
+  }
+  const pts = simulate(gcode).filter((p) => p.z < 0);
+  const all = plan.halves.flatMap((h) => plan.edges[h.name].map((e) => ({ h, e })));
+  for (const p of pts) {
+    assert.ok(!p.rapid, 'a rapid below the stock top');
+    const on = all.filter(({ h, e }) => Math.abs(shapeDistance(plan.shape, e.t, p.x - h.at.x, p.y - h.at.y)) < 0.005 && p.z >= e.z0 - e.depth - 1e-6);
+    // Above an edge's top, going down to it in the air.
+    const above = all.some(({ h, e }) => Math.abs(shapeDistance(plan.shape, e.t, p.x - h.at.x, p.y - h.at.y)) < 0.005 && p.z >= e.z0 - 1e-6);
+    assert.ok(on.length || above, 'edge bit off its edges: ' + JSON.stringify(p));
+  }
+  for (const { h, e } of all) {
+    assert.ok(pts.some((p) => Math.abs(p.z - (e.z0 - e.depth)) < 1e-6 && Math.abs(shapeDistance(plan.shape, e.t, p.x - h.at.x, p.y - h.at.y)) < 0.005), h.name + ' ' + e.what + ' not cut');
+  }
+}
+
+test('chamfered and rounded edges, cut last after a tool change, or on their own', () => {
+  const EF = { toolNumber: 7, feed: 1200, plunge: 300, rpm: 16000, delay: 2, doc: 2 };
+  for (const lipOn of ['base', 'lid']) for (const shape of [{}, { shape: 'rect', length: 120, width: 80, cornerRadius: 12 }]) {
+    for (const edges of [{ bit: 'v', angle: 90, outside: 1.5, inside: 0.8 }, { bit: 'round', radius: 3.175, tip: 3, outside: 3, inside: 1 }, { bit: 'v', angle: 60, outside: 2, inside: 0 }]) {
+      const input = Object.assign({ lipOn, wall: 8, lidHeight: 15, edges }, shape);
+      const plan = boxPlan(input);
+      assert.deepEqual(plan.problems, [], JSON.stringify(input));
+      const all = boxProgram(plan, Object.assign({}, FEEDS, { edges: EF })).gcode;
+      const at = all.indexOf('M6 T7');
+      assert.ok(at > 0 && /M3 S16000/.test(all.slice(at)), 'no change to the edge bit');
+      // The box part is as without edges; the edges part keeps to its edges.
+      assert.equal(all.slice(0, all.indexOf('(Edges')), boxProgram(plan, FEEDS).gcode.slice(0, all.indexOf('(Edges')));
+      checkEdges(plan, all.slice(at));
+      const own = boxProgram(plan, Object.assign({}, FEEDS, { edges: EF }), 'edges').gcode;
+      assert.doesNotMatch(own, /M6/);
+      assert.match(own, /M3 S16000/);
+      checkEdges(plan, own);
+      assert.doesNotMatch(boxProgram(plan, FEEDS).gcode, /edge bit|M6 T7/);
+    }
+  }
+});
+
+test('edges that don\'t fit say why', () => {
+  const said = (o, re) => assert.ok(boxPlan(o).problems.some((p) => re.test(p)), JSON.stringify(o) + ' ' + boxPlan(o).problems);
+  said({ edges: { bit: 'v', angle: 90, outside: 3, inside: 0 } }, /Outside seam edge too big|rim round the widened opening/);
+  said({ edges: { bit: 'v', angle: 90, outside: 0, inside: 1.5 } }, /Inside rim edges too big for the lip/);
+  said({ edges: { bit: 'round', radius: 2, tip: 3, outside: 3, inside: 0 } }, /deeper than the bit's radius/);
+  said({ edges: { bit: 'v', angle: 10, outside: 1, inside: 0 } }, /angle must be between/);
+  said({ wall: 10, lipHeight: 2, edges: { bit: 'v', angle: 60, outside: 0, inside: 1.9 } }, /less deep than the Lip Height/);
+  assert.deepEqual(boxPlan({ edges: { bit: 'v', angle: 90, outside: 0, inside: 0 } }).problems, []);
 });
