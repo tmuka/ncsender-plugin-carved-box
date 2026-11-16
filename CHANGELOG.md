@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+- Cut the base or the lid on its own board (Layout → Cut), the lid's from a thinner Lid Board if you like.
+- Grain Match: the base and the lid from the two leaves of a resawn board, the lid cut where it lands on the base, so the grain runs on across the seam.
+- Nested Set: 2 to 5 boxes, each fitting inside the one before, all in one program on one board, or one at a time from boards as thick as each needs.
+- A base lower than the stock is faced down first, as a lower lid is.
+
 ## 0.2.1: Help, Stock button, taller lips
 - Help (top right): getting started, how the lid fits, Test Fit and Auto Sizes, with your box's and its test fit's previews. The README has the same, with screenshots.
 - Stock Thickness: a Stock button puts in Spoilboard Toolbox's stock thickness, when Spoilboard Toolbox is installed and on. Hidden otherwise.

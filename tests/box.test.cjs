@@ -2,7 +2,7 @@
 // bit's center goes, at what depth, against what must be left standing.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { boxPlan, testFitInput, autoSizes, BOX_DEFAULTS } = require('../lib/box-plan.cjs');
+const { boxPlan, testFitInput, autoSizes, nestInputs, setPlan, BOX_DEFAULTS } = require('../lib/box-plan.cjs');
 const { boxProgram, MAX_LINES } = require('../lib/box-gcode.cjs');
 const { shapeDistance, shapeLoop, shapeLoops, loopLength, loopPoint } = require('../lib/box-shape.cjs');
 
@@ -46,19 +46,20 @@ function simulate(gcode) {
 // Is the bit's center at p allowed, near this half? (What must be left:
 // the wall, the lip, the floor or top, the tabs, round magnet holes and
 // the notch.) Distances: to the box's outline moved t, < 0 inside.
-function allowed(plan, half, p) {
-  const o = plan.o, rb = o.bit / 2, S = plan.shape;
+function allowed(set, half, p) {
+  // A nested set's half: its own box's plan.
+  const plan = half.plan || set, o = plan.o, rb = o.bit / 2, S = plan.shape;
   // eps: the program's coordinates are to 0.001 mm, arc centers too; an
   // outline's offsets (a heart's, an oval's) are straight lines kept to
   // 0.02 mm of the curve.
   const eps = S.kind === 'outline' ? 0.03 : 0.005;
-  const top = half.name === 'lid' ? -plan.face : 0, d = top - p.z;
+  const face = plan.faces[half.name], top = -face, d = top - p.z;
   const px = p.x - half.at.x, py = p.y - half.at.y;
   const at = (t) => shapeDistance(S, t, px, py);
   if (-p.z <= eps) return true;
   // A lid lower than the stock: its area faced down first.
   const facing = half.cuts.find((c) => /faced down/.test(c.what));
-  if (facing && -p.z <= plan.face + eps && at(facing.t - rb) <= eps) return true;
+  if (facing && -p.z <= face + eps && at(facing.t - rb) <= eps) return true;
   if (at(rb) >= -eps) return d <= half.outline.depth + eps;
   const withLip = (o.lipOn === 'lid') === (half.name === 'lid');
   const floor = half.height - (half.name === 'lid' ? o.top : o.floor), meet = withLip ? o.lipHeight : 0;
@@ -78,8 +79,8 @@ function allowed(plan, half, p) {
 }
 
 function check(input, extra) {
-  const plan = boxPlan(input);
-  assert.deepEqual(plan.problems, [], JSON.stringify(input));
+  const plan = input.halves ? input : boxPlan(input);
+  assert.deepEqual(plan.problems, [], JSON.stringify(input.halves ? input.o : input));
   const { gcode } = boxProgram(plan, Object.assign({}, FEEDS, extra || {}));
   for (const l of gcode.split('\n')) {
     assert.ok(l.length <= 79, l);
@@ -90,7 +91,9 @@ function check(input, extra) {
   for (const p of pts) {
     assert.ok(!(p.rapid && p.z < -1e-6), 'a rapid below the stock top');
     if (p.rapid && p.z < SAFE) assert.ok(!p.sideways, 'a move sideways under safe height: ' + JSON.stringify(p));
-    const half = plan.halves.reduce((a, b) => Math.hypot(p.x - a.at.x, p.y - a.at.y) <= Math.hypot(p.x - b.at.x, p.y - b.at.y) ? a : b);
+    // The half it's nearest (inside, or closest outside its outline).
+    const near = (h) => shapeDistance(h.plan.shape, 0, p.x - h.at.x, p.y - h.at.y);
+    const half = plan.halves.reduce((a, b) => near(a) <= near(b) ? a : b);
     assert.ok(allowed(plan, half, p), half.name + ' cut where wood stays: ' + JSON.stringify(p));
   }
   return { plan, pts, gcode };
@@ -597,4 +600,83 @@ test('ovals and hearts: their ends and notch fit, big offsets, tiny pieces, Test
       }
     }
   }
+});
+
+test('one half on its own board: the base or the lid, the lid from a thinner board, a lower base faced', () => {
+  for (const shape of [{}, { shape: 'rect', length: 120, width: 80, cornerRadius: 10 }, { shape: 'heart', length: 100, width: 95, cornerRadius: 12, wall: 7, lipWidth: 3 }])
+    for (const lipOn of ['base', 'lid']) for (const origin of ['front-left', 'center']) {
+      const both = boxPlan(Object.assign({ lipOn, origin }, shape));
+      for (const cut of ['base', 'lid']) {
+        const input = Object.assign({ lipOn, origin, cut, lidStock: 12 }, shape);
+        const { plan, gcode } = check(input);
+        assert.deepEqual(plan.halves.map((h) => h.name), [cut]);
+        assert.equal(plan.stock.thick, cut === 'lid' ? 12 : 19);
+        // One half's board: a margin round its outline.
+        assert.ok(Math.abs(plan.stock.w - (2 * both.halfX + 2 * both.margin)) < 1e-9 && Math.abs(plan.stock.h - (2 * both.halfY + 2 * both.margin)) < 1e-9);
+        if (origin === 'front-left') assert.deepEqual(plan.halves[0].at, both.halves[0].at);
+        if (cut === 'lid') assert.equal(plan.lidHeight, 12);
+        assert.doesNotMatch(gcode, /faced down/);
+        assert.match(gcode, new RegExp('Only the ' + cut));
+      }
+    }
+  // The lid's height still from its own board: lower than it, faced down.
+  check({ cut: 'lid', lidStock: 15, lidHeight: 12 });
+  assert.ok(boxPlan({ cut: 'lid', lidStock: 10, lidHeight: 12 }).problems.some((p) => /more than the lid's board/.test(p)));
+  // A base lower than the stock, as a nested box's: faced down first.
+  const { gcode } = check({ baseHeight: 15, lidHeight: 14 });
+  assert.match(gcode, /Base: faced down to the base height/);
+});
+
+test('grain matched: the lid where the base is, mirrored, on the leaf turned over as the lid turns over', () => {
+  for (const layout of ['x', 'y']) for (const shape of [{}, { shape: 'heart', length: 100, width: 95, cornerRadius: 12, wall: 7, lipWidth: 3 }, { shape: 'poly', sides: 5, flats: 90, cornerRadius: 8 }]) {
+    const base = boxPlan(Object.assign({ layout, cut: 'base', grain: true }, shape)).halves[0].at;
+    const { plan, gcode } = check(Object.assign({ layout, cut: 'lid', grain: true }, shape));
+    const lid = plan.halves[0].at;
+    if (layout === 'x') assert.ok(Math.abs(lid.x + base.x) < 1e-9 && Math.abs(lid.y - base.y) < 1e-9, JSON.stringify([base, lid]));
+    else assert.ok(Math.abs(lid.y + base.y) < 1e-9 && Math.abs(lid.x - base.x) < 1e-9, JSON.stringify([base, lid]));
+    // The lid's board: from that corner (a heart's outline is to 0.02 mm).
+    assert.ok(layout === 'x' ? Math.abs(plan.stock.x0 + plan.stock.w) < 0.01 : Math.abs(plan.stock.y0 + plan.stock.h) < 0.01);
+    assert.match(gcode, layout === 'x' ? /front-right corner/ : /back-left corner/);
+    // The shape the same turned over that way, so the lid lands on the base.
+    const S = plan.shape, lp = shapeLoop(S, 0), len = loopLength(lp);
+    for (let k = 0; k < 60; k++) {
+      const q = loopPoint(lp, len * k / 60);
+      assert.ok(Math.abs(shapeDistance(S, 0, layout === 'x' ? -q.x : q.x, layout === 'x' ? q.y : -q.y)) < 0.05);
+    }
+  }
+  // With the origin in the middle of each, the same place.
+  assert.deepEqual(boxPlan({ cut: 'lid', grain: true, origin: 'center' }).halves[0].at, { x: 0, y: 0 });
+});
+
+test('a nested set: each box inside the one before, all on one board, cut without touching what stays', () => {
+  const tune = (i) => autoSizes(i, 'softwood', false);
+  for (const shape of [{ diameter: 130 }, { shape: 'rect', length: 160, width: 110, cornerRadius: 12 }, { shape: 'poly', sides: 6, flats: 120, cornerRadius: 8 },
+    { shape: 'oval', length: 130, width: 90 }, { shape: 'heart', length: 120, width: 110, cornerRadius: 12 }])
+    for (const layout of ['x', 'y']) {
+      const input = Object.assign({ stock: 30, bit: 6.35, layout, tabs: { count: 4, width: 9, height: 2 } }, shape);
+      const first = Object.assign({}, input, tune(input)); delete first.problems;
+      const list = nestInputs(first, 3, 1.5, tune);
+      assert.equal(list.length, 3, JSON.stringify(shape));
+      const set = setPlan(list, 3);
+      for (let i = 1; i < list.length; i++) {
+        const outer = set.set[i - 1], inner = set.set[i], d = outer.o.wall + 1.5;
+        // Its outline at least the gap inside the one before's inside, and under its lid.
+        const lp = shapeLoop(inner.shape, 0), len = loopLength(lp);
+        for (let k = 0; k < 90; k++) { const q = loopPoint(lp, len * k / 90); assert.ok(shapeDistance(outer.shape, -d, q.x, q.y) <= 0.02, 'box ' + (i + 1) + ' sticks out'); }
+        assert.ok(inner.closedHeight <= outer.insideHeight - 1.5 + 1e-6);
+      }
+      // The halves apart: outlines at least the gap from each other.
+      for (const a of set.halves) for (const b of set.halves) if (a !== b) {
+        const lp = shapeLoop(a.plan.shape, 0), len = loopLength(lp);
+        let near = Infinity;
+        for (let k = 0; k < 90; k++) { const q = loopPoint(lp, len * k / 90); near = Math.min(near, shapeDistance(b.plan.shape, 0, q.x + a.at.x - b.at.x, q.y + a.at.y - b.at.y)); }
+        assert.ok(near >= set.o.gap - 0.05, a.label + ' and ' + b.label + ' ' + near);
+      }
+      // On the stock, a margin round them.
+      if (layout === 'x') check(set);
+      assert.match(boxProgram(set, FEEDS).gcode, /\(Box 3: /);
+    }
+  // Too many: as many as fit, and said.
+  const small = setPlan(nestInputs({ diameter: 60 }, 5, 1.5), 5);
+  assert.ok(small.set.length < 5 && small.problems.some((p) => /boxes fit inside each other/.test(p)));
 });
