@@ -159,9 +159,9 @@ test('numbers that make no box say why', () => {
   const said = (o, re) => assert.ok(boxPlan(o).problems.some((p) => re.test(p)), JSON.stringify(o) + ' ' + boxPlan(o).problems);
   said({ wall: 45 }, /inside must be wider than the bit/);
   said({ wall: 3, lipWidth: 2.5 }, /Wall must be at least 1 mm more/);
-  said({ floor: 19 }, /Floor must be between/);
+  said({ floor: 19 }, /Base Floor must be between/);
   said({ lipHeight: 16 }, /Lip Height must be less/);
-  said({ gap: 3 }, /Gap must be at least/);
+  said({ gap: 3 }, /Gap Between must be at least/);
   said({ tabs: { count: 30, width: 10, height: 2 } }, /Too many or too wide tabs/);
   assert.equal(BOX_DEFAULTS.lipOn, 'base');
 });
@@ -204,7 +204,7 @@ test('magnets and a notch that don\'t fit say why', () => {
   said({ wall: 14, magnets: { count: 4, diameter: 3, depth: 3 } }, /wider than the bit/);
   said({ notch: { width: 30, depth: 3 } }, /Finger notch too wide/);
   said({ lidHeight: 25 }, /Lid Height can't be more/);
-  said({ lidHeight: 6, top: 6 }, /Top must be between/);
+  said({ lidHeight: 6, top: 6 }, /Lid Top must be between/);
   said({ shape: 'rect', cornerRadius: 2 }, /Corner Radius must be at least/);
   said({ shape: 'rect', magnets: { count: 3, diameter: 6, depth: 3 }, wall: 12 }, /even number of magnets/);
   said({ shape: 'rect', width: 0 }, /Length and Width/);
@@ -290,7 +290,7 @@ test('edges that don\'t fit say why', () => {
   const said = (o, re) => assert.ok(boxPlan(o).problems.some((p) => re.test(p)), JSON.stringify(o) + ' ' + boxPlan(o).problems);
   const V = { bit: 'v', angle: 90, diameter: 12.7 };
   said({ edges: { ...V, outside: 3, inside: 0 } }, /rim round the widened opening/);
-  said({ wall: 10, edges: { ...V, outside: 0, inside: 1.5, pocket: 1.5 } }, /Lead-In and Pocket Edge too big for the lip/);
+  said({ wall: 10, edges: { ...V, outside: 0, inside: 1.5, pocket: 1.5 } }, /Lead-In and Inside Rim too big for the lip/);
   // The step's inner edge is down at the step: its bit must clear the opening's wall above.
   said({ wall: 10, edges: { ...V, outside: 0, inside: 0, pocket: 0.5 } }, /cut into the widened opening's wall/);
   said({ edges: { bit: 'round', radius: 2, tip: 3, outside: 3, inside: 0 } }, /deeper than the bit's radius/);
