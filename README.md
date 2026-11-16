@@ -2,6 +2,28 @@
 
 An [ncSender](https://github.com/siganberg/ncSender) plugin that carves a round, rectangular, many-sided, oval or heart-shaped box with a lid out of one board. The base and the lid are cut side by side: each is pocketed down to its wall, floor and top, a lip on one half slides into the other with the clearance you set, and both outlines are cut free with holding tabs. One program, with the box's bit, then (when you use them) a ball or bowl bit for rounded floor corners and a V-bit or roundover bit for the edges.
 
+![The Carved Box dialog: both halves on the stock, the closed box cut through its middle, and the settings](docs/dialog.png)
+
+## Getting started
+
+1. Measure your board and type its **Stock Thickness** (or tap **Stock** beside it, with Spoilboard Toolbox).
+2. Pick the **Shape** and type its outside size.
+3. In **Tool & Feeds**, pick the bit from the Tool Library and the **Material**; the feeds fill in.
+4. Turn on **Auto Sizes**: the wall, lip, clearance, tabs and the rest fill in to fit each other.
+5. Cut a **Test Fit** in scrap of the same board and try the lid on (below).
+6. Press **Generate**. In ncSender, zero X and Y where **Layout** puts the origin and Z on the top of the stock, hold the board down outside the cuts, and run it.
+7. Cut the tabs and sand them flush. The lid goes on turned over: its top is the board's underside.
+
+**Help** (top right of the dialog) walks through these, how the lid fits, and Test Fit, with pictures drawn from your settings.
+
+![Help: getting started, and how the lid fits, with your box's side view](docs/help.png)
+
+## Test Fit
+
+**Test Fit** makes a program for a small box with the same fit as yours: the same wall, lip, Clearance, bit and feeds, only a little wider than its wall and only as deep inside as the lip needs. It takes a few minutes and a scrap of the same board. Cut it and try the lid on: if you have to force it, make the Clearance a little bigger (about 0.05 mm, 0.002"); if it rattles, a little smaller. Wood moves with the weather, so leave a lid that's just snug in a dry shop a touch looser. A rectangle's test is square and a polygon's has the same sides, with the same corner radius; an oval's is round; a heart's is a small heart. Magnets, the notch, edges and floor corners are left out.
+
+![Help on Test Fit: the test box's top and side views for your settings](docs/test-fit.png)
+
 ## Settings
 
 - **Auto Sizes** (the switch on the Box card, on for a first try): fills in the wall, floor, top, Lid Height (the stock's thickness, so nothing is faced away), lip (its width half the wall; in wood at least 1/4" high when the box is deep enough), clearance (from the Material in Tool & Feeds), gap, margin, tabs, notch, magnet count and edges for the box's size, stock and bit, so they fit each other: with magnets, a notch or edges on, the wall gets thicker (or the notch and edges smaller) until they fit. The sizes it fills are in color; typing in one sets it yourself and turns it off.
@@ -18,7 +40,6 @@ An [ncSender](https://github.com/siganberg/ncSender) plugin that carves a round,
 
 The previews show both halves on the stock, and the closed box cut through its middle: the lip in the other half's opening, the clearance drawn a little wider to be seen, the closed and inside heights.
 
-**Test Fit** cuts a small box with the same fit, only as deep inside as the lip needs: try it before the real one, and adjust the Clearance. A rectangle's is square, with the same corner radius.
 
 ## What it cuts
 

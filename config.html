@@ -61,6 +61,14 @@
   .cb-note.cb-warn { color: #e0a84a; }
   .cb-btn { height: 40px; padding: 0 22px !important; margin: 0 !important; border-radius: var(--radius-small) !important; border: none !important; background: var(--color-accent) !important; color: #fff !important; font: inherit !important; font-weight: 600 !important; cursor: pointer; }
   .cb-btn:disabled { opacity: 0.5; cursor: default; }
+  .cb-help-btn { margin-left: 8px !important; height: 30px; padding: 0 14px !important; }
+  .cb-help { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 20px 20px; }
+  .cb-help-inner { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+  .cb-help h3 { margin: 0 0 6px; font-size: 1rem; font-weight: 700; }
+  .cb-help ol, .cb-help ul { margin: 0; padding-left: 22px; line-height: 1.5; font-size: 0.9rem; }
+  .cb-help li { margin: 3px 0; }
+  .cb-help p { font-size: 0.9rem; }
+  .cb-help-pics { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-top: 10px; }
   .cb-btn-quiet { background: transparent !important; color: var(--color-text-primary) !important; border: 1px solid var(--color-border) !important; }
   /* Preview colours */
   .cb-stock { fill: color-mix(in srgb, #c8a77a 55%, var(--color-surface)); stroke: color-mix(in srgb, #c8a77a 70%, var(--color-text-secondary)); stroke-width: 0.6; }
@@ -111,6 +119,7 @@
     <h2>Carved Box</h2>
     <span class="cb-sub">A box with a lid, round, rectangular, many-sided, oval or heart-shaped, carved side by side from one board.</span>
     <span class="cb-unit" id="cb-unit">METRIC (MM)</span>
+    <button type="button" class="cb-btn cb-btn-quiet cb-help-btn" id="cb-help-btn">Help</button>
   </div>
 
   <div class="cb-body">
@@ -303,10 +312,68 @@
     </div>
   </div>
 
+  <div class="cb-help" id="cb-help" hidden>
+    <div class="cb-help-inner">
+    <div class="cb-card">
+      <h3>Getting started</h3>
+      <ol>
+        <li>Measure your board and type its <b>Stock Thickness</b> (or tap <b>Stock</b> beside it, with Spoilboard Toolbox). The base is the full thickness; so is the lid, unless you lower its Lid Height.</li>
+        <li>Pick the <b>Shape</b> and type its outside size.</li>
+        <li>In <b>Tool &amp; Feeds</b>, pick the bit from the Tool Library and the <b>Material</b>. The feeds fill in for them.</li>
+        <li>Turn on <b>Auto Sizes</b>: the wall, lip, clearance, tabs and the rest fill in (in color) to fit each other. Type in one to set it yourself.</li>
+        <li>Cut a <b>Test Fit</b> in scrap of the same board, and try the lid on (below).</li>
+        <li>Press <b>Generate</b>, then in ncSender zero X and Y where <b>Layout</b> puts the origin (the stock's front-left corner, or the middle of the pair), and Z on the top of the stock.</li>
+        <li>Hold the board down outside the cuts (the <b>Margin</b> keeps the bit away from the edges) and run it. Every move sideways is up at ncSender's Safe Z, over your clamps.</li>
+        <li>Afterwards, cut the tabs and sand them flush. The lid goes on turned over: its top is the board's underside.</li>
+      </ol>
+    </div>
+    <div class="cb-card">
+      <h3>How the lid fits</h3>
+      <p>One half has a <b>lip</b>: the inner part of its wall, left standing. The other half's opening is widened by the Lip Width plus the <b>Clearance</b>, as deep as the lip plus the Clearance, so the lip slides in and the halves meet on the shoulder outside it. Your box, closed and cut through its middle:</p>
+      <div class="cb-help-pics"><div class="cb-view"><div class="cb-view-title">Your box · side view</div><svg id="cb-help-side" viewBox="0 0 100 40"></svg></div></div>
+    </div>
+    <div class="cb-card">
+      <h3>Test Fit</h3>
+      <p><b>Test Fit</b> makes a program for a small box with the same fit as yours: the same wall, lip, Clearance, bit and feeds, but only a little wider than its wall and only as deep inside as the lip needs. It takes a few minutes and a scrap of the same board. Cut it, and try the lid on:</p>
+      <ul>
+        <li><b>Too tight</b> (you have to force it): make the Clearance a little bigger, by about 0.05 mm (0.002").</li>
+        <li><b>Too loose</b> (it rattles or falls off): make it a little smaller.</li>
+        <li>Wood moves with the weather: a lid that's just snug in a dry shop can stick later. About 0.2–0.3 mm suits most wood, 0.1 mm plastic.</li>
+      </ul>
+      <p>A rectangle's test is square and a polygon's has the same sides, with the same corner radius; an oval's is round; a heart's is a small heart. Magnets, the notch, edges and floor corners are left out. With your settings:</p>
+      <div class="cb-help-pics">
+        <div class="cb-view"><div class="cb-view-title">Test Fit · top view</div><svg id="cb-help-tf-top" viewBox="0 0 100 60"></svg></div>
+        <div class="cb-view"><div class="cb-view-title">Test Fit · side view</div><svg id="cb-help-tf-side" viewBox="0 0 100 40"></svg></div>
+      </div>
+      <p class="cb-hint" id="cb-help-tf-note"></p>
+    </div>
+    <div class="cb-card">
+      <h3>Auto Sizes</h3>
+      <p>Fills in the sizes that have to fit each other for your box's size, stock, bit and material: a wall about 8% of the size, the lip half the wall and (in wood) at least 1/4" high, the Clearance from the material, the lid as high as the stock, holding tabs, and the magnets, notch and edges when they're on. It makes the wall thicker until they fit. The sizes it fills in are in color; typing in one sets it yourself and turns Auto Sizes off.</p>
+    </div>
+    <div class="cb-card">
+      <h3>Other bits: floor corners and edges</h3>
+      <p><b>Floor Corners</b> rounds where each pocket's floor meets its wall, with a ball or bowl bit. <b>Edges</b> chamfers or rounds the edges with a V-bit or roundover bit: the <b>Lead-In</b> on the lip's outer edge and the opening's edge helps the lid find its way on. Both are cut after the outlines, while the tabs still hold the halves.</p>
+      <ul>
+        <li>With a tool changer set up in ncSender (a manual one too) and the bits picked from the Tool Library, Generate makes one program that changes bits (M6).</li>
+        <li>Otherwise, cut the box, put the other bit in, zero Z on the top of the stock (keep X and Y), and run <b>Corners Only</b> or <b>Edges Only</b>.</li>
+      </ul>
+    </div>
+    <div class="cb-card">
+      <h3>Tips</h3>
+      <ul>
+        <li>The <b>Finishing Pass</b> goes round the walls once more after the roughing, for cleaner walls; Conventional left cleaner walls in pine.</li>
+        <li>Keep the <b>Holding Tabs</b> on: they hold the halves while the outlines, corners and edges are cut.</li>
+        <li>Field values take either unit and simple math: <b>1/4"</b>, <b>6.35mm</b>, <b>1-1/2 in</b>, <b>1in+4mm</b>.</li>
+      </ul>
+    </div>
+    </div>
+  </div>
+
   <div class="cb-footer">
     <p class="cb-note" id="cb-note"></p>
     <button type="button" class="cb-btn cb-btn-quiet" id="cb-close">Close</button>
-    <button type="button" class="cb-btn cb-btn-quiet" id="cb-testfit" title="A small box with the same fit, only as deep inside as the lip needs: cut it first to try the Clearance.">Test Fit</button>
+    <button type="button" class="cb-btn cb-btn-quiet" id="cb-testfit" title="A small box with the same wall, lip and Clearance, only as deep inside as the lip needs: cut it in scrap first and try the lid on. Help says more.">Test Fit</button>
     <button type="button" class="cb-btn" id="cb-generate">Generate</button>
   </div>
 </div>
@@ -2109,7 +2176,8 @@ if (typeof module !== 'undefined' && module.exports) {
     for (var k = 0; k < n; k++) { var p = loopPoint(lp, len * k / n); d += (k ? 'L' : 'M') + (cx + p.x * s).toFixed(2) + ',' + (cy - p.y * s).toFixed(2); }
     return d + 'Z';
   }
-  function topView(plan) {
+  function topView(plan, el) {
+    el = el || $('cb-top');
     var o = plan.o, rb = o.bit / 2, S = plan.shape, st = plan.stock, s = 100 / Math.max(st.w, st.h * 1.6);
     var W = st.w * s, H = st.h * s, pad = 6;
     var X = function (x) { return pad + (x - st.x0) * s; }, Y = function (y) { return pad + H - (y - st.y0) * s; };
@@ -2146,12 +2214,13 @@ if (typeof module !== 'undefined' && module.exports) {
     var ox = X(0), oy = Y(0);
     out += '<line class="cb-axis-x" x1="' + ox + '" y1="' + oy + '" x2="' + (ox + 8) + '" y2="' + oy + '"/><line class="cb-axis-y" x1="' + ox + '" y1="' + oy + '" x2="' + ox + '" y2="' + (oy - 8) + '"/>';
     out += '<text class="cb-dim" x="' + (pad + W / 2) + '" y="' + (pad + H + 4.5) + '">stock ' + fmt(st.w) + ' × ' + fmt(st.h) + ' ' + unit() + '</text>';
-    $('cb-top').setAttribute('viewBox', '0 0 ' + (W + 2 * pad).toFixed(2) + ' ' + (H + 2 * pad + 4).toFixed(2));
-    $('cb-top').innerHTML = out;
+    el.setAttribute('viewBox', '0 0 ' + (W + 2 * pad).toFixed(2) + ' ' + (H + 2 * pad + 4).toFixed(2));
+    el.innerHTML = out;
   }
   // The closed box cut through its middle: the base, the lid turned over on
   // it, the lip in its rabbet (the clearance shown at least 0.4 mm wide).
-  function sideView(plan) {
+  function sideView(plan, el) {
+    el = el || $('cb-side');
     var o = plan.o, T = o.stock, LH = plan.lidHeight, R = loopPoint(shapeLoop(plan.shape, 0), 0).x, Ri = R + plan.tInside, c = Math.max(o.clearance, 0.4);
     var lipBase = o.lipOn !== 'lid', s = 90 / (2 * R), pad = 5;
     var hTot = T + LH - o.lipHeight, X = function (x) { return pad + (x + R) * s; }, Y = function (y) { return pad + (hTot - y) * s; };
@@ -2211,8 +2280,8 @@ if (typeof module !== 'undefined' && module.exports) {
       '<text class="cb-dim" x="' + (xr + 1) + '" y="' + ((Y(0) + Y(hTot)) / 2) + '" transform="rotate(-90 ' + (xr + 1) + ' ' + ((Y(0) + Y(hTot)) / 2) + ')" dy="-1">' + fmt(plan.closedHeight) + ' ' + unit() + ' closed</text>';
     out += '<text class="cb-dim" x="' + X(0) + '" y="' + ((Y(o.floor) + Y(hTot - o.top)) / 2 + 2) + '">' + fmt(plan.insideHeight) + ' ' + unit() + ' inside</text>';
     out += '<text class="cb-dim" x="' + X(0) + '" y="' + (Y(0) + 4.5) + '">' + (plan.shape.kind === 'rect' ? fmt(o.length) + ' × ' + fmt(o.width) : plan.shape.kind === 'poly' ? plan.shape.n + ' sides, ' + fmt(o.flats) : o.shape === 'oval' ? 'oval ' + fmt(o.length) + ' × ' + fmt(o.width) : o.shape === 'heart' ? 'heart ' + fmt(o.length) + ' × ' + fmt(o.width) : 'Ø ' + fmt(o.diameter)) + ' ' + unit() + ' · lip on the ' + o.lipOn + '</text>';
-    $('cb-side').setAttribute('viewBox', '0 0 ' + (90 + 2 * pad + 8) + ' ' + (hTot * s + 2 * pad + 6).toFixed(2));
-    $('cb-side').innerHTML = out;
+    el.setAttribute('viewBox', '0 0 ' + (90 + 2 * pad + 8) + ' ' + (hTot * s + 2 * pad + 6).toFixed(2));
+    el.innerHTML = out;
   }
   function unit() { return state.imperial ? 'in' : 'mm'; }
   function fmt(mm) { return String(round(mm / K(), state.imperial ? 3 : 1)); }
@@ -2609,6 +2678,7 @@ if (typeof module !== 'undefined' && module.exports) {
     $('cb-auto').addEventListener('change', function () { state.autoSizes = $('cb-auto').checked; update(true); });
     ['cb-tabs-on', 'cb-mag-on', 'cb-notch-on', 'cb-finish-on', 'cb-corners-on', 'cb-edges-on'].forEach(function (id) { $(id).addEventListener('change', function () { update(true); }); });
     $('cb-testfit').addEventListener('click', function () { generate('test'); });
+    $('cb-help-btn').addEventListener('click', function () { showHelp($('cb-help').hidden); });
     $('cb-edges-only').addEventListener('click', function () { generate('edges'); });
     $('cb-corners-only').addEventListener('click', function () { generate('corners'); });
     $('cb-ctool').addEventListener('change', pickCornerTool);
@@ -2618,6 +2688,29 @@ if (typeof module !== 'undefined' && module.exports) {
     $('cb-refill').addEventListener('click', function () { fillFeeds(); update(true); });
     $('cb-generate').addEventListener('click', function () { generate('box'); });
     $('cb-close').addEventListener('click', function () { persist(); window.postMessage({ type: 'close-plugin-dialog' }, '*'); });
+  }
+
+  // Help, in place of the settings: its pictures drawn from them.
+  function showHelp(on) {
+    $('cb-help').hidden = !on;
+    ROOT.querySelector('.cb-body').hidden = on;
+    $('cb-help-btn').textContent = on ? 'Back to the Box' : 'Help';
+    if (on) helpPictures();
+  }
+  function helpPictures() {
+    var plan = lastPlan && lastPlan.plan, ok = plan && !Object.keys(lastPlan.errs).length;
+    ['cb-help-side', 'cb-help-tf-top', 'cb-help-tf-side'].forEach(function (id) { $(id).closest('.cb-view').hidden = !ok; });
+    $('cb-help-tf-note').textContent = '';
+    if (!ok) return;
+    try { sideView(plan, $('cb-help-side')); } catch (e) {}
+    var test = boxPlan(testFitInput(plan.o));
+    if (test.problems.length) {
+      ['cb-help-tf-top', 'cb-help-tf-side'].forEach(function (id) { $(id).closest('.cb-view').hidden = true; });
+      $('cb-help-tf-note').textContent = 'The test fit can\u2019t be cut with these settings: ' + test.problems[0] + '.';
+      return;
+    }
+    try { topView(test, $('cb-help-tf-top')); sideView(test, $('cb-help-tf-side')); } catch (e) {}
+    $('cb-help-tf-note').textContent = 'Stock for it: ' + fmt(test.stock.w) + ' \u00d7 ' + fmt(test.stock.h) + ' ' + unit() + ', ' + fmt(test.o.stock) + ' ' + unit() + ' thick.';
   }
 
   // With Spoilboard Toolbox installed and on, the stock thickness it keeps
