@@ -1500,6 +1500,7 @@ function testFitInput(input) {
 // imperial: sizes on a 1/32" grid (under a mm, 0.005") instead of 0.5 mm
 // (0.05 mm). Returns the settings it sets (mm), and problems left when
 // nothing fits.
+var WOOD = { mdf: true, softwood: true, hardwood: true };
 var CLEARANCE = { mdf: 0.15, softwood: 0.25, hardwood: 0.2, hdpe: 0.15, acrylic: 0.1, polycarbonate: 0.1, aluminum: 0.05, foam: 0.2 };
 function autoSizes(input, material, imperial) {
   var o = Object.assign({}, DEFAULTS, input || {});
@@ -1516,21 +1517,27 @@ function autoSizes(input, material, imperial) {
   a.top = half(clamp(lidH * 0.2, 2, 6));
   a.wall = half(clamp(small * 0.08, 4, 15));
   var depth = Math.min(T - a.floor, lidH - a.top);
-  a.lipHeight = half(clamp(depth * 0.3, 2, 8));
+  // In wood, a lip at least 1/4" high (when the box is deep enough), so
+  // the lid sits firmly.
+  var minLip = Math.min(WOOD[material] ? 6.35 : 2, Math.max(2, depth - 3));
+  a.lipHeight = half(clamp(depth * 0.35, minLip, Math.max(minLip, Math.min(12.7, depth - 3))));
   a.margin = half(5);
   a.gap = upHalf(Math.max(8, 2 * b + 2));
   var round = rect ? 2 * (o.length + o.width) : long ? Math.PI * (o.length + o.width) / 2 : poly ? o.sides * o.flats * Math.tan(Math.PI / o.sides) : Math.PI * o.diameter;
   if (o.tabs) a.tabs = { count: clamp(Math.round(round / 90), 3, 8), width: half(Math.max(5, 1.5 * b)), height: half(clamp(T * 0.08, 1, 3)) };
   if (o.magnets) a.magnets = Object.assign({}, o.magnets, { count: rect ? 4 : clamp(Math.round(round / 80), 3, 6) });
-  if (o.notch) a.notch = { width: half(clamp(small * 0.18, 10, 20)), depth: half(clamp(a.lipHeight, 3, 6)) };
+  // A notch in the base below the lip (when it's on the base), above the floor.
+  var notchRoom = T - a.floor - (o.lipOn === 'lid' ? 0 : a.lipHeight) - 0.5;
+  if (o.notch) a.notch = { width: half(clamp(small * 0.18, 10, 20)), depth: Math.min(half(clamp(a.lipHeight, 3, 6)), Math.max(grid(1), Math.floor(notchRoom / grid(notchRoom)) * grid(notchRoom))) };
   if (o.edges) a.edges = Object.assign({}, o.edges, { outside: half(o.edges.bit === 'round' ? Math.min(o.edges.radius || 1, 1.5) : 1), inside: half(0.5), pocket: half(0.5) });
-  // Edges get room first from a lower lip, then a wall up to an eighth
-  // of the size or 2 mm more than it was; then they're made smaller. A
-  // notch narrower, to 12 mm.
+  // Edges get room from a lower lip and a wall up to a sixth of the size
+  // or 2 mm more than it was (in wood, the wall first and the lip not
+  // under 1/4"); then they're made smaller. A notch narrower, to 12 mm.
   var plan, edgeWall = null;
   var smaller = function(d) { return d > 0.3 ? half(d * 0.7) : 0; };
   for (var k = 0; k < 80; k++) {
-    a.lipWidth = half(clamp(a.wall * 0.4, 1.5, 3.5));
+    // Half the wall (down to the grid): the rest outside it.
+    a.lipWidth = Math.max(grid(1), Math.floor(a.wall / 2 / grid(a.wall / 2) + 1e-9) * grid(a.wall / 2));
     if (rect || poly || o.shape === 'heart') a.cornerRadius = Math.max(o.cornerRadius || 0, upHalf(a.wall - a.lipWidth - a.clearance + b / 2));
     // A heart's point under its lobes' radius.
     if (o.shape === 'heart') a.cornerRadius = Math.min(a.cornerRadius, Math.max(o.cornerRadius || 0, (o.length || 0) / 2 / 1.72 - 1));
@@ -1539,8 +1546,9 @@ function autoSizes(input, material, imperial) {
     var p = plan.problems[0], ed = a.edges;
     if (ed && /[Ee]dge|seam/.test(p) && !/Gap/.test(p) && (ed.outside > 0 || ed.inside > 0 || ed.pocket > 0)) {
       var seam = /seam/.test(p), lead = /Lead-In/.test(p), pk = /Pocket Edge/.test(p), any = !seam && !lead && !pk;
-      if (edgeWall === null) edgeWall = Math.max(half(small / 8), a.wall + 2);
-      if ((seam || pk) && a.lipHeight > 3) a.lipHeight = half(a.lipHeight - grid(3));
+      if (edgeWall === null) edgeWall = Math.max(half(small / 6), a.wall + 2);
+      var lower = (seam || pk) && a.lipHeight - grid(3) >= minLip - 1e-9;
+      if (lower && !(WOOD[material] && a.wall < edgeWall)) a.lipHeight = half(a.lipHeight - grid(3));
       else if (a.wall < edgeWall) a.wall = half(a.wall + grid(3));
       else {
         if (seam || any) ed.outside = smaller(ed.outside);
