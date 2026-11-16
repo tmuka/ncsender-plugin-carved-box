@@ -1529,7 +1529,8 @@ function autoSizes(input, material, imperial) {
   // A notch in the base below the lip (when it's on the base), above the floor.
   var notchRoom = T - a.floor - (o.lipOn === 'lid' ? 0 : a.lipHeight) - 0.5;
   if (o.notch) a.notch = { width: half(clamp(small * 0.18, 10, 20)), depth: Math.min(half(clamp(a.lipHeight, 3, 6)), Math.max(grid(1), Math.floor(notchRoom / grid(notchRoom)) * grid(notchRoom))) };
-  if (o.edges) a.edges = Object.assign({}, o.edges, { outside: half(o.edges.bit === 'round' ? Math.min(o.edges.radius || 1, 1.5) : 1), inside: half(0.5), pocket: half(0.5) });
+  // Edges: a lead-in for the lid to find its way on, no outside seam.
+  if (o.edges) a.edges = Object.assign({}, o.edges, { outside: 0, inside: half(o.edges.bit === 'round' ? Math.min(o.edges.radius || 1.5, 1.5) : 1.5), pocket: half(0.5) });
   // Edges get room from a lower lip and a wall up to a sixth of the size
   // or 2 mm more than it was (in wood, the wall first and the lip not
   // under 1/4"); then they're made smaller. A notch narrower, to 12 mm.
@@ -1979,7 +1980,7 @@ if (typeof module !== 'undefined' && module.exports) {
     ['cb-doc', 'doc', 'length', 1.5], ['cb-stepover', 'stepoverPct', 'count', 40], ['cb-rpm', 'rpm', 'count', 18000],
     ['cb-delay', 'delay', 'count', 2],
     ['cb-eangle', 'edgeAngle', 'count', 90], ['cb-ediam', 'edgeDiameter', 'length', 12.7], ['cb-erad', 'edgeRadius', 'length', 3.175], ['cb-etip', 'edgeTip', 'length', 3.175],
-    ['cb-eout', 'edgeOut', 'length', 1.5, true], ['cb-ein', 'edgeIn', 'length', 0.5, true], ['cb-epk', 'edgePocket', 'length', 0, true],
+    ['cb-eout', 'edgeOut', 'length', 0, true], ['cb-ein', 'edgeIn', 'length', 1.5, true], ['cb-epk', 'edgePocket', 'length', 0, true],
     ['cb-efeed', 'edgeFeed', 'feed', 1500], ['cb-erpm', 'edgeRpm', 'count', 18000],
     ['cb-evtip', 'edgeVTip', 'length', 0.3], ['cb-finish', 'finishAllow', 'length', 0.3],
     ['cb-cdiam', 'cornerDiameter', 'length', 6.35], ['cb-crad', 'cornerBitRadius', 'length', 3.175],

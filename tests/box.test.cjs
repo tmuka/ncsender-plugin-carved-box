@@ -321,7 +321,7 @@ test('Auto Sizes: a box that fits together for any size, stock, bit and material
       // On an inch machine, the wall on a 1/32" grid.
       if (imperial) assert.ok(Math.abs(a.wall * 32 / 25.4 - Math.round(a.wall * 32 / 25.4)) < 1e-9, 'wall ' + a.wall);
       if (size >= 80) assert.deepEqual(a.problems, [], JSON.stringify(input));
-      if (opts.edges && size >= 80) assert.ok(a.edges.outside > 0 && a.edges.inside > 0, 'edges left out: ' + JSON.stringify(input));
+      if (opts.edges && size >= 80) assert.ok(a.edges.outside === 0 && a.edges.inside > 0, 'lead-in left out, or a seam: ' + JSON.stringify(input));
       // The lip half the wall (to the grid), and in wood at least 1/4" high where the box is deep enough.
       assert.ok(a.lipWidth <= a.wall / 2 + 1e-9 && a.lipWidth > a.wall / 2 - 0.8, 'lip width ' + a.lipWidth + ' of wall ' + a.wall);
       if (material !== 'acrylic' && Math.min(stock - a.floor, stock - a.top) >= 9.35) assert.ok(a.lipHeight >= 6.35 - 1e-9, 'lip height ' + a.lipHeight + ' ' + JSON.stringify(input));
