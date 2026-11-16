@@ -11,14 +11,18 @@
   .cb-wrapper [hidden] { display: none !important; }
   .cb-wrapper ::-webkit-scrollbar { width: 8px; height: 8px; }
   .cb-wrapper ::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--color-text-secondary) 45%, transparent); border-radius: 4px; }
-  .cb-header { padding: 15px 20px 8px; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .cb-header { padding: 15px 20px 8px; display: flex; align-items: baseline; gap: 12px; }
   .cb-header h2 { font-size: 1.1rem; font-weight: 700; margin: 0; }
-  .cb-header .cb-sub { color: var(--color-text-secondary); font-size: 0.85rem; }
+  .cb-header .cb-sub { color: var(--color-text-secondary); font-size: 0.85rem; min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .cb-unit { margin-left: auto; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; color: var(--color-accent); border: 1px solid color-mix(in srgb, var(--color-accent) 60%, transparent); border-radius: 999px; padding: 2px 10px; }
   .cb-body { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 20px 16px; display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); align-content: start; }
-  @media (min-width: 1200px) and (orientation: landscape) {
-    .cb-body { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); align-items: start; }
+  /* Previews on the left, the settings on the right: wide or tall. */
+  @media (min-width: 900px) {
+    .cb-body { grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); align-items: start; }
     .cb-previews { position: sticky; top: 0; }
+  }
+  @media (min-width: 1200px) and (orientation: landscape) {
+    .cb-body { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
   }
   .cb-card { background: var(--color-surface-muted, color-mix(in srgb, var(--color-text-primary) 4%, var(--color-surface))); border: 1px solid var(--color-border); border-radius: 10px; padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 10px; }
   .cb-card h3 { margin: 0; font-size: 0.95rem; font-weight: 700; display: flex; align-items: center; gap: 8px; }
