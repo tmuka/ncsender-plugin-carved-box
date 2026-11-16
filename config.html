@@ -89,6 +89,8 @@
   .cb-tool-item .cb-tool-name { flex: 1 1 auto; min-width: 0; }
   .cb-tool-item .cb-tool-size { color: var(--color-text-secondary); font-weight: 400; font-variant-numeric: tabular-nums; margin-left: auto; text-align: right; white-space: nowrap; }
   .cb-tool-empty { padding: 8px 10px; font-size: 0.85rem; color: var(--color-text-secondary); }
+  /* A card switched off shows its header only. */
+  .cb-card.cb-off > :not(h3) { display: none !important; }
   .cb-auto-label { font-size: 0.78rem; font-weight: 600; color: var(--color-text-secondary); }
   .cb-input.cb-auto-val { color: var(--color-accent); }
   .cb-edge-fields { display: flex; flex-direction: column; gap: 10px; }
@@ -245,7 +247,8 @@
         </div>
         <div class="cb-row">
           <div class="cb-field"><label for="cb-eout">Outside Seam</label><input class="cb-input" id="cb-eout" data-unit="length" placeholder="none" title="How far down each half's rim is cut at its outer edge. Closed, the two make a groove where the halves meet."></div>
-          <div class="cb-field"><label for="cb-ein">Inside Rim</label><input class="cb-input" id="cb-ein" data-unit="length" placeholder="none" title="How far down the opening's edge and the lip's top edges are cut: eases the lid on."></div>
+          <div class="cb-field"><label for="cb-ein">Lead-In</label><input class="cb-input" id="cb-ein" data-unit="length" placeholder="none" title="How far down the lip's outer edge and the opening's edge are cut: eases the lid on."></div>
+          <div class="cb-field"><label for="cb-epk">Pocket Edge</label><input class="cb-input" id="cb-epk" data-unit="length" placeholder="none" title="How far down each pocket's top edge is cut: the lip's inner edge, and the edge of the step the lip sits on in the other half."></div>
         </div>
         <div class="cb-row cb-row-2">
           <div class="cb-field"><label for="cb-efeed">Edge Feed</label><input class="cb-input" id="cb-efeed" data-unit="feed"></div>
@@ -752,8 +755,10 @@ if (typeof module !== 'undefined' && module.exports) {
 // The settings a plan takes, with their defaults (mm). lidHeight null:
 // the stock's thickness. magnets, notch, edges: null for none. edges:
 // { bit: 'v' (angle, degrees across the V; diameter) or 'round' (radius,
-// tip: the diameter of its flat end), outside, inside: how far down each
-// edge is cut, 0 for none }.
+// tip: the diameter of its flat end), outside (the seam), inside (the
+// lead-in: the lip's outer edge, the opening's), pocket (each pocket's
+// top edge: the lip's inner edge, the step's in the other half): how far
+// down each edge is cut, 0 for none }.
 var DEFAULTS = {
   shape: 'circle', diameter: 80, length: 120, width: 80, cornerRadius: 10,
   stock: 19, lidHeight: null, wall: 6, floor: 4, top: 4,
@@ -871,17 +876,17 @@ function boxPlan(input) {
   // bit reaches, for the waste round a seam below the stock top to be
   // cleared that far first.
   var edgeAt = { base: [], lid: [] }, ed = o.edges, reachOut = { base: 0, lid: 0 };
-  if (ed && (ed.outside > 0 || ed.inside > 0)) {
+  if (ed && (ed.outside > 0 || ed.inside > 0 || ed.pocket > 0)) {
     var vbit = ed.bit !== 'round', tan = Math.tan((ed.angle || 90) * Math.PI / 360), R = ed.radius, tip = ed.tip || 0;
     if (vbit) {
       need(ed.angle >= 20 && ed.angle <= 150, 'Edges: the V-bit\'s angle must be between 20 and 150 degrees');
       need(ed.diameter > 0, 'Edges: give the V-bit\'s diameter');
     } else need(R > 0 && tip >= 0, 'Edges: give the roundover bit\'s radius, and its tip diameter (0 or more)');
-    need(!(ed.outside < 0 || ed.inside < 0), 'Edges: sizes can\'t be negative');
-    if (!vbit && R > 0) need(!(ed.outside > R + 1e-9 || ed.inside > R + 1e-9), 'Edges: a roundover can\'t go deeper than the bit\'s radius');
+    need(!(ed.outside < 0 || ed.inside < 0 || ed.pocket < 0), 'Edges: sizes can\'t be negative');
+    if (!vbit && R > 0) need(!(ed.outside > R + 1e-9 || ed.inside > R + 1e-9 || ed.pocket > R + 1e-9), 'Edges: a roundover can\'t go deeper than the bit\'s radius');
     var width = function(d) { return !(d > 0) ? 0 : vbit ? d * tan : R - Math.sqrt(Math.max(0, R * R - d * d)); };
-    var eOut = width(ed.outside), eIn = width(ed.inside);
-    if (vbit) need(Math.max(eOut, eIn) <= ed.diameter / 2 + 1e-9, 'Edges: the V-bit is too small: the widest edge needs one ' + (2 * Math.max(eOut, eIn)).toFixed(2) + ' mm across');
+    var eOut = width(ed.outside), eIn = width(ed.inside), ePk = width(ed.pocket), eMax = Math.max(eOut, eIn, ePk);
+    if (vbit) need(eMax <= ed.diameter / 2 + 1e-9, 'Edges: the V-bit is too small: the widest edge needs one ' + (2 * eMax).toFixed(2) + ' mm across');
     // An inside pocket's corners are at least the bit's radius: an edge
     // there follows them.
     var shapeFor = function(t) { return rect ? { kind: 'rect', hx: S.hx, hy: S.hy, cr: Math.max(S.cr, rb - t) } : S; };
@@ -893,11 +898,20 @@ function boxPlan(input) {
     add(lipHalf, 0, 1, tops[lipHalf] - o.lipHeight, ed.outside, 'outside seam edge');
     add(rabbetHalf, tRabbet, -1, tops[rabbetHalf], ed.inside, 'opening edge');
     add(lipHalf, tLip, 1, tops[lipHalf], ed.inside, 'lip\'s outer edge');
-    add(lipHalf, tInside, -1, tops[lipHalf], ed.inside, 'lip\'s inner edge');
+    add(lipHalf, tInside, -1, tops[lipHalf], ed.pocket, 'lip\'s inner edge');
+    add(rabbetHalf, tInside, -1, tops[rabbetHalf] - rabbetDepth, ed.pocket, 'step\'s inner edge');
     // What each edge leaves: the rim between the outline and the widened
     // opening, the shoulder outside the lip, the lip itself.
     need(eOut + eIn <= -tRabbet - 0.5, 'Edges too big for the rim round the widened opening: make them smaller, or the wall thicker');
-    need(2 * eIn <= o.lipWidth - 0.3, 'Inside rim edges too big for the lip: they take ' + (2 * eIn).toFixed(2) + ' mm of it');
+    need(eIn + ePk <= o.lipWidth - 0.3, 'Lead-In and Pocket Edge too big for the lip: they take ' + (eIn + ePk).toFixed(2) + ' mm of it');
+    // The step the lip sits on, in the other half: its inner edge is down
+    // at the step, the widened opening's wall above it.
+    if (ed.pocket > 0) {
+      var step = o.lipWidth + o.clearance, upStep = rabbetDepth + ed.pocket;
+      need(ePk <= step - 0.3, 'Pocket Edge too big for the step the lip sits on');
+      need((vbit ? Math.min(upStep * tan, ed.diameter / 2) : R) <= step - 0.3, 'The Pocket Edge\'s bit would cut into the widened opening\'s wall: make it smaller, the Lip Width wider, or use a narrower V-bit');
+      need(!(ed.pocket >= Math.min(T - o.floor, lidH - o.top) - rabbetDepth - 1), 'Pocket Edge too deep for the inside');
+    }
     // The seam on the half with the lip is down at the shoulder: the bit,
     // as high as the lip, must clear it (a V-bit's cone at the lip's top,
     // no wider than the bit; a roundover bit's head).
@@ -911,11 +925,11 @@ function boxPlan(input) {
     }
     // The bit's tip stays above what's below the edges inside: the
     // shoulder by the lip, the widened opening's floor.
-    need(!(ed.inside >= o.lipHeight - 0.2) && !(ed.inside > rabbetDepth - 0.2), 'Inside rim edges must be less deep than the Lip Height');
+    need(!(ed.inside >= o.lipHeight - 0.2) && !(ed.inside > rabbetDepth - 0.2), 'Lead-In edges must be less deep than the Lip Height');
     need(!(ed.outside >= Math.min(T, lidH) - o.lipHeight - (o.tabs ? o.tabs.height : 0) - 1), 'Outside seam edge too deep for the halves');
     // An inside edge's bit fits across the inside.
-    var reach = vbit ? eIn : tip + R;
-    if (ed.inside > 0) need(deep + tInside > reach + 0.5, 'Edges: the inside is too small for the edge bit');
+    var reach = vbit ? Math.max(eIn, ePk) : tip + R;
+    if (ed.inside > 0 || ed.pocket > 0) need(deep + tInside > reach + 0.5, 'Edges: the inside is too small for the edge bit');
     // Beside the finger notch and the magnet holes.
     if (notchCut) {
       need(!(ed.outside > o.notch.depth - 0.3), 'The outside seam must be less deep than the finger notch');
@@ -1015,7 +1029,7 @@ function autoSizes(input, material, imperial) {
   a.tabs = { count: clamp(Math.round(round / 90), 3, 8), width: half(Math.max(5, 1.5 * b)), height: half(clamp(T * 0.08, 1, 3)) };
   if (o.magnets) a.magnets = Object.assign({}, o.magnets, { count: rect ? 4 : clamp(Math.round(round / 80), 3, 6) });
   if (o.notch) a.notch = { width: half(clamp(small * 0.18, 10, 20)), depth: half(clamp(a.lipHeight, 3, 6)) };
-  if (o.edges) a.edges = Object.assign({}, o.edges, { outside: half(o.edges.bit === 'round' ? Math.min(o.edges.radius || 1, 1.5) : 1), inside: half(0.5) });
+  if (o.edges) a.edges = Object.assign({}, o.edges, { outside: half(o.edges.bit === 'round' ? Math.min(o.edges.radius || 1, 1.5) : 1), inside: half(0.5), pocket: half(0.5) });
   // Edges get room first from a lower lip, then a wall up to an eighth
   // of the size or 2 mm more than it was; then they're made smaller. A
   // notch narrower, to 12 mm.
@@ -1027,14 +1041,15 @@ function autoSizes(input, material, imperial) {
     plan = boxPlan(Object.assign({}, o, a));
     if (!plan.problems.length) break;
     var p = plan.problems[0], ed = a.edges;
-    if (ed && /[Ee]dge|seam/.test(p) && !/Gap/.test(p) && (ed.outside > 0 || ed.inside > 0)) {
-      var seam = /seam/.test(p), rim = /Inside rim|inside is too small/.test(p);
+    if (ed && /[Ee]dge|seam/.test(p) && !/Gap/.test(p) && (ed.outside > 0 || ed.inside > 0 || ed.pocket > 0)) {
+      var seam = /seam/.test(p), lead = /Lead-In/.test(p), pk = /Pocket Edge/.test(p), any = !seam && !lead && !pk;
       if (edgeWall === null) edgeWall = Math.max(half(small / 8), a.wall + 2);
-      if (seam && a.lipHeight > 3) a.lipHeight = half(a.lipHeight - grid(3));
+      if ((seam || pk) && a.lipHeight > 3) a.lipHeight = half(a.lipHeight - grid(3));
       else if (a.wall < edgeWall) a.wall = half(a.wall + grid(3));
       else {
-        if (seam || !rim) ed.outside = smaller(ed.outside);
-        if (rim || !seam) ed.inside = smaller(ed.inside);
+        if (seam || any) ed.outside = smaller(ed.outside);
+        if (lead || any) ed.inside = smaller(ed.inside);
+        if (pk || any) ed.pocket = smaller(ed.pocket);
       }
     } else if (a.notch && /notch/.test(p) && a.notch.width > 12) a.notch.width = half(a.notch.width - 2 * grid(3));
     else if (/Gap/.test(p)) a.gap = half(a.gap + 2 * grid(3));
@@ -1235,7 +1250,7 @@ function boxProgram(plan, f, only) {
   if (o.tabs) comment('Tabs: ' + o.tabs.count + ' x ' + mm3(o.tabs.width) + unit + ' wide, ' + mm3(o.tabs.height) + unit + ' high');
   if (o.edges && plan.edges.base.length + plan.edges.lid.length) {
     var ed = o.edges, eb = ed.bit === 'round' ? 'a ' + ed.radius + unit + ' roundover bit' : 'a ' + ed.angle + ' degree V-bit';
-    comment('Edges: outside seam ' + mm3((ed.outside || 0)) + unit + ', inside rim ' + mm3((ed.inside || 0)) + unit + ' down');
+    comment('Edges down: seam ' + mm3(ed.outside || 0) + ', lead-in ' + mm3(ed.inside || 0) + ', pocket ' + mm3(ed.pocket || 0) + unit);
     if (only === 'edges') comment('Just the edges, after the box: ' + eb + ', Z0 on the stock top');
     else if (f.edges) comment('Edges cut last, with ' + eb + ' (T' + f.edges.toolNumber + ')');
     else comment('Edges not in this program: cut them after it with Edges Only');
@@ -1327,7 +1342,7 @@ if (typeof module !== 'undefined' && module.exports) {
     ['cb-doc', 'doc', 'length', 1.5], ['cb-stepover', 'stepoverPct', 'count', 40], ['cb-rpm', 'rpm', 'count', 18000],
     ['cb-delay', 'delay', 'count', 2],
     ['cb-eangle', 'edgeAngle', 'count', 90], ['cb-ediam', 'edgeDiameter', 'length', 12.7], ['cb-erad', 'edgeRadius', 'length', 3.175], ['cb-etip', 'edgeTip', 'length', 3.175],
-    ['cb-eout', 'edgeOut', 'length', 1.5, true], ['cb-ein', 'edgeIn', 'length', 0.5, true],
+    ['cb-eout', 'edgeOut', 'length', 1.5, true], ['cb-ein', 'edgeIn', 'length', 0.5, true], ['cb-epk', 'edgePocket', 'length', 0, true],
     ['cb-efeed', 'edgeFeed', 'feed', 1500], ['cb-erpm', 'edgeRpm', 'count', 18000]
   ];
   // What Auto Sizes fills in: [field, its value from autoSizes()]. Typing
@@ -1340,7 +1355,8 @@ if (typeof module !== 'undefined' && module.exports) {
     ['cb-tab-n', function (a) { return a.tabs.count; }], ['cb-tab-w', function (a) { return a.tabs.width; }], ['cb-tab-h', function (a) { return a.tabs.height; }],
     ['cb-mag-n', function (a) { return a.magnets && a.magnets.count; }],
     ['cb-notch-w', function (a) { return a.notch && a.notch.width; }], ['cb-notch-d', function (a) { return a.notch && a.notch.depth; }],
-    ['cb-eout', function (a) { return a.edges && a.edges.outside; }], ['cb-ein', function (a) { return a.edges && a.edges.inside; }]
+    ['cb-eout', function (a) { return a.edges && a.edges.outside; }], ['cb-ein', function (a) { return a.edges && a.edges.inside; }],
+    ['cb-epk', function (a) { return a.edges && a.edges.pocket; }]
   ];
   // Auto Sizes on: the fields filled in for the size, stock, bit and material.
   function applyAuto() {
@@ -1409,7 +1425,7 @@ if (typeof module !== 'undefined' && module.exports) {
       lipOn: v.lipOn, lipHeight: v.lipHeight, lipWidth: v.lipWidth, clearance: v.clearance,
       gap: v.gap, layout: v.layout, origin: v.origin, margin: v.margin, bit: v.bit,
       tabs: v.tabsOn ? { count: Math.round(v.tabCount), width: v.tabWidth, height: v.tabHeight } : null,
-      edges: v.edgesOn ? { bit: v.edgeBit === 'round' ? 'round' : 'v', angle: v.edgeAngle, diameter: v.edgeDiameter, radius: v.edgeRadius, tip: v.edgeTip, outside: v.edgeOut || 0, inside: v.edgeIn || 0 } : null
+      edges: v.edgesOn ? { bit: v.edgeBit === 'round' ? 'round' : 'v', angle: v.edgeAngle, diameter: v.edgeDiameter, radius: v.edgeRadius, tip: v.edgeTip, outside: v.edgeOut || 0, inside: v.edgeIn || 0, pocket: v.edgePocket || 0 } : null
     });
   }
   // The edge bit's feeds; its T number when the program can change to it.
@@ -1505,7 +1521,7 @@ if (typeof module !== 'undefined' && module.exports) {
     };
     var lipH = lipBase ? 'base' : 'lid', rabH = lipBase ? 'lid' : 'base';
     var eSeamL = edgeOf(lipH, 'outside seam edge'), eSeamR = edgeOf(rabH, 'outside seam edge'), eOpen = edgeOf(rabH, 'opening edge');
-    var eLipOut = edgeOf(lipH, 'lip\'s outer edge'), eLipIn = edgeOf(lipH, 'lip\'s inner edge');
+    var eLipOut = edgeOf(lipH, 'lip\'s outer edge'), eLipIn = edgeOf(lipH, 'lip\'s inner edge'), eStep = edgeOf(rabH, 'step\'s inner edge');
     var out = '';
     [1, -1].forEach(function (side) {
       var f = function (x) { return side * x; };
@@ -1515,11 +1531,11 @@ if (typeof module !== 'undefined' && module.exports) {
         out += poly([[f(Ri), o.floor], [f(Ri), T, eLipIn], [f(Ri + o.lipWidth), T, eLipOut], [f(Ri + o.lipWidth), shoulder], [f(R), shoulder, eSeamL], [f(R), 0], [0, 0], [0, o.floor]], 'cb-wood');
         // The lid, upside down on the shoulder: its rabbet round the lip.
         var top = lidRim + LH, rab = Ri + o.lipWidth + c;
-        out += poly([[f(Ri), top - o.top], [f(Ri), lidRim + o.lipHeight + c], [f(rab), lidRim + o.lipHeight + c], [f(rab), lidRim, eOpen], [f(R), lidRim, eSeamR], [f(R), top], [0, top], [0, top - o.top]], 'cb-wood-dark');
+        out += poly([[f(Ri), top - o.top], [f(Ri), lidRim + o.lipHeight + c, eStep], [f(rab), lidRim + o.lipHeight + c], [f(rab), lidRim, eOpen], [f(R), lidRim, eSeamR], [f(R), top], [0, top], [0, top - o.top]], 'cb-wood-dark');
       } else {
         // Lip on the lid: the base's opening is widened; the lid's lip hangs down into it.
         var rabB = Ri + o.lipWidth + c, rimB = T;
-        out += poly([[f(Ri), o.floor], [f(Ri), T - o.lipHeight - c], [f(rabB), T - o.lipHeight - c], [f(rabB), T, eOpen], [f(R), T, eSeamR], [f(R), 0], [0, 0], [0, o.floor]], 'cb-wood');
+        out += poly([[f(Ri), o.floor], [f(Ri), T - o.lipHeight - c, eStep], [f(rabB), T - o.lipHeight - c], [f(rabB), T, eOpen], [f(R), T, eSeamR], [f(R), 0], [0, 0], [0, o.floor]], 'cb-wood');
         var top2 = T + LH - o.lipHeight;
         out += poly([[f(Ri), top2 - o.top], [f(Ri), rimB - o.lipHeight, eLipIn], [f(Ri + o.lipWidth), rimB - o.lipHeight, eLipOut], [f(Ri + o.lipWidth), rimB], [f(R), rimB, eSeamL], [f(R), top2], [0, top2], [0, top2 - o.top]], 'cb-wood-dark');
       }
@@ -1766,7 +1782,7 @@ if (typeof module !== 'undefined' && module.exports) {
     }
     var anyEdges = plan.edges.base.length + plan.edges.lid.length > 0, et = toolEntry(v.edgeTool);
     $('cb-edge-note').textContent = !v.edgesOn ? 'Chamfer or round over the seam where the halves meet, and the rim inside, with a second bit, cut last.'
-      : !anyEdges ? 'Give the Outside Seam or Inside Rim a size.'
+      : !anyEdges ? 'Give the Outside Seam, Lead-In or Pocket Edge a size.'
       : edgesInBox(v) ? 'Cut last, after the outlines: the program changes to T' + et.n + '.' +
         (toolEntry(v.tool) ? '' : ' Pick the box\u2019s bit from the Tool Library too, so the program starts by changing back to it.')
       : state.changer ? 'Pick the edge bit from the Tool Library to have the program change to it; or cut the edges with Edges Only after the box.'
@@ -1775,6 +1791,7 @@ if (typeof module !== 'undefined' && module.exports) {
     $('cb-ev-fields').hidden = v.edgeBit === 'round'; $('cb-eround-fields').hidden = v.edgeBit !== 'round';
     $('cb-generate').disabled = $('cb-testfit').disabled = !!(errKeys.length || plan.problems.length || tooBig);
     if (!errKeys.length) { try { topView(plan); sideView(plan); } catch (e) {} }
+    GROUPS.forEach(function (g) { $(g[1]).closest('.cb-card').classList.toggle('cb-off', !$(g[1]).checked); });
     GROUPS.forEach(function (g) {
       ROOT.querySelectorAll('#' + g[0] + ' .cb-input, #' + g[0] + ' .cb-select, #' + g[0] + ' .cb-seg button').forEach(function (el) { el.disabled = !$(g[1]).checked; });
     });

@@ -260,14 +260,29 @@ test('chamfered and rounded edges, cut last after a tool change, or on their own
   }
 });
 
+test('pocket edges: the lip\'s inner edge and the step\'s, on either half', () => {
+  for (const lipOn of ['base', 'lid']) for (const shape of [{}, { shape: 'rect', length: 130, width: 90, cornerRadius: 14 }]) {
+    for (const edges of [{ bit: 'v', angle: 60, diameter: 6.35, outside: 0, inside: 0.5, pocket: 0.8 }, { bit: 'round', radius: 1.5, tip: 3, outside: 0, inside: 0, pocket: 1 }]) {
+      const input = Object.assign({ lipOn, wall: 12, lipWidth: 5, lidHeight: 15, edges }, shape);
+      const plan = boxPlan(input);
+      assert.deepEqual(plan.problems, [], JSON.stringify(input));
+      const step = plan.edges[lipOn === 'lid' ? 'base' : 'lid'].find((e) => /step/.test(e.what));
+      assert.ok(step && Math.abs(step.z0 - ((lipOn === 'lid' ? 0 : -plan.face) - plan.rabbetDepth)) < 1e-9, 'step edge at the step');
+      checkEdges(plan, boxProgram(plan, Object.assign({}, FEEDS, { edges: { toolNumber: 3, feed: 1000, plunge: 300, rpm: 16000, doc: 2 } }), 'edges').gcode);
+    }
+  }
+});
+
 test('edges that don\'t fit say why', () => {
   const said = (o, re) => assert.ok(boxPlan(o).problems.some((p) => re.test(p)), JSON.stringify(o) + ' ' + boxPlan(o).problems);
   const V = { bit: 'v', angle: 90, diameter: 12.7 };
   said({ edges: { ...V, outside: 3, inside: 0 } }, /rim round the widened opening/);
-  said({ edges: { ...V, outside: 0, inside: 1.5 } }, /Inside rim edges too big for the lip/);
+  said({ wall: 10, edges: { ...V, outside: 0, inside: 1.5, pocket: 1.5 } }, /Lead-In and Pocket Edge too big for the lip/);
+  // The step's inner edge is down at the step: its bit must clear the opening's wall above.
+  said({ wall: 10, edges: { ...V, outside: 0, inside: 0, pocket: 0.5 } }, /cut into the widened opening's wall/);
   said({ edges: { bit: 'round', radius: 2, tip: 3, outside: 3, inside: 0 } }, /deeper than the bit's radius/);
   said({ edges: { ...V, angle: 10, outside: 1, inside: 0 } }, /angle must be between/);
-  said({ wall: 10, lipHeight: 2, edges: { bit: 'v', angle: 60, diameter: 12.7, outside: 0, inside: 1.9 } }, /less deep than the Lip Height/);
+  said({ wall: 10, lipHeight: 2, edges: { bit: 'v', angle: 60, diameter: 12.7, outside: 0, inside: 1.9 } }, /Lead-In edges must be less deep/);
   // On the half with the lip, the seam's bit, as high as the lip, mustn't reach it.
   said({ edges: { ...V, outside: 1.5, inside: 0.5 } }, /would cut into the lip/);
   said({ edges: { bit: 'round', radius: 3.175, tip: 3.175, outside: 1.5, inside: 0 } }, /would cut into the lip/);
