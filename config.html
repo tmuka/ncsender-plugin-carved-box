@@ -761,7 +761,7 @@ function boxPlan(input) {
   } else need(o.diameter > 0, 'Diameter must be more than 0');
   need(T > 0, 'Stock Thickness must be more than 0');
   need(lidH <= T + 1e-9, 'Lid Height can\'t be more than the stock thickness');
-  need(o.bit > 0, 'Bit Diameter must be more than 0');
+  need(o.bit >= 0.8, 'Bit Diameter must be at least 0.8 mm: check it\'s in the right units');
   need(w > 0, 'Wall must be more than 0');
   need(o.floor > 0 && o.floor < T, 'Floor must be between 0 and the stock thickness');
   need(o.top > 0 && o.top < lidH, 'Top must be between 0 and the lid height');
@@ -955,10 +955,58 @@ function testFitInput(input) {
   });
 }
 
+// Sizes that suit a box of this size, stock, bit and material, for a
+// first try: the wall, floor and top, the lip and its clearance, the gap
+// and margin, the tabs, and (when they're on) the notch, the magnet count
+// and the edges; a rectangle's corners as round as the lip needs. Made to
+// fit each other: when they don't, the notch and edges are made smaller
+// or the wall thicker until they do. input: the plan's settings (shape,
+// size, stock, lidHeight, bit, and magnets, notch, edges when on);
+// material: QuickCut's key (mdf, softwood, hardwood, hdpe, ...). Returns
+// the settings it sets (mm), and problems left when nothing fits.
+var CLEARANCE = { mdf: 0.15, softwood: 0.25, hardwood: 0.2, hdpe: 0.15, acrylic: 0.1, polycarbonate: 0.1, aluminum: 0.05, foam: 0.2 };
+function autoSizes(input, material) {
+  var o = Object.assign({}, DEFAULTS, input || {});
+  var rect = o.shape === 'rect', small = rect ? Math.min(o.length, o.width) : o.diameter;
+  var T = o.stock, lidH = o.lidHeight > 0 ? o.lidHeight : T, b = o.bit;
+  var half = function(v) { return Math.round(v * 2) / 2; }, upHalf = function(v) { return Math.ceil(v * 2 - 1e-9) / 2; };
+  var clamp = function(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); };
+  var a = { clearance: CLEARANCE[material] != null ? CLEARANCE[material] : 0.2 };
+  a.floor = clamp(half(T * 0.2), 2, 6);
+  a.top = clamp(half(lidH * 0.2), 2, 6);
+  a.wall = clamp(half(small * 0.08), 4, 15);
+  var depth = Math.min(T - a.floor, lidH - a.top);
+  a.lipHeight = clamp(half(depth * 0.3), 2, 8);
+  a.margin = half(Math.max(5, b));
+  a.gap = upHalf(Math.max(8, 2 * b + 2));
+  var round = rect ? 2 * (o.length + o.width) : Math.PI * o.diameter;
+  a.tabs = { count: clamp(Math.round(round / 90), 3, 8), width: half(Math.max(5, 1.5 * b)), height: clamp(Math.round(T * 0.08 * 4) / 4, 1, 3) };
+  if (o.magnets) a.magnets = Object.assign({}, o.magnets, { count: rect ? 4 : clamp(Math.round(round / 80), 3, 6) });
+  if (o.notch) a.notch = { width: clamp(half(small * 0.18), 10, 20), depth: clamp(half(a.lipHeight), 3, 6) };
+  if (o.edges) a.edges = Object.assign({}, o.edges, { outside: o.edges.bit === 'round' ? Math.min(o.edges.radius || 1, 1.5) : 1, inside: 0.5 });
+  var plan;
+  for (var k = 0; k < 60; k++) {
+    a.lipWidth = clamp(half(a.wall * 0.4), 1.5, 6);
+    if (rect) a.cornerRadius = Math.max(o.cornerRadius || 0, upHalf(a.wall - a.lipWidth - a.clearance + b / 2));
+    plan = boxPlan(Object.assign({}, o, a));
+    if (!plan.problems.length) break;
+    var p = plan.problems.join(' ');
+    if (a.edges && /[Ee]dge|seam/.test(p) && (a.edges.outside > 0.3 || a.edges.inside > 0.3)) {
+      a.edges.outside = a.edges.outside > 0.3 ? Math.round(a.edges.outside * 6) / 10 : 0;
+      a.edges.inside = a.edges.inside > 0.3 ? Math.round(a.edges.inside * 6) / 10 : 0;
+    } else if (a.notch && /notch/.test(p) && a.notch.width > 10) a.notch.width -= 1;
+    else if (/Gap/.test(p)) a.gap += 1;
+    else if (a.wall < small / 2 - b - 2) a.wall += 0.5;
+    else break;
+  }
+  a.problems = plan.problems;
+  return a;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   var shapeLib = require('./box-shape.cjs');
   var shapeLoop = shapeLib.shapeLoop, shapeDeepest = shapeLib.shapeDeepest, loopLength = shapeLib.loopLength, loopPoint = shapeLib.loopPoint;
-  module.exports = { boxPlan: boxPlan, testFitInput: testFitInput, BOX_DEFAULTS: DEFAULTS };
+  module.exports = { boxPlan: boxPlan, testFitInput: testFitInput, autoSizes: autoSizes, BOX_DEFAULTS: DEFAULTS };
 }
 /* END lib/box-plan.cjs */
 /* BEGIN lib/box-gcode.cjs */
@@ -994,8 +1042,14 @@ function boxProgram(plan, f, only) {
     if (z > near) { L.push('G0 Z' + n3(near)); z = near; }
     L.push('G1 Z' + n3(toZ) + ' F' + Math.round(f.plunge)); minutes += Math.abs(z - toZ) / f.plunge; z = toZ;
   }
+  // Too long to load (a bit or a Depth of Cut far too small): stopped
+  // early, said why.
+  function tooLong() {
+    if (L.length > MAX_LINES) throw new Error('The program would be over ' + MAX_LINES.toLocaleString('en-US') + ' lines: check the bit, the Depth of Cut and the Stepover');
+  }
   // F: the feed (a ramp's, going down on the way); else the cutting feed.
   function line(px, py, toZ, F) {
+    tooLong();
     F = F || f.feed;
     var zp = toZ == null ? '' : ' Z' + n3(toZ);
     L.push('G1 X' + n3(px) + ' Y' + n3(py) + zp + ' F' + Math.round(F));
@@ -1006,6 +1060,7 @@ function boxProgram(plan, f, only) {
   // An arc whose ends round to the same point would be a whole circle to
   // the controller: a piece that short is left out.
   function arc(cx, cy, r, a, b, toZ, F) {
+    tooLong();
     F = F || f.feed;
     var parts = Math.max(1, Math.ceil((b - a) / Math.PI - 1e-9)), z0 = z;
     for (var k = 1; k <= parts; k++) {
@@ -1195,12 +1250,13 @@ function boxProgram(plan, f, only) {
   L.push('M30 ; Program end');
   return { gcode: L.join('\n') + '\n', minutes: minutes };
 }
+var MAX_LINES = 300000;
 function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
 if (typeof module !== 'undefined' && module.exports) {
   var shapeLib = require('./box-shape.cjs');
   var shapeLoop = shapeLib.shapeLoop, shapeDeepest = shapeLib.shapeDeepest, loopLength = shapeLib.loopLength, loopPart = shapeLib.loopPart, loopPoint = shapeLib.loopPoint;
-  module.exports = { boxProgram: boxProgram };
+  module.exports = { boxProgram: boxProgram, MAX_LINES: MAX_LINES };
 }
 /* END lib/box-gcode.cjs */
 (function () {
@@ -1236,10 +1292,10 @@ if (typeof module !== 'undefined' && module.exports) {
   var GROUPS = [['cb-tab-fields', 'cb-tabs-on'], ['cb-mag-fields', 'cb-mag-on'], ['cb-notch-fields', 'cb-notch-on'], ['cb-edge-fields', 'cb-edges-on']];
   // Feeds that must be in range: [field, ok, what's wrong].
   var RANGES = [
-    ['cb-feed', function (x) { return x > 0; }, 'must be more than 0'], ['cb-plunge', function (x) { return x > 0; }, 'must be more than 0'],
-    ['cb-doc', function (x) { return x > 0; }, 'must be more than 0'], ['cb-stepover', function (x) { return x >= 1 && x <= 90; }, 'must be between 1 and 90'],
+    ['cb-feed', function (x) { return x >= 25; }, 'must be at least 25 mm/min (1 in/min)'], ['cb-plunge', function (x) { return x >= 10; }, 'must be at least 10 mm/min (0.4 in/min)'],
+    ['cb-doc', function (x) { return x >= 0.05; }, 'must be at least 0.05 mm (0.002 in)'], ['cb-stepover', function (x) { return x >= 1 && x <= 90; }, 'must be between 1 and 90'],
     ['cb-rpm', function (x) { return x >= 0; }, 'can\u2019t be negative'], ['cb-delay', function (x) { return x >= 0; }, 'can\u2019t be negative'],
-    ['cb-efeed', function (x) { return x > 0; }, 'must be more than 0'], ['cb-erpm', function (x) { return x >= 0; }, 'can\u2019t be negative']
+    ['cb-efeed', function (x) { return x >= 25; }, 'must be at least 25 mm/min (1 in/min)'], ['cb-erpm', function (x) { return x >= 0; }, 'can\u2019t be negative']
   ];
   var SEGS = [['cb-ebit', 'edgeBit', 'v'], ['cb-shape', 'shape', 'circle'], ['cb-lip-on', 'lipOn', 'base'], ['cb-layout', 'layout', 'x'], ['cb-origin', 'origin', 'front-left']];
   var K = function () { return state.imperial ? 25.4 : 1; };
@@ -1487,15 +1543,19 @@ if (typeof module !== 'undefined' && module.exports) {
     var note = $('cb-note'), errKeys = Object.keys(c.errs);
     $('cb-stock-need').textContent = 'Stock needed: at least ' + fmt(plan.stock.w) + ' × ' + fmt(plan.stock.h) + ' ' + unit() + ', ' + fmt(v.stock) + ' ' + unit() + ' thick.';
     note.classList.remove('cb-bad', 'cb-warn');
+    var minutes = null, tooBig = null;
+    if (!errKeys.length && !plan.problems.length) {
+      try { minutes = boxProgram(plan, feedsOf(v)).minutes; } catch (e) { tooBig = e.message; }
+    }
     if (errKeys.length) {
       var f = FIELDS.filter(function (x) { return x[0] === errKeys[0]; })[0];
       note.textContent = $(f[0]).closest('.cb-field').querySelector('label').textContent + ' ' + c.errs[errKeys[0]] + '.';
       note.classList.add('cb-bad');
-    } else if (plan.problems.length) {
-      note.textContent = plan.problems[0] + '.';
+    } else if (plan.problems.length || tooBig) {
+      note.textContent = (tooBig || plan.problems[0]) + '.';
       note.classList.add('cb-bad');
     } else {
-      var minutes = boxProgram(plan, feedsOf(v)).minutes, warns = plan.notes.slice();
+      var warns = plan.notes.slice();
       if (!(v.rpm > 0)) warns.push('Spindle RPM 0: the program won\u2019t start the spindle.');
       if (v.edgesOn && !(v.edgeRpm > 0)) warns.push('Edge RPM 0: the edges are cut with the spindle off.');
       note.textContent = 'About ' + (minutes < 1.5 ? '1 min' : Math.round(minutes) + ' min') + '. Closed: ' + fmt(plan.closedHeight) + ' ' + unit() +
@@ -1511,7 +1571,7 @@ if (typeof module !== 'undefined' && module.exports) {
       : 'No tool changer is set up in ncSender: cut the box, put the edge bit in, zero Z on the stock top (keep X Y), and run Edges Only.';
     $('cb-edges-only').disabled = !!(errKeys.length || plan.problems.length || !anyEdges);
     $('cb-ev-fields').hidden = v.edgeBit === 'round'; $('cb-eround-fields').hidden = v.edgeBit !== 'round';
-    $('cb-generate').disabled = $('cb-testfit').disabled = !!(errKeys.length || plan.problems.length);
+    $('cb-generate').disabled = $('cb-testfit').disabled = !!(errKeys.length || plan.problems.length || tooBig);
     if (!errKeys.length) { try { topView(plan); sideView(plan); } catch (e) {} }
     GROUPS.forEach(function (g) {
       ROOT.querySelectorAll('#' + g[0] + ' .cb-input, #' + g[0] + ' .cb-select, #' + g[0] + ' .cb-seg button').forEach(function (el) { el.disabled = !$(g[1]).checked; });
@@ -1534,8 +1594,11 @@ if (typeof module !== 'undefined' && module.exports) {
     var v = lastPlan.v, btn = $(test ? 'cb-testfit' : edges ? 'cb-edges-only' : 'cb-generate'), label = btn.textContent;
     var plan = test ? boxPlan(testFitInput(lastPlan.plan.o)) : lastPlan.plan;
     if (plan.problems.length) { alert('Carved Box: the test fit can\u2019t be cut: ' + plan.problems[0]); return; }
-    var res = edges ? boxProgram(plan, Object.assign(feedsOf(v), { edges: edgeFeeds(v), label: 'Carved Box edges' }), 'edges')
-      : boxProgram(plan, Object.assign(feedsOf(v), { label: test ? 'Test fit' : 'Carved Box' }));
+    var res;
+    try {
+      res = edges ? boxProgram(plan, Object.assign(feedsOf(v), { edges: edgeFeeds(v), label: 'Carved Box edges' }), 'edges')
+        : boxProgram(plan, Object.assign(feedsOf(v), { label: test ? 'Test fit' : 'Carved Box' }));
+    } catch (e) { alert('Carved Box: ' + e.message + '.'); return; }
     var name = 'CarvedBox-' + (test ? 'TestFit-' : edges ? 'Edges-' : '') + (test ? '' : v.shape === 'rect' ? round(v.length / K(), 2) + 'x' + round(v.width / K(), 2) + '-' : 'D' + round(v.diameter / K(), 2) + '-') + 'T' + round(v.stock / K(), 2) + '-' + unit() + '.nc';
     btn.disabled = true; btn.textContent = 'Generating\u2026';
     try {

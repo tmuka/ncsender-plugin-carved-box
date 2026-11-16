@@ -3,7 +3,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { boxPlan, testFitInput, BOX_DEFAULTS } = require('../lib/box-plan.cjs');
-const { boxProgram } = require('../lib/box-gcode.cjs');
+const { boxProgram, MAX_LINES } = require('../lib/box-gcode.cjs');
 const { shapeDistance, shapeLoop, loopLength, loopPoint } = require('../lib/box-shape.cjs');
 
 const FEEDS = { feed: 1500, plunge: 400, rpm: 18000, delay: 2, doc: 2, stepoverPct: 40, toolNumber: 0 };
@@ -275,4 +275,12 @@ test('edges that don\'t fit say why', () => {
   said({ wall: 10, notch: { width: 12, depth: 2 }, edges: { ...V, outside: 2.5, inside: 0 } }, /less deep than the finger notch/);
   said({ wall: 12, magnets: { count: 4, diameter: 6.35, depth: 3 }, edges: { ...V, outside: 2, inside: 0 } }, /beside the magnet holes/);
   assert.deepEqual(boxPlan({ edges: { ...V, outside: 0, inside: 0 } }).problems, []);
+});
+
+test('a bit or a depth of cut far too small: said, not a program too big to load', () => {
+  assert.ok(boxPlan({ bit: 0.25 }).problems.some((p) => /at least 0.8 mm/.test(p)));
+  const plan = boxPlan({ bit: 0.8, diameter: 150 });
+  assert.deepEqual(plan.problems, []);
+  assert.throws(() => boxProgram(plan, Object.assign({}, FEEDS, { doc: 0.05, stepoverPct: 10 })), /over 300,000 lines/);
+  assert.ok(boxProgram(boxPlan({}), FEEDS).gcode.split('\n').length < MAX_LINES / 20);
 });
