@@ -1434,7 +1434,7 @@ function boxPlan(input) {
     });
     // From the stock's top: past the outline, the shoulder round a lip
     // doesn't reach.
-    notchCut = { op: 'pocket', shape: { kind: 'circle', r: rn }, t: 0, dx: front.x, dy: front.y, z0: 0, depth: meet.base + o.notch.depth, what: 'finger notch' };
+    notchCut = { op: 'pocket', shape: { kind: 'circle', r: rn }, t: 0, dx: front.x, dy: front.y, z0: -faces.base, depth: meet.base + o.notch.depth, what: 'finger notch' };
   }
 
   // Chamfered or rounded edges: per half, its edges (u: which side the
@@ -1612,7 +1612,8 @@ function boardsOf(o) {
 }
 
 // A small box with the same fit, only as deep inside as the lip needs:
-// cut it first to try the Clearance. No magnets, notch, edges or faced lid. A
+// cut it first to try the Clearance, both halves from one board. No
+// magnets, notch, edges or faced lid. A
 // rectangle keeps its corner radius (where a lip fits worst).
 function testFitInput(input) {
   var o = Object.assign({}, DEFAULTS, input || {});
@@ -1623,8 +1624,8 @@ function testFitInput(input) {
   var fit = function(hf) {
     return Object.assign({}, o, {
       diameter: 2 * hf, length: 2 * hf, width: 2 * hf, flats: 2 * hf, cornerRadius: cr,
-      lidHeight: null, baseHeight: null, magnets: null, notch: null, edges: null, corners: null,
-      floor: Math.max(1, B.base - deep), top: Math.max(1, B.lid - deep)
+      lidHeight: null, baseHeight: null, magnets: null, notch: null, edges: null, corners: null, cut: 'both', grain: false,
+      floor: Math.max(1, B.base - deep), top: Math.max(1, B.base - deep)
     });
   };
   // A heart big enough for its inside to stay in one piece at the walls.
@@ -1640,48 +1641,62 @@ function nestInputs(input, count, gap, tune) {
   var list = [Object.assign({}, DEFAULTS, input || {}, { cut: 'both', baseHeight: null })];
   var cm = function(v) { return Math.floor(v * 100 + 1e-6) / 100; };
   for (var i = 1; i < count; i++) {
-    var prev = list[i - 1], pp = boxPlan(prev), next = shrunk(prev, prev.wall + gap, pp.shape);
+    // Clear of the wall, the gap, and any rounded floor corners (so it sits
+    // on the flat of the floor, under the flat of the top).
+    var prev = list[i - 1], pp = boxPlan(prev), rc = prev.corners ? prev.corners.radius || 0 : 0;
+    var at = limitOf(pp.shape, prev.wall + gap + rc), next = at && shrunk(prev, prev.wall + gap + rc, at);
     if (!next) break;
-    var room = pp.insideHeight - gap, r = pp.baseHeight / (pp.baseHeight + pp.lidHeight);
+    var room = pp.insideHeight - gap, r = pp.baseHeight / (pp.baseHeight + pp.lidHeight), fits = true;
     var heights = function() { var X = room + next.lipHeight; next.baseHeight = cm(X * r); next.lidHeight = cm(X * (1 - r)); };
-    for (var k = 0; k < 3; k++) {
+    // Its own sizes can round its corners or point more: fitted again.
+    var size = function() { return [next.diameter, next.length, next.width, next.flats].join(); };
+    for (var k = 0; k < 2 && fits; k++) {
       heights();
       if (tune) { var a = tune(next); delete a.problems; Object.assign(next, a); }
+      var was = size();
+      fits = fitIn(next, at);
+      if (!tune || size() === was) break;
     }
     heights();
-    if (!(next.baseHeight > next.floor + 1 && next.lidHeight > next.top + 1)) break;
+    if (!fits || !(next.baseHeight > next.floor + 1 && next.lidHeight > next.top + 1)) break;
     list.push(next);
   }
   return list;
 }
-// A box d smaller all round than o (whose outline is outer), to fit in
-// its inside: its sizes less 2 d, then smaller still until its outline
-// is d inside outer everywhere; null when nothing's left.
-function shrunk(o, d, outer) {
-  var n = Object.assign({}, o), long = o.shape === 'rect' || o.shape === 'oval' || o.shape === 'heart', size = function(k) {
-    if (long) { n.length = (o.length - 2 * d) * k; n.width = (o.width - 2 * d) * k; }
-    else if (o.shape === 'poly') n.flats = (o.flats - 2 * d) * k;
-    else n.diameter = (o.diameter - 2 * d) * k;
-    if (o.shape !== 'circle' && o.shape !== 'oval') n.cornerRadius = Math.max(0, (o.cornerRadius || 0) - d) * k;
-  };
-  // Where it must stay inside: the outline d in, every half mm or so; it
-  // sticks out where one of those is inside it.
+// Where a box must stay inside another (outline outer): that outline d
+// in, every mm or so; null when there's no inside left.
+function limitOf(outer, d) {
   var limit = shapeLoop(outer, -d);
   if (!limit) return null;
   var len = loopLength(limit), at = [];
-  for (var j = 0, m = Math.max(240, Math.ceil(len / 0.5)); j < m; j++) at.push(loopPoint(limit, len * j / m));
-  // Smaller by as much as it sticks out (and a little), till it doesn't.
-  for (var k = 0, f = 1; k < 12; k++) {
-    size(f);
-    var small = long ? Math.min(n.length, n.width) : o.shape === 'poly' ? n.flats : n.diameter;
+  for (var j = 0, m = Math.max(180, Math.ceil(len)); j < m; j++) at.push(loopPoint(limit, len * j / m));
+  return at;
+}
+// A box d smaller all round than o, its corners or point no tighter than
+// its lip needs, fitted inside the limit at; null when nothing's left.
+function shrunk(o, d, at) {
+  var n = Object.assign({}, o);
+  if (o.shape === 'rect' || o.shape === 'oval' || o.shape === 'heart') { n.length = o.length - 2 * d; n.width = o.width - 2 * d; }
+  else if (o.shape === 'poly') n.flats = o.flats - 2 * d;
+  else n.diameter = o.diameter - 2 * d;
+  if (o.shape !== 'circle' && o.shape !== 'oval') n.cornerRadius = Math.max((o.cornerRadius || 0) - d, n.wall - n.lipWidth - n.clearance + n.bit / 2);
+  return fitIn(n, at) ? n : null;
+}
+// Smaller (its corners as they are) by as much as it sticks out past the
+// limit at, and a little, till it doesn't: false when it can't.
+function fitIn(n, at) {
+  var long = n.shape === 'rect' || n.shape === 'oval' || n.shape === 'heart';
+  for (var k = 0; k < 12; k++) {
+    var small = long ? Math.min(n.length, n.width) : n.shape === 'poly' ? n.flats : n.diameter;
     var S = small > 0 && shapeOf(n);
-    if (!S) return null;
+    if (!S) return false;
     var out = -Infinity;
     at.forEach(function(q) { out = Math.max(out, -shapeDistance(S, 0, q.x, q.y)); });
-    if (out <= 0.01) return n;
-    f *= 1 - 2 * (out + 0.05) / small;
+    if (out <= 0.01) return true;
+    var f = 1 - 2 * (out + 0.05) / small;
+    if (long) { n.length *= f; n.width *= f; } else if (n.shape === 'poly') n.flats *= f; else n.diameter *= f;
   }
-  return null;
+  return false;
 }
 // A nested set's plan: each box's halves side by side as one box's, the
 // boxes one after another the other way, the biggest at the front (along
@@ -2090,8 +2105,9 @@ function boxProgram(plan, f, only) {
   if (!plan.set) ['base', 'lid'].forEach(function(h) {
     if (plan.faces && plan.faces[h] > 0 && plan.halves.some(function(x) { return x.name === h; })) comment(cap(h) + ' ' + n3(h === 'lid' ? plan.lidHeight : plan.baseHeight) + unit + ' high: its area faced down ' + n3(plan.faces[h]) + unit + ' first');
   });
-  if (plan.magnetAt.length) comment('Magnets: ' + plan.magnetAt.length + ' holes ' + mm3(o.magnets.diameter) + unit + ' wide, ' + mm3(o.magnets.depth) + unit + ' deep, both halves');
-  if (plan.notch) comment('Finger notch in the base, ' + mm3(o.notch.width) + unit + ' wide, ' + mm3(o.notch.depth) + unit + ' deep');
+  if (plan.set) comment('Each box as its own settings say: magnets, notch, edges, corners');
+  else if (plan.magnetAt.length) comment('Magnets: ' + plan.magnetAt.length + ' holes ' + mm3(o.magnets.diameter) + unit + ' wide, ' + mm3(o.magnets.depth) + unit + ' deep, both halves');
+  if (plan.notch && !plan.set) comment('Finger notch in the base, ' + mm3(o.notch.width) + unit + ' wide, ' + mm3(o.notch.depth) + unit + ' deep');
   comment('Closed ' + n3(plan.closedHeight) + unit + ' high, ' + n3(plan.insideHeight) + unit + ' inside');
   comment('Origin: ' + (plan.originSay || (o.origin === 'center' ? 'the middle of the pair' : 'the stock\'s front-left corner')));
   comment('Z0: top of the ' + (B.sep ? 'board' : 'stock'));
@@ -2764,7 +2780,7 @@ if (typeof module !== 'undefined' && module.exports) {
         ' high, ' + fmt(plan.insideHeight) + ' ' + unit() + ' inside.' + (warns.length ? ' ' + warns.join(' ') : '');
       if (warns.length) note.classList.add('cb-warn');
     }
-    var anyEdges = plan.edges.base.length + plan.edges.lid.length > 0, et = toolEntry(v.edgeTool);
+    var anyEdges = plan.halves.some(function (h) { return h.plan.edges[h.name].length > 0; }), et = toolEntry(v.edgeTool);
     $('cb-edge-note').textContent = !v.edgesOn ? 'Chamfer or round over the seam where the halves meet, the lip and the pockets\u2019 edges, with a V-bit or roundover bit, after the outlines.'
       : !anyEdges ? 'Give the Outside Seam, Lead-In or Pocket Edge a size.'
       : edgesInBox(v) ? 'Cut last, after the outlines: the program changes to T' + et.n + '.' +
@@ -2778,7 +2794,7 @@ if (typeof module !== 'undefined' && module.exports) {
         (toolEntry(v.tool) ? '' : ' Pick the box\u2019s bit from the Tool Library too, so the program starts by changing back to it.')
       : state.changer ? 'Pick the corner bit from the Tool Library to have the program change to it; or cut the corners with Corners Only after the box.'
       : 'No tool changer is set up in ncSender: cut the box, put the corner bit in, zero Z on the stock top (keep X Y), and run Corners Only.';
-    $('cb-corners-only').disabled = !!(errKeys.length || plan.problems.length || !(plan.corners.base.length + plan.corners.lid.length));
+    $('cb-corners-only').disabled = !!(errKeys.length || plan.problems.length || !plan.halves.some(function (h) { return h.plan.corners[h.name].length > 0; }));
     $('cb-ev-fields').hidden = v.edgeBit === 'round'; $('cb-eround-fields').hidden = v.edgeBit !== 'round';
     $('cb-generate').disabled = !!(errKeys.length || probs.length || tooBig);
     $('cb-testfit').disabled = !!(errKeys.length || plan.problems.length || tooBig);

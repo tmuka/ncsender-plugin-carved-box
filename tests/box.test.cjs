@@ -680,3 +680,39 @@ test('a nested set: each box inside the one before, all on one board, cut withou
   const small = setPlan(nestInputs({ diameter: 60 }, 5, 1.5), 5);
   assert.ok(small.set.length < 5 && small.problems.some((p) => /boxes fit inside each other/.test(p)));
 });
+
+test('nested sets after the review: refitted after Auto Sizes, clear of floor corners, notch below a faced base, no Auto Sizes needed', () => {
+  const fitsIn = (outer, inner, d) => {
+    const lp = shapeLoop(inner.shape, 0), len = loopLength(lp);
+    let worst = -Infinity;
+    for (let k = 0; k < 400; k++) { const q = loopPoint(lp, len * k / 400); worst = Math.max(worst, shapeDistance(outer.shape, -d, q.x, q.y)); }
+    return worst;
+  };
+  // A heart whose point Auto Sizes rounds more after it was fitted.
+  for (const gap of [0.5, 1.5]) for (const sh of [{ length: 120, width: 150, cornerRadius: 4 }, { length: 150, width: 150, cornerRadius: 10 }]) {
+    const tune = (i) => autoSizes(i, 'hardwood', false);
+    const input = Object.assign({ shape: 'heart', layout: 'y', stock: 40, bit: 6.35 }, sh), first = Object.assign({}, input, tune(input));
+    delete first.problems;
+    const set = setPlan(nestInputs(first, 5, gap, tune), 5);
+    for (let i = 1; i < set.set.length; i++) assert.ok(fitsIn(set.set[i - 1], set.set[i], set.set[i - 1].o.wall + gap) <= 0.02, 'box ' + (i + 1) + ' sticks out, gap ' + gap);
+  }
+  // Rounded floor corners: each box clear of the one before's coves.
+  const corners = { diameter: 12.7, radius: 6.35 }, cs = setPlan(nestInputs({ diameter: 150, stock: 40, wall: 8, lipWidth: 4, corners }, 3, 1.5), 3);
+  assert.deepEqual(cs.problems, []);
+  for (let i = 1; i < 3; i++) assert.ok(fitsIn(cs.set[i - 1], cs.set[i], 8 + 1.5 + 6.35) <= 0.02);
+  // The notch: from the faced-down top of a nested box's base.
+  const ns = setPlan(nestInputs({ diameter: 160, stock: 40, wall: 14, lipWidth: 4, notch: { width: 16, depth: 4 } }, 3, 1.5), 3);
+  for (const p of ns.set) {
+    const n = p.halves.find((h) => h.name === 'base').cuts.find((c) => /notch/.test(c.what));
+    assert.equal(n.z0, -p.faces.base);
+  }
+  check(ns);
+  // Rectangles, polygons and hearts without Auto Sizes: their corners as round as their lips need.
+  for (const sh of [{ shape: 'rect', length: 160, width: 110, cornerRadius: 10 }, { shape: 'poly', sides: 6, flats: 130, cornerRadius: 10 }, { shape: 'heart', length: 140, width: 130, cornerRadius: 12, wall: 7 }]) {
+    const set = setPlan(nestInputs(Object.assign({ stock: 40 }, sh), 3, 1.5), 3);
+    assert.deepEqual(set.problems, [], JSON.stringify(sh));
+  }
+  // Test Fit: both halves from one board, even when the box is cut a half at a time.
+  const tf = boxPlan(testFitInput(boxPlan({ cut: 'lid', grain: true, lidStock: 12 }).o));
+  assert.deepEqual(tf.halves.map((h) => h.name), ['base', 'lid']);
+});
