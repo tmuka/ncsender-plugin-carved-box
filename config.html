@@ -27,6 +27,15 @@
   .cb-row-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .cb-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
   .cb-field label { font-size: 0.78rem; color: var(--color-text-secondary); font-weight: 600; }
+  /* Spoilboard Toolbox's stock thickness, beside Stock Thickness. */
+  .cb-field > label:has(> .cb-stock-sbt) { display: flex; align-items: center; gap: 6px; }
+  button.cb-stock-sbt {
+    margin: 0 0 0 auto !important; padding: 0 8px !important; min-height: 0 !important; height: 18px; line-height: 16px;
+    font-size: 0.72rem !important; font-weight: 600; border-radius: 999px !important; cursor: pointer;
+    border: 1px solid color-mix(in srgb, var(--color-accent) 45%, transparent) !important;
+    background: transparent !important; color: var(--color-accent) !important;
+  }
+  button.cb-stock-sbt:hover { background: color-mix(in srgb, var(--color-accent) 14%, transparent) !important; }
   .cb-input, .cb-select { width: 100%; box-sizing: border-box; height: 36px; padding: 0 10px; border-radius: var(--radius-small); border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text-primary); font: inherit; font-size: 0.9rem; }
   .cb-input { text-align: right; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; }
   .cb-input:focus, .cb-select:focus { outline: none; border-color: var(--color-accent); }
@@ -2440,7 +2449,7 @@ if (typeof module !== 'undefined' && module.exports) {
     }
     if (errKeys.length) {
       var f = FIELDS.filter(function (x) { return x[0] === errKeys[0]; })[0];
-      note.textContent = $(f[0]).closest('.cb-field').querySelector('label').textContent + ' ' + c.errs[errKeys[0]] + '.';
+      note.textContent = $(f[0]).closest('.cb-field').querySelector('label').firstChild.textContent + ' ' + c.errs[errKeys[0]] + '.';
       note.classList.add('cb-bad');
     } else if (probs.length || tooBig) {
       note.textContent = (tooBig || probs[0]) + '.';
@@ -2599,6 +2608,35 @@ if (typeof module !== 'undefined' && module.exports) {
     $('cb-close').addEventListener('click', function () { persist(); window.postMessage({ type: 'close-plugin-dialog' }, '*'); });
   }
 
+  // With Spoilboard Toolbox installed and on, the stock thickness it keeps
+  // (its Stock T, saved in its own units): a Stock button by Stock
+  // Thickness puts it in. Hidden otherwise.
+  async function wireStockThickness() {
+    var mm = 0;
+    try {
+      var plugins = await (await fetch(BASE_URL + '/api/plugins')).json();
+      var sbt = (plugins || []).filter(function (p) { return p.id === 'com.tmuka.spoilboard-toolbox'; })[0];
+      if (!sbt || sbt.enabled === false) return;
+      var s = await (await fetch(BASE_URL + '/api/plugins/com.tmuka.spoilboard-toolbox/settings')).json();
+      var t = parseFloat(s && s.stockT);
+      mm = t > 0 ? t * (s.units === 'imperial' ? 25.4 : 1) : 0;
+    } catch (e) { return; }
+    if (!(mm > 0)) return;
+    var shown = fmt(mm) + ' ' + unit();
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'cb-stock-sbt';
+    b.textContent = 'Stock';
+    b.title = 'Stock Thickness = ' + shown + ', the stock thickness in Spoilboard Toolbox.';
+    b.setAttribute('aria-label', 'Use the stock thickness from Spoilboard Toolbox, ' + shown);
+    b.addEventListener('click', function (e) {
+      e.preventDefault();
+      show('cb-stock', mm, 'length');
+      $('cb-stock').dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    ROOT.querySelector('label[for="cb-stock"]').appendChild(b);
+  }
+
   async function init() {
     try {
       var s = await (await fetch(BASE_URL + '/api/settings')).json();
@@ -2628,6 +2666,7 @@ if (typeof module !== 'undefined' && module.exports) {
     wire();
     if (state.feedsAuto && !(initialConfig && initialConfig.v && initialConfig.v.feed)) fillFeeds();
     update(false);
+    wireStockThickness();
     await loadTools();
     update(false);
   }
