@@ -100,7 +100,7 @@
 <div class="cb-wrapper">
   <div class="cb-header">
     <h2>Carved Box</h2>
-    <span class="cb-sub">A box with a lid, round, rectangular or many-sided, carved side by side from one board.</span>
+    <span class="cb-sub">A box with a lid, round, rectangular, many-sided, oval or heart-shaped, carved side by side from one board.</span>
     <span class="cb-unit" id="cb-unit">METRIC (MM)</span>
   </div>
 
@@ -115,7 +115,7 @@
       <h3><span class="cb-grow">Box</span><span class="cb-auto-label">Auto Sizes</span><label class="cb-switch" title="Fill in the wall, floor, top, lip, clearance, gap, margin, tabs, notch, magnet count and edges for this size, stock, bit and material."><input type="checkbox" id="cb-auto" aria-label="Auto Sizes"><span></span></label></h3>
       <div class="cb-field"><label>Shape</label>
         <div class="cb-seg" id="cb-shape" role="radiogroup" aria-label="Shape">
-          <button type="button" role="radio" data-v="circle">Round</button><button type="button" role="radio" data-v="rect">Rectangle</button><button type="button" role="radio" data-v="poly">Polygon</button>
+          <button type="button" role="radio" data-v="circle">Round</button><button type="button" role="radio" data-v="rect">Rectangle</button><button type="button" role="radio" data-v="poly">Polygon</button><button type="button" role="radio" data-v="oval">Oval</button><button type="button" role="radio" data-v="heart">Heart</button>
         </div>
       </div>
       <div class="cb-row" id="cb-size-rect">
@@ -666,6 +666,260 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = { startingFeeds: startingFeeds };
 }
 /* END lib/starting-feeds.cjs */
+/* BEGIN lib/box-outline.cjs */
+/**
+ * Carved Box: a shape from its outline, for the ones without a formula
+ * for their offsets (a heart, an oval): { kind: 'outline', segs, step }.
+ * segs: the outline, a closed CCW loop of lines and arcs as box-shape.cjs's
+ * loops. Its signed distance (< 0 inside) is exact: to the nearest piece of
+ * the outline. Its offsets are that distance's contours on a grid `step`
+ * apart (0.2 mm or so), straightened where they're straight, so they're
+ * lines only; moved in far enough, an outline can come apart, so there can
+ * be several. mm.
+ */
+
+// The distance from (x, y) to a piece of the outline.
+function segDistance(s, x, y) {
+  if (s.type === 'line') {
+    var dx = s.x1 - s.x0, dy = s.y1 - s.y0, l2 = dx * dx + dy * dy;
+    var f = l2 > 0 ? Math.max(0, Math.min(1, ((x - s.x0) * dx + (y - s.y0) * dy) / l2)) : 0;
+    return Math.hypot(x - s.x0 - f * dx, y - s.y0 - f * dy);
+  }
+  // An arc: to its circle where the point's angle is on it, else an end.
+  var a = Math.atan2(y - s.cy, x - s.cx);
+  while (a < s.a0) a += 2 * Math.PI;
+  while (a > s.a0 + 2 * Math.PI) a -= 2 * Math.PI;
+  if (a <= s.a1) return Math.abs(Math.hypot(x - s.cx, y - s.cy) - s.r);
+  return Math.min(Math.hypot(x - s.cx - s.r * Math.cos(s.a0), y - s.cy - s.r * Math.sin(s.a0)),
+    Math.hypot(x - s.cx - s.r * Math.cos(s.a1), y - s.cy - s.r * Math.sin(s.a1)));
+}
+// Inside the outline: an odd count of crossings to the right (arcs as
+// fine chords).
+function insideOutline(segs, x, y) {
+  var c = 0, pts = outlinePoints(segs);
+  for (var i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    var p = pts[i], q = pts[j];
+    if ((p.y > y) !== (q.y > y) && x < (q.x - p.x) * (y - p.y) / (q.y - p.y) + p.x) c++;
+  }
+  return c % 2 === 1;
+}
+// The outline as points: lines' ends, arcs every few degrees (kept).
+function outlinePoints(segs) {
+  if (segs._pts) return segs._pts;
+  var pts = [];
+  segs.forEach(function(s) {
+    if (s.type === 'line') { pts.push({ x: s.x0, y: s.y0 }); return; }
+    var n = Math.max(2, Math.ceil((s.a1 - s.a0) / (Math.PI / 90)));
+    for (var k = 0; k < n; k++) { var a = s.a0 + (s.a1 - s.a0) * k / n; pts.push({ x: s.cx + s.r * Math.cos(a), y: s.cy + s.r * Math.sin(a) }); }
+  });
+  segs._pts = pts;
+  return pts;
+}
+function outlineDistance(S, x, y) {
+  if (S.sdf) return S.sdf(x, y);
+  var d = Infinity;
+  for (var i = 0; i < S.segs.length; i++) d = Math.min(d, segDistance(S.segs[i], x, y));
+  return insideOutline(S.segs, x, y) ? -d : d;
+}
+
+// The distance on a grid round the outline, PAD past it: made once for
+// each outline (by its key), the inside found a row at a time.
+var PAD = 25, GRIDS = {}, GRID_KEYS = [];
+function outlineGrid(S) {
+  if (S.key && GRIDS[S.key]) return GRIDS[S.key];
+  var pts = S.segs ? outlinePoints(S.segs) : [], x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  pts.forEach(function(p) { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y); });
+  if (S.box) { x0 = S.box.minX; x1 = S.box.maxX; y0 = S.box.minY; y1 = S.box.maxY; }
+  var h = S.step || 0.2;
+  x0 -= PAD; y0 -= PAD; x1 += PAD; y1 += PAD;
+  var nx = Math.ceil((x1 - x0) / h) + 1, ny = Math.ceil((y1 - y0) / h) + 1, v = new Float64Array(nx * ny), lo = Infinity;
+  for (var j = 0; j < ny; j++) {
+    var y = y0 + j * h, xs = [];
+    for (var i = 0, k = pts.length - 1; i < pts.length; k = i++) {
+      var p = pts[i], q = pts[k];
+      if ((p.y > y) !== (q.y > y)) xs.push((q.x - p.x) * (y - p.y) / (q.y - p.y) + p.x);
+    }
+    xs.sort(function(m, n) { return m - n; });
+    var c = 0;
+    for (i = 0; i < nx; i++) {
+      var x = x0 + i * h;
+      while (c < xs.length && xs[c] <= x) c++;
+      if (S.sdf) v[j * nx + i] = S.sdf(x, y);
+      else {
+        var d = Infinity;
+        for (var m = 0; m < S.segs.length; m++) d = Math.min(d, segDistance(S.segs[m], x, y));
+        v[j * nx + i] = c % 2 === 1 ? -d : d;
+      }
+      if (v[j * nx + i] < lo) lo = v[j * nx + i];
+    }
+  }
+  var grid = { x0: x0, y0: y0, h: h, nx: nx, ny: ny, v: v, deepest: -lo };
+  if (S.key) {
+    GRIDS[S.key] = grid; GRID_KEYS.push(S.key);
+    if (GRID_KEYS.length > 6) { var old = GRID_KEYS.shift(); delete GRIDS[old]; delete MEMO[old]; }
+  }
+  return grid;
+}
+
+// Where the distance is t: closed loops (CCW, lines), by marching squares.
+function outlineLoops(S, t) {
+  var g = outlineGrid(S), nx = g.nx, ny = g.ny, v = g.v, h = g.h;
+  // Contours of a shape are asked for many times: kept by level.
+  var memo = S.key ? (MEMO[S.key] = MEMO[S.key] || {}) : null, mk = t.toFixed(6);
+  if (memo && memo[mk]) return memo[mk];
+  if (t <= -g.deepest + 1e-9 || t >= PAD - h) return [];
+  // An edge's crossing point, by its key (a cell's edge, shared).
+  var pt = {};
+  var cross = function(i0, j0, i1, j1) {
+    var key = i0 < i1 || j0 < j1 ? i0 + ',' + j0 + ',' + i1 + ',' + j1 : i1 + ',' + j1 + ',' + i0 + ',' + j0;
+    if (pt[key]) return key;
+    var a = v[j0 * nx + i0] - t, b = v[j1 * nx + i1] - t, f = a / (a - b);
+    pt[key] = { x: g.x0 + (i0 + (i1 - i0) * f) * h, y: g.y0 + (j0 + (j1 - j0) * f) * h };
+    return key;
+  };
+  // Each cell's pieces: the two edges each joins (no direction yet).
+  var adj = {};
+  var link = function(p, q) { (adj[p] = adj[p] || []).push(q); (adj[q] = adj[q] || []).push(p); };
+  for (var j = 0; j < ny - 1; j++) for (var i = 0; i < nx - 1; i++) {
+    var a = v[j * nx + i] < t, b = v[j * nx + i + 1] < t, c = v[(j + 1) * nx + i + 1] < t, d = v[(j + 1) * nx + i] < t;
+    var code = (a ? 1 : 0) | (b ? 2 : 0) | (c ? 4 : 0) | (d ? 8 : 0);
+    if (code === 0 || code === 15) continue;
+    var Sx = function() { return cross(i, j, i + 1, j); }, E = function() { return cross(i + 1, j, i + 1, j + 1); };
+    var N = function() { return cross(i, j + 1, i + 1, j + 1); }, W = function() { return cross(i, j, i, j + 1); };
+    // The edges whose ends differ, joined in pairs round the cell.
+    if (code === 5 || code === 10) {
+      // A saddle: the middle's value says which corners connect.
+      var mid = (v[j * nx + i] + v[j * nx + i + 1] + v[(j + 1) * nx + i + 1] + v[(j + 1) * nx + i]) / 4 < t;
+      if ((code === 5) === mid) { link(W(), N()); link(Sx(), E()); } else { link(W(), Sx()); link(E(), N()); }
+      continue;
+    }
+    var es = [];
+    if (a !== b) es.push(Sx()); if (b !== c) es.push(E()); if (c !== d) es.push(N()); if (d !== a) es.push(W());
+    link(es[0], es[1]);
+  }
+  var loops = [], seen = {};
+  Object.keys(adj).forEach(function(k0) {
+    if (seen[k0]) return;
+    var ring = [], prev = null, k = k0;
+    while (k && !seen[k]) {
+      seen[k] = true; ring.push(pt[k]);
+      var ns = adj[k], nk = ns[0] !== prev && !seen[ns[0]] ? ns[0] : ns[1] !== prev && !seen[ns[1]] ? ns[1] : null;
+      prev = k; k = nk;
+    }
+    if (ring.length < 3) return;
+    // Counter-clockwise.
+    var area = 0;
+    for (var m = 0; m < ring.length; m++) { var P = ring[m], Q = ring[(m + 1) % ring.length]; area += P.x * Q.y - Q.x * P.y; }
+    if (area < 0) ring.reverse();
+    ring = straighten(ring, Math.min(0.02, h / 10));
+    if (ring.length >= 3) loops.push(toSegs(ring));
+  });
+  // Largest first.
+  loops.sort(function(p, q) { return loopArea(q) - loopArea(p); });
+  if (memo) memo[mk] = loops;
+  return loops;
+}
+var MEMO = {};
+function loopArea(loop) {
+  return loop.reduce(function(a, s) { return a + (s.x0 * s.y1 - s.x1 * s.y0) / 2; }, 0);
+}
+// Points on a closed ring with the ones that don't bend it more than tol
+// left out (Douglas-Peucker, from its two furthest-apart points).
+function straighten(ring, tol) {
+  var far = 0, best = 0;
+  for (var i = 1; i < ring.length; i++) { var dd = Math.hypot(ring[i].x - ring[0].x, ring[i].y - ring[0].y); if (dd > best) { best = dd; far = i; } }
+  var keep = new Array(ring.length).fill(false);
+  keep[0] = keep[far] = true;
+  var dp = function(a, b) {
+    var p = ring[a], q = ring[b % ring.length], dx = q.x - p.x, dy = q.y - p.y, l = Math.hypot(dx, dy) || 1e-12, worst = 0, at = -1;
+    for (var k = a + 1; k < b; k++) { var r = ring[k % ring.length], e = Math.abs((r.x - p.x) * dy - (r.y - p.y) * dx) / l; if (e > worst) { worst = e; at = k; } }
+    if (worst > tol) { keep[at % ring.length] = true; dp(a, at); dp(at, b); }
+  };
+  dp(0, far); dp(far, ring.length);
+  return ring.filter(function(p, i) { return keep[i]; });
+}
+function toSegs(ring) {
+  var segs = [];
+  for (var i = 0; i < ring.length; i++) {
+    var p = ring[i], q = ring[(i + 1) % ring.length], len = Math.hypot(q.x - p.x, q.y - p.y);
+    if (len > 1e-9) segs.push({ type: 'line', x0: p.x, y0: p.y, x1: q.x, y1: q.y, len: len });
+  }
+  return segs;
+}
+// Is (x, y) inside a loop of lines?
+function inLoop(loop, x, y) {
+  var c = 0;
+  loop.forEach(function(s) { if ((s.y0 > y) !== (s.y1 > y) && x < (s.x1 - s.x0) * (y - s.y0) / (s.y1 - s.y0) + s.x0) c++; });
+  return c % 2 === 1;
+}
+
+// A heart Width across its lobes and Height from its point to the top of
+// the lobes, the point rounded `point` (mm), pointing to -Y (or turned to
+// -X, along Y): two round lobes meeting in a notch at the top, their
+// sides straight down to the point. As QuickCut's heart (lobes 0.72 of
+// their radius either side of the middle). null when the point's too
+// close under the lobes for a heart.
+var HEART_LOBE = 0.72;
+function heartShape(W, H, point, alongY) {
+  var r = W / 2 / (1 + HEART_LOBE), a = HEART_LOBE * r, yc = H / 2 - r, rho = Math.max(0, point || 0);
+  if (!(W > 0 && H > 0) || yc - (-H / 2) < r * 1.5) return null;
+  // The point's circle: its bottom at -H/2.
+  var ct = { x: 0, y: -H / 2 + rho }, cR = { x: a, y: yc };
+  var dx = cR.x - ct.x, dy = cR.y - ct.y, L = Math.hypot(dx, dy);
+  if (!(L > Math.abs(r - rho) + 1e-6) || rho >= r) return null;
+  // The right side: the line touching both circles, its outward normal at phiR.
+  var phiR = Math.atan2(dy, dx) - Math.acos((rho - r) / L), phiL = Math.PI - phiR;
+  var notchR = Math.atan2(Math.sqrt(r * r - a * a), -a);
+  var u = function(t) { return { x: Math.cos(t), y: Math.sin(t) }; }, nR = u(phiR), nL = u(phiL);
+  var segs = [];
+  var line = function(p, q) { var len = Math.hypot(q.x - p.x, q.y - p.y); if (len > 1e-9) segs.push({ type: 'line', x0: p.x, y0: p.y, x1: q.x, y1: q.y, len: len }); };
+  var arc = function(cx, cy, rr, a0, a1) { if (rr > 1e-9) segs.push({ type: 'arc', cx: cx, cy: cy, r: rr, a0: a0, a1: a1, len: rr * (a1 - a0) }); };
+  arc(ct.x, ct.y, rho, phiL, phiR + 2 * Math.PI);
+  line({ x: ct.x + rho * nR.x, y: ct.y + rho * nR.y }, { x: cR.x + r * nR.x, y: cR.y + r * nR.y });
+  arc(cR.x, cR.y, r, phiR, notchR);
+  arc(-cR.x, cR.y, r, Math.PI - notchR, phiL);
+  line({ x: -cR.x + r * nL.x, y: cR.y + r * nL.y }, { x: ct.x + rho * nL.x, y: ct.y + rho * nL.y });
+  // Along Y, its point to -X: turned a quarter clockwise.
+  if (alongY) segs = segs.map(function(sg) {
+    if (sg.type === 'line') return { type: 'line', x0: sg.y0, y0: -sg.x0, x1: sg.y1, y1: -sg.x1, len: sg.len };
+    return { type: 'arc', cx: sg.cy, cy: -sg.cx, r: sg.r, a0: sg.a0 - Math.PI / 2, a1: sg.a1 - Math.PI / 2, len: sg.len };
+  });
+  return { kind: 'outline', segs: segs, cr: rho, key: 'heart:' + [W, H, rho, alongY ? 'y' : 'x'].join(','), step: gridStep(Math.max(W, H)) };
+}
+// An oval (an ellipse) A across X and B across Y: its exact signed
+// distance (the nearest point on it, found by Newton's method).
+function ovalShape(A, B) {
+  if (!(A > 0 && B > 0)) return null;
+  var a = A / 2, b = B / 2;
+  var sdf = function(x, y) {
+    var px = Math.abs(x), py = Math.abs(y);
+    if (Math.abs(a - b) < 1e-9) return Math.hypot(px, py) - a;
+    // The nearest point (a cos t, b sin t): t by Newton, from the point's
+    // angle and both ends of the quarter (inside, there can be more than
+    // one point where the distance is level); the nearest of them.
+    var d = Infinity;
+    [Math.atan2(a * py, b * px), 0, Math.PI / 2].forEach(function(t) {
+      for (var k = 0; k < 12; k++) {
+        var ct = Math.cos(t), st = Math.sin(t);
+        var f = (a * a - b * b) * st * ct - px * a * st + py * b * ct;
+        var df = (a * a - b * b) * (ct * ct - st * st) - px * a * ct - py * b * st;
+        if (Math.abs(df) < 1e-12) break;
+        t = Math.max(0, Math.min(Math.PI / 2, t - f / df));
+      }
+      d = Math.min(d, Math.hypot(px - a * Math.cos(t), py - b * Math.sin(t)));
+    });
+    return (px * px) / (a * a) + (py * py) / (b * b) < 1 ? -d : d;
+  };
+  return { kind: 'outline', sdf: sdf, box: { minX: -a, maxX: a, minY: -b, maxY: b }, cr: Math.min(a, b), key: 'oval:' + A + ',' + B, step: gridStep(Math.max(A, B)) };
+}
+// Fine enough for a small box, not too many points for a big one.
+function gridStep(size) { return Math.max(0.15, Math.min(0.4, size / 600)); }
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { outlineDistance: outlineDistance, outlineLoops: outlineLoops, outlineGrid: outlineGrid, inLoop: inLoop,
+    heartShape: heartShape, ovalShape: ovalShape };
+}
+/* END lib/box-outline.cjs */
 /* BEGIN lib/box-shape.cjs */
 /**
  * Carved Box: the box's outline (a circle, or a rectangle with rounded
@@ -677,7 +931,8 @@ if (typeof module !== 'undefined' && module.exports) {
  * shape: { kind: 'circle', r }, { kind: 'rect', hx, hy, cr } (half the
  * length along X and the width along Y, the corner radius), or { kind:
  * 'poly', n, a, cr, rot } (a regular polygon: n sides, a the apothem, half
- * across the flats, the corner radius, rot the angle of a corner). mm.
+ * across the flats, the corner radius, rot the angle of a corner), or an
+ * outline (box-outline.cjs: a heart, an oval). mm.
  */
 
 // The outline moved t out (in, t < 0): null when there's nothing left.
@@ -691,6 +946,8 @@ function shapeLoop(shape, t) {
     return [arcSeg(0, 0, r, 0, Math.PI), arcSeg(0, 0, r, Math.PI, 2 * Math.PI)];
   }
   if (shape.kind === 'poly') { var pl = polyLoop(shape, t); return pl && startAtPlusX(pl); }
+  // An outline: its biggest piece (shapeLoops for them all).
+  if (shape.kind === 'outline') { var ol = outlineLoops(shape, t); return ol.length ? startAtPlusX(ol[0]) : null; }
   var hx = shape.hx + t, hy = shape.hy + t, cr = Math.max(0, Math.min(shape.cr + t, hx, hy));
   if (hx < -1e-9 || hy < -1e-9) return null;
   hx = Math.max(0, hx); hy = Math.max(0, hy);
@@ -782,11 +1039,18 @@ function loopExtent(loop) {
 function arcSeg(cx, cy, r, a0, a1) { return { type: 'arc', cx: cx, cy: cy, r: r, a0: a0, a1: a1, len: r * (a1 - a0) }; }
 
 // How far in the outline can go before nothing's left.
-function shapeDeepest(shape) { return shape.kind === 'circle' ? shape.r : shape.kind === 'poly' ? shape.a : Math.min(shape.hx, shape.hy); }
+// Every piece of the outline moved t (an outline's can come apart).
+function shapeLoops(shape, t) {
+  if (shape.kind === 'outline') return outlineLoops(shape, t);
+  var one = shapeLoop(shape, t);
+  return one ? [one] : [];
+}
+function shapeDeepest(shape) { if (shape.kind === 'outline') return outlineGrid(shape).deepest; return shape.kind === 'circle' ? shape.r : shape.kind === 'poly' ? shape.a : Math.min(shape.hx, shape.hy); }
 
 // The signed distance from (x, y) to the outline moved t: < 0 inside.
 function shapeDistance(shape, t, x, y) {
   if (shape.kind === 'circle') return Math.hypot(x, y) - (shape.r + t);
+  if (shape.kind === 'outline') return outlineDistance(shape, x, y) - t;
   if (shape.kind === 'poly') {
     // In the sector of the nearest side: its distance, or past its end, the corner's.
     var pr = Math.max(0, Math.min(shape.cr + t, shape.a + t)), ap = shape.a + t - pr, half = Math.PI / shape.n, w = 2 * half;
@@ -824,6 +1088,26 @@ function loopPart(loop, s0, s1) {
   });
   return out;
 }
+// How far along the loop its nearest point to (x, y) is.
+function loopNearest(loop, x, y) {
+  var at = 0, best = Infinity, bestS = 0;
+  loop.forEach(function(s) {
+    var f;
+    if (s.type === 'line') {
+      var dx = s.x1 - s.x0, dy = s.y1 - s.y0, l2 = dx * dx + dy * dy;
+      f = l2 > 0 ? Math.max(0, Math.min(1, ((x - s.x0) * dx + (y - s.y0) * dy) / l2)) : 0;
+    } else {
+      var a = Math.atan2(y - s.cy, x - s.cx);
+      while (a < s.a0) a += 2 * Math.PI;
+      while (a > s.a0 + 2 * Math.PI) a -= 2 * Math.PI;
+      f = a <= s.a1 ? (a - s.a0) / (s.a1 - s.a0) : (a - s.a1 < s.a0 + 2 * Math.PI - a ? 1 : 0);
+    }
+    var p = segAt(s, f), d = Math.hypot(p.x - x, p.y - y);
+    if (d < best) { best = d; bestS = at + s.len * f; }
+    at += s.len;
+  });
+  return bestS;
+}
 // The point s along the loop.
 function loopPoint(loop, s) {
   var at = 0;
@@ -835,8 +1119,10 @@ function loopPoint(loop, s) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { shapeLoop: shapeLoop, shapeDeepest: shapeDeepest, shapeDistance: shapeDistance,
-    loopLength: loopLength, loopPart: loopPart, loopPoint: loopPoint, loopAt: loopAt, loopExtent: loopExtent };
+  var outlineLib = require('./box-outline.cjs');
+  var outlineLoops = outlineLib.outlineLoops, outlineGrid = outlineLib.outlineGrid, outlineDistance = outlineLib.outlineDistance;
+  module.exports = { shapeLoop: shapeLoop, shapeLoops: shapeLoops, shapeDeepest: shapeDeepest, shapeDistance: shapeDistance,
+    loopLength: loopLength, loopPart: loopPart, loopPoint: loopPoint, loopAt: loopAt, loopExtent: loopExtent, loopNearest: loopNearest };
 }
 /* END lib/box-shape.cjs */
 /* BEGIN lib/box-plan.cjs */
@@ -845,8 +1131,10 @@ if (typeof module !== 'undefined' && module.exports) {
  * side out of one board. All lengths in mm.
  *
  * The box is round (Diameter), a rectangle (Length along X, Width along
- * Y, Corner Radius) or a regular polygon (Sides, the size across the
- * Flats, Corner Radius; a flat side to the front). The base is the full thickness of the stock; the lid
+ * Y, Corner Radius), a regular polygon (Sides, the size across the
+ * Flats, Corner Radius; a flat side to the front), an oval (Length along
+ * X, Width along Y) or a heart (Length across its lobes, Width from its
+ * point to the top, Corner Radius its point's; the point to the front). The base is the full thickness of the stock; the lid
  * is too, unless a Lid Height under it is set, when the lid's area is
  * faced down first. Each half's inside is pocketed from the top face,
  * leaving the Wall all round and the Floor (base) or Top (lid)
@@ -896,14 +1184,24 @@ function boxPlan(input) {
   var o = Object.assign({}, DEFAULTS, input || {});
   var problems = [], notes = [];
   var need = function(ok, msg) { if (!ok) problems.push(msg); };
-  var rect = o.shape === 'rect', poly = o.shape === 'poly', cornered = rect || poly, rb = o.bit / 2, w = o.wall, T = o.stock;
+  var rect = o.shape === 'rect', poly = o.shape === 'poly', oval = o.shape === 'oval', heart = o.shape === 'heart';
+  var cornered = rect || poly || heart, rb = o.bit / 2, w = o.wall, T = o.stock;
   // A polygon with a flat side to the front (-Y; along Y, -X), so it's the
   // same turned over across the line between the halves.
   var n = Math.round(o.sides), polyRot = (o.layout === 'y' ? Math.PI : -Math.PI / 2) - Math.PI / n;
   var S = rect ? { kind: 'rect', hx: o.length / 2, hy: o.width / 2, cr: Math.max(0, Math.min(o.cornerRadius || 0, o.length / 2, o.width / 2)) }
     : poly ? { kind: 'poly', n: n, a: o.flats / 2, cr: Math.max(0, Math.min(o.cornerRadius || 0, o.flats / 2)), rot: polyRot }
+    : oval ? ovalShape(o.length, o.width)
+    : heart ? heartShape(o.length, o.width, o.cornerRadius, o.layout === 'y')
     : { kind: 'circle', r: o.diameter / 2 };
-  var outlineAt0 = (rect ? o.length > 0 && o.width > 0 : poly ? o.flats > 0 && n >= 3 && n <= 12 : o.diameter > 0) ? shapeLoop(S, 0) : null;
+  // A heart too short for its width (no point under its lobes): said, and
+  // a stand-in so the rest still adds up.
+  if (!S) {
+    var lobe = (o.length || 0) / 2 / 1.72;
+    problems.push(heart ? 'A heart ' + +(+o.length || 0).toFixed(1) + ' mm across needs at least ' + +(2.5 * lobe + 0.05).toFixed(1) + ' mm from point to top, and a point radius under ' + +(lobe - 0.05).toFixed(1) + ' mm' : 'Give the oval a Length and Width');
+    S = { kind: 'circle', r: Math.max(1, (o.length || 2) / 2) };
+  }
+  var outlineAt0 = (rect || oval || heart ? o.length > 0 && o.width > 0 : poly ? o.flats > 0 && n >= 3 && n <= 12 : o.diameter > 0) ? shapeLoop(S, 0) : null;
   // How far the outline reaches each way from the middle (an odd polygon's
   // not the same up as down).
   var ext = outlineAt0 ? loopExtent(outlineAt0) : { minX: -1, maxX: 1, minY: -1, maxY: 1 };
@@ -916,7 +1214,7 @@ function boxPlan(input) {
   var height = { base: T, lid: lidH }, under = { base: o.floor, lid: o.top };
   var lipHalf = lipOnLid ? 'lid' : 'base', rabbetHalf = lipOnLid ? 'base' : 'lid';
 
-  if (rect) need(o.length > 0 && o.width > 0, 'Length and Width must be more than 0');
+  if (rect || oval || heart) need(o.length > 0 && o.width > 0, 'Length and Width must be more than 0');
   if (poly) need(o.flats > 0 && o.sides >= 3 && o.sides <= 12 && o.sides === Math.round(o.sides), 'A polygon needs 3 to 12 sides and a size across the flats');
   if (cornered) {
     need((o.cornerRadius || 0) >= 0, 'Corner Radius can\'t be negative');
@@ -934,6 +1232,9 @@ function boxPlan(input) {
   need(o.lipWidth > 0, 'Lip Width must be more than 0');
   need(o.clearance >= 0, 'Clearance can\'t be negative');
   need(deep - w > rb + (o.finish > 0 ? o.finish : 0), 'Wall too thick for the size: the inside must be wider than the bit');
+  // A heart's inside in one piece where the walls are (deeper, its pocket
+  // can come apart into the lobes, and is cut a piece at a time).
+  if (S.kind === 'outline') need(shapeLoops(S, tInside).length <= 1 && shapeLoops(S, tInside - rb).length <= 1, 'Wall too thick for the heart: its inside comes apart in two');
   need(w - o.lipWidth - o.clearance >= 1, 'Wall must be at least 1 mm more than Lip Width + Clearance, for the wall outside the lip');
   need(o.lipHeight < height[lipHalf] - under[lipHalf], 'Lip Height must be less than the inside depth of the half with the lip');
   need(rabbetDepth < height[rabbetHalf] - under[rabbetHalf], 'Lip Height + Clearance must be less than the inside depth of the half without the lip');
@@ -1173,7 +1474,8 @@ function testFitInput(input) {
 var CLEARANCE = { mdf: 0.15, softwood: 0.25, hardwood: 0.2, hdpe: 0.15, acrylic: 0.1, polycarbonate: 0.1, aluminum: 0.05, foam: 0.2 };
 function autoSizes(input, material, imperial) {
   var o = Object.assign({}, DEFAULTS, input || {});
-  var rect = o.shape === 'rect', poly = o.shape === 'poly', small = rect ? Math.min(o.length, o.width) : poly ? o.flats : o.diameter;
+  var rect = o.shape === 'rect', poly = o.shape === 'poly', long = rect || o.shape === 'oval' || o.shape === 'heart';
+  var small = long ? Math.min(o.length, o.width) : poly ? o.flats : o.diameter;
   var T = o.stock, lidH = o.lidHeight > 0 ? o.lidHeight : T, b = o.bit;
   // To the grid: the nearest step, or (up) the next one.
   var grid = function(v) { return imperial ? (v < 1 ? 0.127 : 25.4 / 32) : (v < 1 ? 0.05 : 0.5); };
@@ -1188,7 +1490,7 @@ function autoSizes(input, material, imperial) {
   a.lipHeight = half(clamp(depth * 0.3, 2, 8));
   a.margin = half(5);
   a.gap = upHalf(Math.max(8, 2 * b + 2));
-  var round = rect ? 2 * (o.length + o.width) : poly ? o.sides * o.flats * Math.tan(Math.PI / o.sides) : Math.PI * o.diameter;
+  var round = rect ? 2 * (o.length + o.width) : long ? Math.PI * (o.length + o.width) / 2 : poly ? o.sides * o.flats * Math.tan(Math.PI / o.sides) : Math.PI * o.diameter;
   if (o.tabs) a.tabs = { count: clamp(Math.round(round / 90), 3, 8), width: half(Math.max(5, 1.5 * b)), height: half(clamp(T * 0.08, 1, 3)) };
   if (o.magnets) a.magnets = Object.assign({}, o.magnets, { count: rect ? 4 : clamp(Math.round(round / 80), 3, 6) });
   if (o.notch) a.notch = { width: half(clamp(small * 0.18, 10, 20)), depth: half(clamp(a.lipHeight, 3, 6)) };
@@ -1200,7 +1502,9 @@ function autoSizes(input, material, imperial) {
   var smaller = function(d) { return d > 0.3 ? half(d * 0.7) : 0; };
   for (var k = 0; k < 80; k++) {
     a.lipWidth = half(clamp(a.wall * 0.4, 1.5, 3.5));
-    if (rect || poly) a.cornerRadius = Math.max(o.cornerRadius || 0, upHalf(a.wall - a.lipWidth - a.clearance + b / 2));
+    if (rect || poly || o.shape === 'heart') a.cornerRadius = Math.max(o.cornerRadius || 0, upHalf(a.wall - a.lipWidth - a.clearance + b / 2));
+    // A heart's point under its lobes' radius.
+    if (o.shape === 'heart') a.cornerRadius = Math.min(a.cornerRadius, Math.max(o.cornerRadius || 0, (o.length || 0) / 2 / 1.72 - 1));
     plan = boxPlan(Object.assign({}, o, a));
     if (!plan.problems.length) break;
     var p = plan.problems[0], ed = a.edges;
@@ -1227,7 +1531,8 @@ function autoSizes(input, material, imperial) {
 if (typeof module !== 'undefined' && module.exports) {
   var shapeLib = require('./box-shape.cjs');
   var shapeLoop = shapeLib.shapeLoop, shapeDeepest = shapeLib.shapeDeepest, loopLength = shapeLib.loopLength, loopPoint = shapeLib.loopPoint;
-  var loopAt = shapeLib.loopAt, loopExtent = shapeLib.loopExtent;
+  var loopAt = shapeLib.loopAt, loopExtent = shapeLib.loopExtent, shapeLoops = shapeLib.shapeLoops;
+  var outlineLib = require('./box-outline.cjs'), heartShape = outlineLib.heartShape, ovalShape = outlineLib.ovalShape;
   module.exports = { boxPlan: boxPlan, testFitInput: testFitInput, autoSizes: autoSizes, BOX_DEFAULTS: DEFAULTS };
 }
 /* END lib/box-plan.cjs */
@@ -1360,7 +1665,9 @@ function boxProgram(plan, f, only) {
   // the middle (a circle, or a slot's center line out and back) out to the
   // bit a radius inside the wall.
   function pocket(cx, cy, cut) {
-    var S = cut.shape || plan.shape, outer = cut.t - (cut.finish || 0) - rb, D = shapeDeepest(S) + outer;
+    var S = cut.shape || plan.shape;
+    if (S.kind === 'outline') return pocketOutline(cx, cy, cut, S);
+    var outer = cut.t - (cut.finish || 0) - rb, D = shapeDeepest(S) + outer;
     var n = Math.max(1, Math.ceil(D / step - 1e-9)), loops = [];
     for (var k = n; k >= 0; k--) { var lp = shapeLoop(S, outer - D * k / n); if (lp) loops.push(lp); }
     // Too small to go down along, or (a circle's, a square's) wider than
@@ -1369,6 +1676,51 @@ function boxProgram(plan, f, only) {
     if (!loops.length || loopLength(loops[0]) < 2 * o.bit || (pointMiddle && D / n > 0.9 * rb)) loops.unshift(shapeLoop({ kind: 'circle', r: Math.max(0.05, Math.min(rb * 0.5, D)) }, 0));
     cutLoops(cx, cy, loops, cut.z0, cut.depth, Math.max(0.2, Math.min(doc, o.bit * 0.5)));
     if (cut.finish) finishWall(cx, cy, S, cut.t - rb, -cut.finish, cut, o.finishDir !== 'climb');
+  }
+  // An outline's pocket (a heart's, an oval's): its rings a stepover
+  // apart from the wall in, each with the ring round it (a heart's can
+  // come apart into its lobes); cut from the deepest out, a ring then the
+  // one round it, joined straight across between them, lifting between
+  // pieces; each piece ramped down along its first ring.
+  function pocketOutline(cx, cy, cut, S) {
+    var outer = cut.t - (cut.finish || 0) - rb, rings = [];
+    for (var e = outer, k = 0; k < 5000; k++, e -= step) {
+      var ls = shapeLoops(S, e);
+      if (!ls.length) break;
+      rings.push(ls.map(function(lp) { return { loop: lp, kids: [], parent: null }; }));
+    }
+    for (var i = 1; i < rings.length; i++) rings[i].forEach(function(nd) {
+      var p = loopPoint(nd.loop, 0);
+      var par = rings[i - 1].filter(function(q) { return inLoop(q.loop, p.x, p.y); })[0] || rings[i - 1][0];
+      nd.parent = par; par.kids.push(nd);
+    });
+    var order = [];
+    var visit = function(nd) { nd.kids.forEach(visit); order.push(nd); };
+    (rings[0] || []).forEach(visit);
+    var pitch = Math.max(0.2, Math.min(doc, o.bit * 0.5)), above = cut.z0;
+    levels(cut.z0, cut.depth).forEach(function(zl) {
+      var prev = null;
+      order.forEach(function(nd) {
+        if (prev && prev.parent === nd) {
+          var lp = startNear(nd.loop, x - cx, y - cy), p = loopPoint(lp, 0);
+          line(cx + p.x, cy + p.y);
+          path(lp, cx, cy);
+        } else {
+          var p0 = loopPoint(nd.loop, 0);
+          rapid(cx + p0.x, cy + p0.y);
+          down(above);
+          ramp(nd.loop, cx, cy, zl, pitch);
+        }
+        prev = nd;
+      });
+      above = zl;
+    });
+    lift();
+  }
+  // The loop started at its nearest point to (x, y).
+  function startNear(loop, px, py) {
+    var s = loopNearest(loop, px, py), len = loopLength(loop);
+    return s < 1e-9 || s > len - 1e-9 ? loop : loopPart(loop, s, len).concat(loopPart(loop, 0, s));
   }
   // A ring between the shape moved tIn and tOut (the shoulder round a
   // lip), depth deep; about 3 degrees down along its first loop.
@@ -1437,6 +1789,8 @@ function boxProgram(plan, f, only) {
   comment((f.label || 'Carved Box') + ': a base and a lid, ' + (plan.shape.kind === 'rect'
     ? mm3(o.length) + ' x ' + mm3(o.width) + unit + ', corners ' + mm3(plan.shape.cr) + unit
     : plan.shape.kind === 'poly' ? plan.shape.n + ' sides, ' + mm3(o.flats) + unit + ' across, corners ' + mm3(plan.shape.cr) + unit
+    : o.shape === 'oval' ? 'an oval ' + mm3(o.length) + ' x ' + mm3(o.width) + unit
+    : o.shape === 'heart' ? 'a heart ' + mm3(o.length) + ' x ' + mm3(o.width) + unit + ', point ' + mm3(o.cornerRadius) + unit
     : mm3(o.diameter) + unit + ' across'));
   comment('Stock ' + mm3(o.stock) + unit + ' thick, at least ' + n3(plan.stock.w) + ' x ' + n3(plan.stock.h) + unit);
   comment('Wall ' + mm3(o.wall) + ', floor ' + mm3(o.floor) + ', top ' + mm3(o.top) + unit);
@@ -1534,6 +1888,7 @@ function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
 if (typeof module !== 'undefined' && module.exports) {
   var shapeLib = require('./box-shape.cjs');
+  var shapeLoops = shapeLib.shapeLoops, loopNearest = shapeLib.loopNearest, inLoop = require('./box-outline.cjs').inLoop;
   var shapeLoop = shapeLib.shapeLoop, shapeDeepest = shapeLib.shapeDeepest, loopLength = shapeLib.loopLength, loopPart = shapeLib.loopPart, loopPoint = shapeLib.loopPoint;
   module.exports = { boxProgram: boxProgram, MAX_LINES: MAX_LINES };
 }
@@ -1627,7 +1982,8 @@ if (typeof module !== 'undefined' && module.exports) {
     // switch that's off) don't stop the program.
     var seg = function (id) { var on = ROOT.querySelector('#' + id + ' button.on'); return on ? on.dataset.v : null; };
     var shp = seg('cb-shape');
-    var unused = (shp === 'rect' ? ['cb-diameter', 'cb-sides', 'cb-flats'] : shp === 'poly' ? ['cb-diameter', 'cb-length', 'cb-width'] : ['cb-length', 'cb-width', 'cb-corner', 'cb-sides', 'cb-flats'])
+    var unused = (shp === 'rect' || shp === 'heart' ? ['cb-diameter', 'cb-sides', 'cb-flats'] : shp === 'oval' ? ['cb-diameter', 'cb-sides', 'cb-flats', 'cb-corner']
+      : shp === 'poly' ? ['cb-diameter', 'cb-length', 'cb-width'] : ['cb-length', 'cb-width', 'cb-corner', 'cb-sides', 'cb-flats'])
       .concat(seg('cb-ebit') === 'round' ? ['cb-eangle', 'cb-ediam', 'cb-evtip'] : ['cb-erad', 'cb-etip']);
     var off = function (id) {
       return unused.indexOf(id) >= 0 || GROUPS.some(function (g) { return !$(g[1]).checked && $(g[0]).contains($(id)); });
@@ -1790,7 +2146,7 @@ if (typeof module !== 'undefined' && module.exports) {
     out += '<line class="cb-dim-line" x1="' + xr + '" y1="' + Y(0) + '" x2="' + xr + '" y2="' + Y(hTot) + '"/>' +
       '<text class="cb-dim" x="' + (xr + 1) + '" y="' + ((Y(0) + Y(hTot)) / 2) + '" transform="rotate(-90 ' + (xr + 1) + ' ' + ((Y(0) + Y(hTot)) / 2) + ')" dy="-1">' + fmt(plan.closedHeight) + ' ' + unit() + ' closed</text>';
     out += '<text class="cb-dim" x="' + X(0) + '" y="' + ((Y(o.floor) + Y(hTot - o.top)) / 2 + 2) + '">' + fmt(plan.insideHeight) + ' ' + unit() + ' inside</text>';
-    out += '<text class="cb-dim" x="' + X(0) + '" y="' + (Y(0) + 4.5) + '">' + (plan.shape.kind === 'rect' ? fmt(o.length) + ' × ' + fmt(o.width) : plan.shape.kind === 'poly' ? plan.shape.n + ' sides, ' + fmt(o.flats) : 'Ø ' + fmt(o.diameter)) + ' ' + unit() + ' · lip on the ' + o.lipOn + '</text>';
+    out += '<text class="cb-dim" x="' + X(0) + '" y="' + (Y(0) + 4.5) + '">' + (plan.shape.kind === 'rect' ? fmt(o.length) + ' × ' + fmt(o.width) : plan.shape.kind === 'poly' ? plan.shape.n + ' sides, ' + fmt(o.flats) : o.shape === 'oval' ? 'oval ' + fmt(o.length) + ' × ' + fmt(o.width) : o.shape === 'heart' ? 'heart ' + fmt(o.length) + ' × ' + fmt(o.width) : 'Ø ' + fmt(o.diameter)) + ' ' + unit() + ' · lip on the ' + o.lipOn + '</text>';
     $('cb-side').setAttribute('viewBox', '0 0 ' + (90 + 2 * pad + 8) + ' ' + (hTot * s + 2 * pad + 6).toFixed(2));
     $('cb-side').innerHTML = out;
   }
@@ -2079,7 +2435,15 @@ if (typeof module !== 'undefined' && module.exports) {
       ROOT.querySelectorAll('#' + g[0] + ' .cb-input, #' + g[0] + ' .cb-select, #' + g[0] + ' .cb-seg button').forEach(function (el) { el.disabled = !$(g[1]).checked; });
     });
     $('cb-size-round').hidden = v.shape !== 'circle'; $('cb-size-rect').hidden = v.shape === 'circle';
-    ['cb-length', 'cb-width'].forEach(function (id) { $(id).closest('.cb-field').hidden = v.shape !== 'rect'; });
+    var long = v.shape === 'rect' || v.shape === 'oval' || v.shape === 'heart';
+    ['cb-length', 'cb-width'].forEach(function (id) { $(id).closest('.cb-field').hidden = !long; });
+    $('cb-corner').closest('.cb-field').hidden = v.shape === 'oval';
+    // A heart's sizes: across its lobes, from its point to the top, its point's radius.
+    var heartLabels = v.shape === 'heart';
+    [['cb-length', 'X Length', 'Across the Lobes'], ['cb-width', 'Y Width', 'Point to Top'], ['cb-corner', 'Corner Radius', 'Point Radius']].forEach(function (l) {
+      var lab = $(l[0]).closest('.cb-field').querySelector('label');
+      lab.textContent = (heartLabels ? l[2] : l[1]) + ' (' + unit() + ')';
+    });
     ['cb-sides', 'cb-flats'].forEach(function (id) { $(id).closest('.cb-field').hidden = v.shape !== 'poly'; });
     showPickers();
     if (save) { clearTimeout(saveTimer); saveTimer = setTimeout(persist, 400); }
@@ -2106,7 +2470,7 @@ if (typeof module !== 'undefined' && module.exports) {
         : corners ? boxProgram(plan, Object.assign(feedsOf(v), { corners: cornerFeeds(v), label: 'Carved Box corners' }), 'corners')
         : boxProgram(plan, Object.assign(feedsOf(v), { label: test ? 'Test fit' : 'Carved Box' }));
     } catch (e) { alert('Carved Box: ' + e.message + '.'); return; }
-    var name = 'CarvedBox-' + (test ? 'TestFit-' : edges ? 'Edges-' : corners ? 'Corners-' : '') + (test ? '' : v.shape === 'rect' ? round(v.length / K(), 2) + 'x' + round(v.width / K(), 2) + '-' : v.shape === 'poly' ? v.sides + 'gon' + round(v.flats / K(), 2) + '-' : 'D' + round(v.diameter / K(), 2) + '-') + 'T' + round(v.stock / K(), 2) + '-' + unit() + '.nc';
+    var name = 'CarvedBox-' + (test ? 'TestFit-' : edges ? 'Edges-' : corners ? 'Corners-' : '') + (test ? '' : v.shape === 'rect' ? round(v.length / K(), 2) + 'x' + round(v.width / K(), 2) + '-' : v.shape === 'poly' ? v.sides + 'gon' + round(v.flats / K(), 2) + '-' : v.shape === 'oval' ? 'Oval' + round(v.length / K(), 2) + 'x' + round(v.width / K(), 2) + '-' : v.shape === 'heart' ? 'Heart' + round(v.length / K(), 2) + 'x' + round(v.width / K(), 2) + '-' : 'D' + round(v.diameter / K(), 2) + '-') + 'T' + round(v.stock / K(), 2) + '-' + unit() + '.nc';
     btn.disabled = true; btn.textContent = 'Generating\u2026';
     try {
       var r = await fetch(BASE_URL + '/api/gcode-files/load-temp', { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -2160,13 +2524,21 @@ if (typeof module !== 'undefined' && module.exports) {
       });
     });
     var FEED_IDS = ['cb-feed', 'cb-plunge', 'cb-doc', 'cb-stepover', 'cb-rpm'];
+    // An oval's or heart's outline takes a moment to work out: after a
+    // pause in the typing.
+    var later = null;
+    var soon = function () {
+      var shp = ROOT.querySelector('#cb-shape button.on');
+      if (shp && (shp.dataset.v === 'oval' || shp.dataset.v === 'heart')) { clearTimeout(later); later = setTimeout(function () { update(true); }, 350); }
+      else update(true);
+    };
     FIELDS.forEach(function (f) {
       $(f[0]).addEventListener('input', function (e) {
         if (e.isTrusted && FEED_IDS.indexOf(f[0]) >= 0) state.feedsAuto = false;
         if (e.isTrusted && f[0] === 'cb-bit') $('cb-tool').value = '';
         if (e.isTrusted && AUTO.some(function (x) { return x[0] === f[0]; })) state.autoSizes = false;
         if (e.isTrusted && f[0] === 'cb-corner') { var cr = read('cb-corner', 'length'); if (cr != null && !isNaN(cr)) state.cornerOwn = cr; }
-        update(true);
+        soon();
       });
       $(f[0]).addEventListener('change', function () { if (f[0] === 'cb-bit' && state.feedsAuto) { fillFeeds(); update(true); } });
     });

@@ -4,7 +4,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { boxPlan, testFitInput, autoSizes, BOX_DEFAULTS } = require('../lib/box-plan.cjs');
 const { boxProgram, MAX_LINES } = require('../lib/box-gcode.cjs');
-const { shapeDistance, shapeLoop, loopLength, loopPoint } = require('../lib/box-shape.cjs');
+const { shapeDistance, shapeLoop, shapeLoops, loopLength, loopPoint } = require('../lib/box-shape.cjs');
 
 const FEEDS = { feed: 1500, plunge: 400, rpm: 18000, delay: 2, doc: 2, stepoverPct: 40, toolNumber: 0 };
 
@@ -48,8 +48,10 @@ function simulate(gcode) {
 // the notch.) Distances: to the box's outline moved t, < 0 inside.
 function allowed(plan, half, p) {
   const o = plan.o, rb = o.bit / 2, S = plan.shape;
-  // eps: the program's coordinates are to 0.001 mm, arc centers too.
-  const eps = 0.005;
+  // eps: the program's coordinates are to 0.001 mm, arc centers too; an
+  // outline's offsets (a heart's, an oval's) are straight lines kept to
+  // 0.02 mm of the curve.
+  const eps = S.kind === 'outline' ? 0.03 : 0.005;
   const top = half.name === 'lid' ? -plan.face : 0, d = top - p.z;
   const px = p.x - half.at.x, py = p.y - half.at.y;
   const at = (t) => shapeDistance(S, t, px, py);
@@ -495,4 +497,68 @@ test('regular polygons: a flat side to the front, any side count, with everythin
   const said = (o, re) => assert.ok(boxPlan(o).problems.some((p) => re.test(p)), JSON.stringify(o) + ' ' + boxPlan(o).problems);
   said({ shape: 'poly', sides: 2, flats: 80 }, /3 to 12 sides/);
   said({ shape: 'poly', sides: 6, flats: 80, cornerRadius: 1 }, /Corner Radius must be at least/);
+});
+
+test('ovals and hearts: cut without touching what stays, the heart\'s lobes cleared on their own', () => {
+  const runs = [
+    { shape: 'oval', length: 140, width: 80 },
+    { shape: 'oval', length: 70, width: 110, layout: 'y', lipOn: 'lid', finish: 0.3 },
+    { shape: 'heart', length: 100, width: 95, cornerRadius: 8 },
+    { shape: 'heart', length: 100, width: 80, cornerRadius: 11, layout: 'y', lipOn: 'lid', finish: 0.3, magnets: { count: 4, diameter: 6.35, depth: 3.2 }, wall: 12 },
+  ];
+  for (const input of runs) {
+    const { plan, pts } = check(input);
+    const rb = plan.o.bit / 2, S = plan.shape;
+    // Turned over across the line between the halves, the same outline.
+    const flip = plan.o.layout === 'y' ? (p) => ({ x: p.x, y: -p.y }) : (p) => ({ x: -p.x, y: p.y });
+    const out = shapeLoop(S, 0), len = loopLength(out);
+    for (let k = 0; k < 60; k++) { const q = flip(loopPoint(out, len * k / 60)); assert.ok(Math.abs(shapeDistance(S, 0, q.x, q.y)) < 0.03, input.shape + ' not the same turned over'); }
+    // Every floor cleared, the heart's lobes too.
+    for (const half of plan.halves) {
+      const floor = (half.name === 'lid' ? plan.face : 0) + half.height - (half.name === 'lid' ? plan.o.top : plan.o.floor);
+      const deep = pts.filter((p) => Math.abs(p.z + floor) < 1e-6);
+      for (let qx = plan.ext.minX; qx <= plan.ext.maxX; qx += 1.5) for (let qy = plan.ext.minY; qy <= plan.ext.maxY; qy += 1.5) {
+        if (shapeDistance(S, plan.tInside - (plan.o.finish || 0), qx, qy) > -0.3) continue;
+        let near = Infinity;
+        for (const p of deep) { const d = Math.hypot(p.x - half.at.x - qx, p.y - half.at.y - qy); if (d < near) near = d; if (near <= rb) break; }
+        assert.ok(near <= rb + 0.35, input.shape + ' ' + half.name + ' floor left at ' + qx.toFixed(1) + ',' + qy.toFixed(1) + ' (' + near.toFixed(2) + ')');
+      }
+    }
+  }
+  const said = (o, re) => assert.ok(boxPlan(o).problems.some((p) => re.test(p)), JSON.stringify(o) + ' ' + boxPlan(o).problems);
+  said({ shape: 'heart', length: 100, width: 40, cornerRadius: 8 }, /needs at least 72.7 mm from point to top/);
+  said({ shape: 'heart', length: 100, width: 95, cornerRadius: 1 }, /Corner Radius must be at least/);
+});
+
+test('an outline whose pocket comes apart: each piece cleared on its own, between lifts', () => {
+  // Two 60 mm discs joined by a neck 30 mm wide: its pocket splits about
+  // 15 mm in, leaving two discs' worth to clear.
+  const a = Math.asin(15 / 30), x = 35 - 30 * Math.cos(a);
+  const line = (x0, y0, x1, y1) => ({ type: 'line', x0, y0, x1, y1, len: Math.hypot(x1 - x0, y1 - y0) });
+  const arc = (cx, cy, r, a0, a1) => ({ type: 'arc', cx, cy, r, a0, a1, len: r * (a1 - a0) });
+  const dumbbell = { kind: 'outline', key: 'dumbbell', step: 0.2, cr: 30,
+    segs: [line(-x, -15, x, -15), arc(35, 0, 30, -Math.PI + a, Math.PI - a), line(x, 15, -x, 15), arc(-35, 0, 30, a, 2 * Math.PI - a)] };
+  const plan = boxPlan({ shape: 'oval', length: 130, width: 60 });
+  assert.deepEqual(plan.problems, []);
+  plan.shape = dumbbell;
+  assert.equal(shapeLoops(dumbbell, plan.tInside).length, 1);
+  assert.ok(shapeLoops(dumbbell, -20).length === 2, 'splits in two');
+  const { gcode } = boxProgram(plan, FEEDS);
+  const pts = simulate(gcode);
+  for (const p of pts) {
+    assert.ok(!(p.rapid && p.z < -1e-6), 'a rapid below the stock top');
+    const half = plan.halves.reduce((m, n) => Math.hypot(p.x - m.at.x, p.y - m.at.y) <= Math.hypot(p.x - n.at.x, p.y - n.at.y) ? m : n);
+    assert.ok(allowed(plan, half, p), half.name + ' cut where wood stays: ' + JSON.stringify(p));
+  }
+  const rb = plan.o.bit / 2;
+  for (const half of plan.halves) {
+    const floor = half.height - (half.name === 'lid' ? plan.o.top : plan.o.floor);
+    const deep = pts.filter((p) => Math.abs(p.z + floor) < 1e-6);
+    for (let qx = -65; qx <= 65; qx += 1.5) for (let qy = -30; qy <= 30; qy += 1.5) {
+      if (shapeDistance(dumbbell, plan.tInside, qx, qy) > -0.3) continue;
+      let near = Infinity;
+      for (const p of deep) { const d = Math.hypot(p.x - half.at.x - qx, p.y - half.at.y - qy); if (d < near) near = d; if (near <= rb) break; }
+      assert.ok(near <= rb + 0.35, half.name + ' floor left at ' + qx + ',' + qy + ' (' + near.toFixed(2) + ')');
+    }
+  }
 });

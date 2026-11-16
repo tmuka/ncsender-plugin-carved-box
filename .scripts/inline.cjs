@@ -9,7 +9,7 @@ const root = path.join(__dirname, '..');
 const file = path.join(root, 'config.html');
 let html = fs.readFileSync(file, 'utf8');
 // [marker, file]: the marker is the name in BEGIN / END.
-const libs = [['ncsender-unit-input', 'node_modules/ncsender-unit-input/dist/unit-input.global.js'], 'lib/starting-feeds.cjs', 'lib/box-shape.cjs', 'lib/box-plan.cjs', 'lib/box-gcode.cjs']
+const libs = [['ncsender-unit-input', 'node_modules/ncsender-unit-input/dist/unit-input.global.js'], 'lib/starting-feeds.cjs', 'lib/box-outline.cjs', 'lib/box-shape.cjs', 'lib/box-plan.cjs', 'lib/box-gcode.cjs']
   .map((l) => (Array.isArray(l) ? l : [l, l]));
 let stale = [];
 for (const [lib, src] of libs) {
