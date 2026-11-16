@@ -4,6 +4,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { boxPlan, testFitInput, BOX_DEFAULTS } = require('../lib/box-plan.cjs');
 const { boxProgram } = require('../lib/box-gcode.cjs');
+const { shapeDistance, shapeLoop, loopLength, loopPoint } = require('../lib/box-shape.cjs');
 
 const FEEDS = { feed: 1500, plunge: 400, rpm: 18000, delay: 2, doc: 2, stepoverPct: 40, toolNumber: 0 };
 
@@ -40,27 +41,28 @@ function simulate(gcode) {
 
 // Is the bit's center at p allowed, near this half? (What must be left:
 // the wall, the lip, the floor or top, the tabs, round magnet holes and
-// the notch.)
+// the notch.) Distances: to the box's outline moved t, < 0 inside.
 function allowed(plan, half, p) {
-  const o = plan.o, rb = o.bit / 2;
+  const o = plan.o, rb = o.bit / 2, S = plan.shape;
   // eps: the program's coordinates are to 0.001 mm, arc centers too.
   const eps = 0.005;
   const top = half.name === 'lid' ? -plan.face : 0, d = top - p.z;
-  const dist = Math.hypot(p.x - half.at.x, p.y - half.at.y);
+  const px = p.x - half.at.x, py = p.y - half.at.y;
+  const at = (t) => shapeDistance(S, t, px, py);
   if (-p.z <= eps) return true;
   // A lid lower than the stock: its area faced down first.
-  if (half.name === 'lid' && plan.face > 0 && -p.z <= plan.face + eps && dist <= plan.R + rb + eps) return true;
-  if (dist >= plan.R + rb - eps) return d <= half.outline.depth + eps;
+  if (half.name === 'lid' && plan.face > 0 && -p.z <= plan.face + eps && at(rb) <= eps) return true;
+  if (at(rb) >= -eps) return d <= half.outline.depth + eps;
   const withLip = (o.lipOn === 'lid') === (half.name === 'lid');
   const floor = half.height - (half.name === 'lid' ? o.top : o.floor), meet = withLip ? o.lipHeight : 0;
-  if (dist <= plan.Ri - rb + eps && d <= floor + eps) return true;
-  if (withLip && dist >= plan.Ri + o.lipWidth + rb - eps && d <= o.lipHeight + eps) return true;
-  if (!withLip && dist <= plan.rabbet - rb + eps && d <= plan.rabbetDepth + eps) return true;
+  if (at(plan.tInside - rb) <= eps && d <= floor + eps) return true;
+  if (withLip && at(plan.tLip + rb) >= -eps && d <= o.lipHeight + eps) return true;
+  if (!withLip && at(plan.tRabbet - rb) <= eps && d <= plan.rabbetDepth + eps) return true;
   for (const m of plan.magnetAt) {
-    if (Math.hypot(p.x - half.at.x - m.dx, p.y - half.at.y - m.dy) <= o.magnets.diameter / 2 - rb + eps && d <= meet + o.magnets.depth + eps) return true;
+    if (Math.hypot(px - m.dx, py - m.dy) <= o.magnets.diameter / 2 - rb + eps && d <= meet + o.magnets.depth + eps) return true;
   }
   if (half.name === 'base' && plan.notch) {
-    if (Math.hypot(p.x - half.at.x - plan.notch.dx, p.y - half.at.y - plan.notch.dy) <= plan.notch.r - rb + eps && d <= meet + o.notch.depth + eps) return true;
+    if (Math.hypot(px - plan.notch.dx, py - plan.notch.dy) <= plan.notch.shape.r - rb + eps && d <= meet + o.notch.depth + eps) return true;
   }
   return false;
 }
@@ -92,35 +94,46 @@ test('lip on either half, along X or Y, origin at the corner or the middle', () 
   check({ diameter: 120, stock: 25, wall: 8, lipWidth: 4, bit: 6.35, gap: 20, tabs: null });
 });
 
-test('every floor and the shoulder are cleared all over', () => {
-  const { plan, pts } = check({});
-  const rb = plan.o.bit / 2;
-  for (const half of plan.halves) {
-    const floor = (half.name === 'lid' ? plan.face : 0) + half.height - (half.name === 'lid' ? plan.o.top : plan.o.floor);
-    const deep = pts.filter((p) => Math.abs(p.z + floor) < 1e-6 && Math.hypot(p.x - half.at.x, p.y - half.at.y) < plan.Ri);
-    for (let r = 0; r < plan.Ri - 0.2; r += 1) for (let a = 0; a < 2 * Math.PI; a += 0.3) {
-      const q = { x: half.at.x + r * Math.cos(a), y: half.at.y + r * Math.sin(a) };
-      const near = Math.min(...deep.map((p) => Math.hypot(p.x - q.x, p.y - q.y)));
-      assert.ok(near <= rb + 0.3, half.name + ' floor left at r=' + r.toFixed(1));
+test('rectangles: long either way, square, a slot-like inside, rounded right out', () => {
+  for (const lipOn of ['base', 'lid']) for (const layout of ['x', 'y']) {
+    check({ shape: 'rect', lipOn, layout, length: 140, width: 70, cornerRadius: 8 });
+    check({ shape: 'rect', lipOn, layout, length: 50, width: 110, cornerRadius: 12, origin: 'center' });
+  }
+  check({ shape: 'rect', length: 70, width: 70, cornerRadius: 6 });
+  check({ shape: 'rect', length: 100, width: 20, cornerRadius: 6, wall: 6, lipWidth: 2, gap: 12 });
+  check({ shape: 'rect', length: 80, width: 50, cornerRadius: 25 });
+  check({ shape: 'rect', length: 120, width: 80, cornerRadius: 10, bit: 6.35, wall: 9, lipWidth: 3, gap: 20, tabs: null });
+});
+
+test('every floor is cleared all over', () => {
+  for (const input of [{}, { shape: 'rect', length: 110, width: 70, cornerRadius: 8 }, { shape: 'rect', length: 60, width: 60, cornerRadius: 30 }]) {
+    const { plan, pts } = check(input);
+    const rb = plan.o.bit / 2, S = plan.shape;
+    for (const half of plan.halves) {
+      const floor = (half.name === 'lid' ? plan.face : 0) + half.height - (half.name === 'lid' ? plan.o.top : plan.o.floor);
+      const deep = pts.filter((p) => Math.abs(p.z + floor) < 1e-6 && shapeDistance(S, plan.tInside, p.x - half.at.x, p.y - half.at.y) < 0);
+      for (let qx = -plan.halfX; qx <= plan.halfX; qx += 1) for (let qy = -plan.halfY; qy <= plan.halfY; qy += 1) {
+        if (shapeDistance(S, plan.tInside, qx, qy) > -0.2) continue;
+        const near = Math.min(...deep.map((p) => Math.hypot(p.x - half.at.x - qx, p.y - half.at.y - qy)));
+        assert.ok(near <= rb + 0.3, half.name + ' floor left at ' + qx + ',' + qy + ' ' + JSON.stringify(input));
+      }
     }
   }
 });
 
 test('the tabs stay standing, and the outline goes through', () => {
-  const { plan, pts } = check({});
-  const o = plan.o, rb = o.bit / 2, pr = plan.R + rb;
-  for (const half of plan.halves) {
-    const tabTop = half.outline.z0 - (half.outline.depth - o.tabs.height);
-    const ring = pts.filter((p) => Math.abs(Math.hypot(p.x - half.at.x, p.y - half.at.y) - pr) < 1e-3);
-    assert.ok(ring.some((p) => Math.abs(p.z - (half.outline.z0 - half.outline.depth)) < 1e-6), half.name + ' cut through');
-    for (let k = 0; k < o.tabs.count; k++) {
-      const c = Math.PI / 4 + 2 * Math.PI * k / o.tabs.count;
-      const inTab = ring.filter((p) => {
-        let a = Math.atan2(p.y - half.at.y, p.x - half.at.x) - c;
-        a = Math.atan2(Math.sin(a), Math.cos(a));
-        return Math.abs(a) * pr < o.tabs.width / 2;
-      });
-      assert.ok(inTab.length > 0 && inTab.every((p) => p.z >= tabTop - 1e-6), half.name + ' tab ' + k + ' cut away');
+  for (const input of [{}, { shape: 'rect', length: 120, width: 60, cornerRadius: 6, tabs: { count: 6, width: 6, height: 1.5 } }]) {
+    const { plan, pts } = check(input);
+    const o = plan.o, rb = o.bit / 2, loop = shapeLoop(plan.shape, rb), len = loopLength(loop);
+    for (const half of plan.halves) {
+      const tabTop = half.outline.z0 - (half.outline.depth - o.tabs.height);
+      const ring = pts.filter((p) => Math.abs(shapeDistance(plan.shape, rb, p.x - half.at.x, p.y - half.at.y)) < 1e-3);
+      assert.ok(ring.some((p) => Math.abs(p.z - (half.outline.z0 - half.outline.depth)) < 1e-6), half.name + ' cut through');
+      for (let k = 0; k < o.tabs.count; k++) {
+        const c = loopPoint(loop, len * (1 / 8 + k / o.tabs.count));
+        const inTab = ring.filter((p) => Math.hypot(p.x - half.at.x - c.x, p.y - half.at.y - c.y) < o.tabs.width / 2 - 0.05);
+        assert.ok(inTab.length > 0 && inTab.every((p) => p.z >= tabTop - 1e-6), half.name + ' tab ' + k + ' cut away');
+      }
     }
   }
 });
@@ -139,8 +152,9 @@ test('numbers that make no box say why', () => {
 test('a lid lower than the stock, magnets and a finger notch', () => {
   for (const lipOn of ['base', 'lid']) for (const layout of ['x', 'y']) {
     const input = { lipOn, layout, diameter: 90, stock: 19, lidHeight: 12, wall: 12, lipWidth: 3,
-      magnets: { count: 3, diameter: 6.35, depth: 3.2 }, notch: { width: 12, depth: 4 } };
-    const { plan, pts } = check(input);
+      magnets: { count: 4, diameter: 6.35, depth: 3.2 }, notch: { width: 12, depth: 4 } };
+    for (const shape of [{}, { shape: 'rect', length: 130, width: 90, cornerRadius: 16 }]) {
+    const { plan, pts } = check(Object.assign({}, input, shape, shape.shape ? { magnets: { count: 4, diameter: 6.35, depth: 3.2 } } : {}));
     assert.equal(plan.closedHeight, 19 + 12 - 4);
     // Each magnet hole goes its full depth in both halves.
     for (const half of plan.halves) {
@@ -149,6 +163,11 @@ test('a lid lower than the stock, magnets and a finger notch', () => {
       for (const m of plan.magnetAt) {
         assert.ok(pts.some((p) => Math.abs(p.z - bottom) < 1e-6 && Math.hypot(p.x - half.at.x - m.dx, p.y - half.at.y - m.dy) < plan.o.magnets.diameter / 2), half.name + ' magnet hole too shallow');
       }
+    }
+    // Turned over onto the base (mirrored across the line between them),
+    // the lid's magnets land on the base's.
+    const flip = layout === 'y' ? (m) => ({ dx: m.dx, dy: -m.dy }) : (m) => ({ dx: -m.dx, dy: m.dy });
+    for (const m of plan.magnetAt.map(flip)) assert.ok(plan.magnetAt.some((b) => Math.hypot(b.dx - m.dx, b.dy - m.dy) < 1e-6), 'magnets don\'t meet');
     }
   }
 });
@@ -169,4 +188,8 @@ test('magnets and a notch that don\'t fit say why', () => {
   said({ notch: { width: 30, depth: 3 } }, /Finger notch too wide/);
   said({ lidHeight: 25 }, /Lid Height can't be more/);
   said({ lidHeight: 6, top: 6 }, /Top must be between/);
+  said({ shape: 'rect', cornerRadius: 2 }, /Corner Radius must be at least/);
+  said({ shape: 'rect', magnets: { count: 3, diameter: 6, depth: 3 }, wall: 12 }, /even number of magnets/);
+  said({ shape: 'rect', width: 0 }, /Length and Width/);
+  said({ wall: 12, magnets: { count: 12, diameter: 6.35, depth: 3 }, notch: { width: 16, depth: 3 } }, /runs into a magnet hole/);
 });
