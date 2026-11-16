@@ -4,6 +4,7 @@
 - A round or rectangular box (with rounded corners) with a lid from one board: base and lid side by side, a lip on either half with a set clearance, holding tabs, starting feeds from the bit and material.
 - A lid lower than the stock (faced down first), magnet holes in both halves, a finger notch, and Test Fit: a small box with the same fit to try first.
 - Auto Sizes (on for a first try): the wall, floor, top, lip, clearance (from the material), gap, margin, tabs, notch, magnet count and edges filled in for the box's size, stock and bit, made to fit each other; typing in one sets it yourself.
+- The Margin is to the outside of the cuts (it was to the outline's middle, so the bit took half its width of it).
 - Floor Corners: a ball or bowl bit rounds each pocket's floor corners; the box's bit leaves the floor that radius short of the walls for it. Cut after the outlines (before the edges) after a tool change, or on their own with Corners Only.
 - Edges: Lead-In (the lip's outer edge, the opening's) and Pocket Edge (each pocket's top edge, the step's too) sized on their own.
 - A card switched off (Tabs, Magnets, Finger Notch, Edges) shows its header only.

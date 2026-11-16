@@ -160,7 +160,7 @@
           </div>
         </div>
         <div class="cb-field"><label for="cb-gap">Gap</label><input class="cb-input" id="cb-gap" data-unit="length" title="Wood left between the two halves."></div>
-        <div class="cb-field"><label for="cb-margin">Margin</label><input class="cb-input" id="cb-margin" data-unit="length" title="From the stock's edges to the cuts."></div>
+        <div class="cb-field"><label for="cb-margin">Margin</label><input class="cb-input" id="cb-margin" data-unit="length" title="Wood left from the stock's edges to the outside of the cuts: the outline's whole width is inside it."></div>
       </div>
       <div class="cb-field"><label>Origin (X0 Y0)</label>
         <div class="cb-seg" id="cb-origin" role="radiogroup" aria-label="Origin">
@@ -979,7 +979,9 @@ function boxPlan(input) {
   }
 
   // Where the halves go: side by side along X (base first) or Y (base in front).
-  var m = o.margin + rb, base = { x: 0, y: 0 };
+  // The margin is from the stock's edges to the cuts' outsides: the
+  // outline's whole width, or the waste cleared round a seam.
+  var m = o.margin + Math.max(o.bit, reachOut.base + 1, reachOut.lid + 1), base = { x: 0, y: 0 };
   var lid = o.layout === 'y' ? { x: 0, y: 2 * halfY + o.gap } : { x: 2 * halfX + o.gap, y: 0 };
   var stockW = 2 * halfX + lid.x + 2 * m, stockH = 2 * halfY + lid.y + 2 * m;
   // Origin: the stock's front-left corner, or the middle of the pair.
@@ -1065,7 +1067,7 @@ function autoSizes(input, material, imperial) {
   a.wall = half(clamp(small * 0.08, 4, 15));
   var depth = Math.min(T - a.floor, lidH - a.top);
   a.lipHeight = half(clamp(depth * 0.3, 2, 8));
-  a.margin = half(Math.max(5, b));
+  a.margin = half(5);
   a.gap = upHalf(Math.max(8, 2 * b + 2));
   var round = rect ? 2 * (o.length + o.width) : Math.PI * o.diameter;
   a.tabs = { count: clamp(Math.round(round / 90), 3, 8), width: half(Math.max(5, 1.5 * b)), height: half(clamp(T * 0.08, 1, 3)) };

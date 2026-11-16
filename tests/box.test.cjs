@@ -357,3 +357,18 @@ test('rounded floor corners: a ball or bowl bit after the box, or on its own', (
   said({ corners: { diameter: 80, radius: 3 } }, /inside is too small for the corner bit/);
   said({ stock: 12, corners: { diameter: 12.7, radius: 6.35 } }, /radius is too big for the/);
 });
+
+test('the margin is from the stock\'s edges to the outsides of the cuts', () => {
+  for (const input of [{}, { bit: 6.35, gap: 20, margin: 3, origin: 'center' }, { shape: 'rect', length: 120, width: 80, cornerRadius: 12, layout: 'y', margin: 0 },
+    { lipOn: 'lid', wall: 10, lidHeight: 15, margin: 4, edges: { bit: 'v', angle: 90, diameter: 12.7, outside: 1, inside: 0, pocket: 0 } }]) {
+    const { plan, pts } = check(input);
+    const rb = plan.o.bit / 2, st = plan.stock, m = plan.o.margin, cut = pts.filter((p) => p.z < -1e-6);
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const p of cut) { minX = Math.min(minX, p.x - rb); maxX = Math.max(maxX, p.x + rb); minY = Math.min(minY, p.y - rb); maxY = Math.max(maxY, p.y + rb); }
+    for (const [got, want] of [[minX - st.x0, m], [st.x0 + st.w - maxX, m], [minY - st.y0, m], [st.y0 + st.h - maxY, m]]) {
+      assert.ok(got >= want - 0.01, 'margin ' + got.toFixed(3) + ' under ' + want + ' ' + JSON.stringify(input));
+    }
+    // Snug: the outline's outside on the margin.
+    assert.ok(Math.abs(minX - st.x0 - m) < 0.01 || Math.abs(minY - st.y0 - m) < 0.01 || plan.edges.base.length, 'more stock than the margin');
+  }
+});
