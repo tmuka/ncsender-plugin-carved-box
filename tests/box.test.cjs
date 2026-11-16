@@ -51,7 +51,8 @@ function allowed(plan, half, p) {
   const at = (t) => shapeDistance(S, t, px, py);
   if (-p.z <= eps) return true;
   // A lid lower than the stock: its area faced down first.
-  if (half.name === 'lid' && plan.face > 0 && -p.z <= plan.face + eps && at(rb) <= eps) return true;
+  const facing = half.cuts.find((c) => /faced down/.test(c.what));
+  if (facing && -p.z <= plan.face + eps && at(facing.t - rb) <= eps) return true;
   if (at(rb) >= -eps) return d <= half.outline.depth + eps;
   const withLip = (o.lipOn === 'lid') === (half.name === 'lid');
   const floor = half.height - (half.name === 'lid' ? o.top : o.floor), meet = withLip ? o.lipHeight : 0;
@@ -208,21 +209,29 @@ function checkEdges(plan, gcode) {
   const all = plan.halves.flatMap((h) => plan.edges[h.name].map((e) => ({ h, e })));
   for (const p of pts) {
     assert.ok(!p.rapid, 'a rapid below the stock top');
-    const on = all.filter(({ h, e }) => Math.abs(shapeDistance(plan.shape, e.t, p.x - h.at.x, p.y - h.at.y)) < 0.005 && p.z >= e.z0 - e.depth - 1e-6);
+    const on = all.filter(({ h, e }) => Math.abs(shapeDistance(e.shape, e.t, p.x - h.at.x, p.y - h.at.y)) < 0.005 && p.z >= e.z0 - e.depth - 1e-6);
     // Above an edge's top, going down to it in the air.
-    const above = all.some(({ h, e }) => Math.abs(shapeDistance(plan.shape, e.t, p.x - h.at.x, p.y - h.at.y)) < 0.005 && p.z >= e.z0 - 1e-6);
+    const above = all.some(({ h, e }) => Math.abs(shapeDistance(e.shape, e.t, p.x - h.at.x, p.y - h.at.y)) < 0.005 && p.z >= e.z0 - 1e-6);
     assert.ok(on.length || above, 'edge bit off its edges: ' + JSON.stringify(p));
+    // Below an edge's top, the bit's bottom stays on the air side: a
+    // V-bit's point on the edge, a roundover bit's flat end beside it.
+    const ed = plan.o.edges, half = ed.bit === 'round' ? ed.tip / 2 : 0;
+    for (const { h, e } of on) {
+      if (p.z >= e.z0 - 1e-6) continue;
+      const out = e.u * shapeDistance(e.shape, e.at, p.x - h.at.x, p.y - h.at.y);
+      assert.ok(Math.abs(out - half) < 0.01, h.name + ' ' + e.what + ': bit ' + out.toFixed(3) + ' off the edge, not ' + half);
+    }
   }
   for (const { h, e } of all) {
-    assert.ok(pts.some((p) => Math.abs(p.z - (e.z0 - e.depth)) < 1e-6 && Math.abs(shapeDistance(plan.shape, e.t, p.x - h.at.x, p.y - h.at.y)) < 0.005), h.name + ' ' + e.what + ' not cut');
+    assert.ok(pts.some((p) => Math.abs(p.z - (e.z0 - e.depth)) < 1e-6 && Math.abs(shapeDistance(e.shape, e.t, p.x - h.at.x, p.y - h.at.y)) < 0.005), h.name + ' ' + e.what + ' not cut');
   }
 }
 
 test('chamfered and rounded edges, cut last after a tool change, or on their own', () => {
   const EF = { toolNumber: 7, feed: 1200, plunge: 300, rpm: 16000, delay: 2, doc: 2 };
   for (const lipOn of ['base', 'lid']) for (const shape of [{}, { shape: 'rect', length: 120, width: 80, cornerRadius: 12 }]) {
-    for (const edges of [{ bit: 'v', angle: 90, outside: 1.5, inside: 0.8 }, { bit: 'round', radius: 3.175, tip: 3, outside: 3, inside: 1 }, { bit: 'v', angle: 60, outside: 2, inside: 0 }]) {
-      const input = Object.assign({ lipOn, wall: 8, lidHeight: 15, edges }, shape);
+    for (const edges of [{ bit: 'v', angle: 90, diameter: 12.7, outside: 1.5, inside: 0.8 }, { bit: 'round', radius: 3.175, tip: 3, outside: 3, inside: 1 }, { bit: 'v', angle: 60, diameter: 6.35, outside: 2, inside: 0 }]) {
+      const input = Object.assign({ lipOn, wall: 10, lidHeight: 15, edges }, shape);
       const plan = boxPlan(input);
       assert.deepEqual(plan.problems, [], JSON.stringify(input));
       const all = boxProgram(plan, Object.assign({}, FEEDS, { edges: EF })).gcode;
@@ -232,20 +241,38 @@ test('chamfered and rounded edges, cut last after a tool change, or on their own
       assert.equal(all.slice(0, all.indexOf('(Edges')), boxProgram(plan, FEEDS).gcode.slice(0, all.indexOf('(Edges')));
       checkEdges(plan, all.slice(at));
       const own = boxProgram(plan, Object.assign({}, FEEDS, { edges: EF }), 'edges').gcode;
-      assert.doesNotMatch(own, /M6/);
+      assert.match(own, /^M6 T7/m);
+      assert.doesNotMatch(boxProgram(plan, Object.assign({}, FEEDS, { edges: { ...EF, toolNumber: 0 } }), 'edges').gcode, /M6/);
       assert.match(own, /M3 S16000/);
       checkEdges(plan, own);
       assert.doesNotMatch(boxProgram(plan, FEEDS).gcode, /edge bit|M6 T7/);
+      // The waste round a seam below the stock top is cleared as far as
+      // the edge bit reaches (the simulator holds the box part to it).
+      for (const h of plan.halves) {
+        const seam = plan.edges[h.name].find((e) => e.what === 'outside seam edge');
+        const clearing = h.cuts.find((c) => /shoulder|faced/.test(c.what));
+        if (seam && seam.z0 < 0) {
+          const reach = edges.bit === 'round' ? edges.tip + edges.radius : Math.min((seam.depth - seam.z0) * Math.tan(edges.angle * Math.PI / 360), edges.diameter / 2);
+          assert.ok((clearing.tOut ?? clearing.t) >= reach + 1 - 1e-9, h.name + ' waste not cleared for the seam');
+        }
+      }
     }
   }
 });
 
 test('edges that don\'t fit say why', () => {
   const said = (o, re) => assert.ok(boxPlan(o).problems.some((p) => re.test(p)), JSON.stringify(o) + ' ' + boxPlan(o).problems);
-  said({ edges: { bit: 'v', angle: 90, outside: 3, inside: 0 } }, /Outside seam edge too big|rim round the widened opening/);
-  said({ edges: { bit: 'v', angle: 90, outside: 0, inside: 1.5 } }, /Inside rim edges too big for the lip/);
+  const V = { bit: 'v', angle: 90, diameter: 12.7 };
+  said({ edges: { ...V, outside: 3, inside: 0 } }, /rim round the widened opening/);
+  said({ edges: { ...V, outside: 0, inside: 1.5 } }, /Inside rim edges too big for the lip/);
   said({ edges: { bit: 'round', radius: 2, tip: 3, outside: 3, inside: 0 } }, /deeper than the bit's radius/);
-  said({ edges: { bit: 'v', angle: 10, outside: 1, inside: 0 } }, /angle must be between/);
-  said({ wall: 10, lipHeight: 2, edges: { bit: 'v', angle: 60, outside: 0, inside: 1.9 } }, /less deep than the Lip Height/);
-  assert.deepEqual(boxPlan({ edges: { bit: 'v', angle: 90, outside: 0, inside: 0 } }).problems, []);
+  said({ edges: { ...V, angle: 10, outside: 1, inside: 0 } }, /angle must be between/);
+  said({ wall: 10, lipHeight: 2, edges: { bit: 'v', angle: 60, diameter: 12.7, outside: 0, inside: 1.9 } }, /less deep than the Lip Height/);
+  // On the half with the lip, the seam's bit, as high as the lip, mustn't reach it.
+  said({ edges: { ...V, outside: 1.5, inside: 0.5 } }, /would cut into the lip/);
+  said({ edges: { bit: 'round', radius: 3.175, tip: 3.175, outside: 1.5, inside: 0 } }, /would cut into the lip/);
+  said({ wall: 10, edges: { ...V, diameter: 2, outside: 1.5, inside: 0 } }, /V-bit is too small/);
+  said({ wall: 10, notch: { width: 12, depth: 2 }, edges: { ...V, outside: 2.5, inside: 0 } }, /less deep than the finger notch/);
+  said({ wall: 12, magnets: { count: 4, diameter: 6.35, depth: 3 }, edges: { ...V, outside: 2, inside: 0 } }, /beside the magnet holes/);
+  assert.deepEqual(boxPlan({ edges: { ...V, outside: 0, inside: 0 } }).problems, []);
 });
