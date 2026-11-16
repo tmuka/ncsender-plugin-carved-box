@@ -2,7 +2,7 @@
 // bit's center goes, at what depth, against what must be left standing.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { boxPlan, testFitInput, BOX_DEFAULTS } = require('../lib/box-plan.cjs');
+const { boxPlan, testFitInput, autoSizes, BOX_DEFAULTS } = require('../lib/box-plan.cjs');
 const { boxProgram, MAX_LINES } = require('../lib/box-gcode.cjs');
 const { shapeDistance, shapeLoop, loopLength, loopPoint } = require('../lib/box-shape.cjs');
 
@@ -283,4 +283,26 @@ test('a bit or a depth of cut far too small: said, not a program too big to load
   assert.deepEqual(plan.problems, []);
   assert.throws(() => boxProgram(plan, Object.assign({}, FEEDS, { doc: 0.05, stepoverPct: 10 })), /over 300,000 lines/);
   assert.ok(boxProgram(boxPlan({}), FEEDS).gcode.split('\n').length < MAX_LINES / 20);
+});
+
+test('Auto Sizes: a box that fits together for any size, stock, bit and material', () => {
+  const OPTS = { plain: {}, magnets: { magnets: { count: 4, diameter: 8, depth: 3.2 } }, notch: { notch: { width: 16, depth: 4 } },
+    v: { edges: { bit: 'v', angle: 90, diameter: 12.7 } }, round: { edges: { bit: 'round', radius: 3.175, tip: 3.175 } },
+    all: { magnets: { count: 4, diameter: 8, depth: 3.2 }, notch: { width: 16, depth: 4 }, edges: { bit: 'v', angle: 60, diameter: 12.7 } } };
+  for (const shape of ['circle', 'rect']) for (const size of [40, 80, 200]) for (const stock of [12, 19, 38]) for (const bit of [3.175, 6.35])
+    for (const material of ['mdf', 'hardwood', 'acrylic']) for (const opts of Object.values(OPTS)) for (const imperial of [false, true]) {
+      const input = Object.assign({ shape, diameter: size, length: size * 1.5, width: size, cornerRadius: 3, stock, bit }, opts);
+      const a = autoSizes(input, material, imperial);
+      // On an inch machine, the wall on a 1/32" grid.
+      if (imperial) assert.ok(Math.abs(a.wall * 32 / 25.4 - Math.round(a.wall * 32 / 25.4)) < 1e-9, 'wall ' + a.wall);
+      if (size >= 80) assert.deepEqual(a.problems, [], JSON.stringify(input));
+      if (opts.edges && size >= 80) assert.ok(a.edges.outside > 0 && a.edges.inside > 0, 'edges left out: ' + JSON.stringify(input));
+    }
+  // A few cut through the simulator.
+  for (const input of [{ diameter: 80, stock: 19, bit: 3.175 }, { shape: 'rect', length: 150, width: 90, cornerRadius: 2, stock: 25, bit: 6.35, notch: { width: 16, depth: 4 } }]) {
+    const a = autoSizes(input, 'softwood');
+    delete a.problems;
+    check(Object.assign({}, input, a));
+  }
+  assert.equal(autoSizes({}, 'acrylic').clearance, 0.1);
 });

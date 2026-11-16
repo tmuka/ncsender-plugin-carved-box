@@ -65,6 +65,32 @@
   .cb-axis-x { stroke: #e05252; stroke-width: 0.7; }
   .cb-axis-y { stroke: #4caf50; stroke-width: 0.7; }
   .cb-tab { fill: #d9bc8c; stroke: var(--color-accent); stroke-width: 0.5; }
+  /* Tool Library picker (as QuickCut's): the picked tool, a list with a filter. */
+  .cb-wrapper { position: relative; }
+  button.cb-tool-row { -webkit-appearance: none; appearance: none; display: flex; align-items: center; gap: 8px; width: 100%; height: 36px; margin: 0 !important; padding: 0 30px 0 10px !important;
+    border: 1px solid var(--color-border) !important; border-radius: var(--radius-small) !important; color: var(--color-text-primary) !important; font: inherit !important; font-size: 0.9rem !important; text-align: left; cursor: pointer;
+    background: var(--color-surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2393a2b4' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 12px center / 10px 6px !important; }
+  button.cb-tool-row b { color: var(--color-accent); font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; }
+  button.cb-tool-row span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  button.cb-tool-row .cb-tool-row-empty { color: var(--color-text-secondary); }
+  button.cb-tool-row[aria-expanded="true"] { border-color: var(--color-accent) !important; }
+  button.cb-tool-row:disabled { opacity: 0.5; cursor: default; }
+  .cb-tool-pop { position: absolute; z-index: 30; width: max-content; min-width: min(420px, calc(100% - 16px)); max-width: calc(100% - 16px); display: flex; flex-direction: column; gap: 6px; padding: 8px;
+    background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 10px; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.38); }
+  .cb-tool-pop .cb-input { text-align: left; font-family: inherit; }
+  .cb-tool-list { display: flex; flex-direction: column; max-height: min(50vh, 420px); overflow-y: auto; }
+  .cb-tool-list > * { flex-shrink: 0; }
+  .cb-tool-head { padding: 4px 10px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-secondary); }
+  .cb-tool-item { -webkit-appearance: none; appearance: none; display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; margin: 0 !important; padding: 8px 10px !important; text-align: left;
+    background: transparent !important; border: none !important; border-radius: 6px !important; color: var(--color-text-primary) !important; font: inherit !important; font-size: 0.88rem !important; line-height: 1.3; cursor: pointer; }
+  .cb-tool-item:hover, .cb-tool-item.cb-active { background: color-mix(in srgb, var(--color-accent) 16%, transparent) !important; }
+  .cb-tool-item[aria-selected="true"] { font-weight: 600 !important; }
+  .cb-tool-item b { white-space: nowrap; color: var(--color-accent); font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; }
+  .cb-tool-item .cb-tool-name { flex: 1 1 auto; min-width: 0; }
+  .cb-tool-item .cb-tool-size { color: var(--color-text-secondary); font-weight: 400; font-variant-numeric: tabular-nums; margin-left: auto; text-align: right; white-space: nowrap; }
+  .cb-tool-empty { padding: 8px 10px; font-size: 0.85rem; color: var(--color-text-secondary); }
+  .cb-auto-label { font-size: 0.78rem; font-weight: 600; color: var(--color-text-secondary); }
+  .cb-input.cb-auto-val { color: var(--color-accent); }
   .cb-edge-fields { display: flex; flex-direction: column; gap: 10px; }
   .cb-edge { fill: none; stroke: #8a6a3c; opacity: 0.9; }
 </style>
@@ -84,7 +110,7 @@
 
     <div class="cb-cards">
     <div class="cb-card">
-      <h3>Box</h3>
+      <h3><span class="cb-grow">Box</span><span class="cb-auto-label">Auto Sizes</span><label class="cb-switch" title="Fill in the wall, floor, top, lip, clearance, gap, margin, tabs, notch, magnet count and edges for this size, stock, bit and material."><input type="checkbox" id="cb-auto" aria-label="Auto Sizes"><span></span></label></h3>
       <div class="cb-field"><label>Shape</label>
         <div class="cb-seg" id="cb-shape" role="radiogroup" aria-label="Shape">
           <button type="button" role="radio" data-v="circle">Round</button><button type="button" role="radio" data-v="rect">Rectangle</button>
@@ -105,6 +131,7 @@
         <div class="cb-field"><label for="cb-top-t">Top (lid)</label><input class="cb-input" id="cb-top-t" data-unit="length" title="Left over the lid's inside."></div>
         <div class="cb-field"><label for="cb-lid-h">Lid Height</label><input class="cb-input" id="cb-lid-h" data-unit="length" placeholder="= stock" title="Empty: the stock's thickness. Lower: the lid's area is faced down first."></div>
       </div>
+      <p class="cb-hint" id="cb-auto-hint"></p>
     </div>
 
     <div class="cb-card">
@@ -962,41 +989,56 @@ function testFitInput(input) {
 // fit each other: when they don't, the notch and edges are made smaller
 // or the wall thicker until they do. input: the plan's settings (shape,
 // size, stock, lidHeight, bit, and magnets, notch, edges when on);
-// material: QuickCut's key (mdf, softwood, hardwood, hdpe, ...). Returns
-// the settings it sets (mm), and problems left when nothing fits.
+// material: QuickCut's key (mdf, softwood, hardwood, hdpe, ...);
+// imperial: sizes on a 1/32" grid (under a mm, 0.005") instead of 0.5 mm
+// (0.05 mm). Returns the settings it sets (mm), and problems left when
+// nothing fits.
 var CLEARANCE = { mdf: 0.15, softwood: 0.25, hardwood: 0.2, hdpe: 0.15, acrylic: 0.1, polycarbonate: 0.1, aluminum: 0.05, foam: 0.2 };
-function autoSizes(input, material) {
+function autoSizes(input, material, imperial) {
   var o = Object.assign({}, DEFAULTS, input || {});
   var rect = o.shape === 'rect', small = rect ? Math.min(o.length, o.width) : o.diameter;
   var T = o.stock, lidH = o.lidHeight > 0 ? o.lidHeight : T, b = o.bit;
-  var half = function(v) { return Math.round(v * 2) / 2; }, upHalf = function(v) { return Math.ceil(v * 2 - 1e-9) / 2; };
+  // To the grid: the nearest step, or (up) the next one.
+  var grid = function(v) { return imperial ? (v < 1 ? 0.127 : 25.4 / 32) : (v < 1 ? 0.05 : 0.5); };
+  var half = function(v) { var g = grid(v); return Math.max(g, Math.round(v / g) * g); };
+  var upHalf = function(v) { var g = grid(v); return Math.ceil(v / g - 1e-9) * g; };
   var clamp = function(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); };
-  var a = { clearance: CLEARANCE[material] != null ? CLEARANCE[material] : 0.2 };
-  a.floor = clamp(half(T * 0.2), 2, 6);
-  a.top = clamp(half(lidH * 0.2), 2, 6);
-  a.wall = clamp(half(small * 0.08), 4, 15);
+  var a = { clearance: half(CLEARANCE[material] != null ? CLEARANCE[material] : 0.2) };
+  a.floor = half(clamp(T * 0.2, 2, 6));
+  a.top = half(clamp(lidH * 0.2, 2, 6));
+  a.wall = half(clamp(small * 0.08, 4, 15));
   var depth = Math.min(T - a.floor, lidH - a.top);
-  a.lipHeight = clamp(half(depth * 0.3), 2, 8);
+  a.lipHeight = half(clamp(depth * 0.3, 2, 8));
   a.margin = half(Math.max(5, b));
   a.gap = upHalf(Math.max(8, 2 * b + 2));
   var round = rect ? 2 * (o.length + o.width) : Math.PI * o.diameter;
-  a.tabs = { count: clamp(Math.round(round / 90), 3, 8), width: half(Math.max(5, 1.5 * b)), height: clamp(Math.round(T * 0.08 * 4) / 4, 1, 3) };
+  a.tabs = { count: clamp(Math.round(round / 90), 3, 8), width: half(Math.max(5, 1.5 * b)), height: half(clamp(T * 0.08, 1, 3)) };
   if (o.magnets) a.magnets = Object.assign({}, o.magnets, { count: rect ? 4 : clamp(Math.round(round / 80), 3, 6) });
-  if (o.notch) a.notch = { width: clamp(half(small * 0.18), 10, 20), depth: clamp(half(a.lipHeight), 3, 6) };
-  if (o.edges) a.edges = Object.assign({}, o.edges, { outside: o.edges.bit === 'round' ? Math.min(o.edges.radius || 1, 1.5) : 1, inside: 0.5 });
-  var plan;
-  for (var k = 0; k < 60; k++) {
-    a.lipWidth = clamp(half(a.wall * 0.4), 1.5, 6);
+  if (o.notch) a.notch = { width: half(clamp(small * 0.18, 10, 20)), depth: half(clamp(a.lipHeight, 3, 6)) };
+  if (o.edges) a.edges = Object.assign({}, o.edges, { outside: half(o.edges.bit === 'round' ? Math.min(o.edges.radius || 1, 1.5) : 1), inside: half(0.5) });
+  // Edges get room first from a lower lip, then a wall up to an eighth
+  // of the size or 2 mm more than it was; then they're made smaller. A
+  // notch narrower, to 12 mm.
+  var plan, edgeWall = null;
+  var smaller = function(d) { return d > 0.3 ? half(d * 0.7) : 0; };
+  for (var k = 0; k < 80; k++) {
+    a.lipWidth = half(clamp(a.wall * 0.4, 1.5, 3.5));
     if (rect) a.cornerRadius = Math.max(o.cornerRadius || 0, upHalf(a.wall - a.lipWidth - a.clearance + b / 2));
     plan = boxPlan(Object.assign({}, o, a));
     if (!plan.problems.length) break;
-    var p = plan.problems.join(' ');
-    if (a.edges && /[Ee]dge|seam/.test(p) && (a.edges.outside > 0.3 || a.edges.inside > 0.3)) {
-      a.edges.outside = a.edges.outside > 0.3 ? Math.round(a.edges.outside * 6) / 10 : 0;
-      a.edges.inside = a.edges.inside > 0.3 ? Math.round(a.edges.inside * 6) / 10 : 0;
-    } else if (a.notch && /notch/.test(p) && a.notch.width > 10) a.notch.width -= 1;
-    else if (/Gap/.test(p)) a.gap += 1;
-    else if (a.wall < small / 2 - b - 2) a.wall += 0.5;
+    var p = plan.problems[0], ed = a.edges;
+    if (ed && /[Ee]dge|seam/.test(p) && !/Gap/.test(p) && (ed.outside > 0 || ed.inside > 0)) {
+      var seam = /seam/.test(p), rim = /Inside rim|inside is too small/.test(p);
+      if (edgeWall === null) edgeWall = Math.max(half(small / 8), a.wall + 2);
+      if (seam && a.lipHeight > 3) a.lipHeight = half(a.lipHeight - grid(3));
+      else if (a.wall < edgeWall) a.wall = half(a.wall + grid(3));
+      else {
+        if (seam || !rim) ed.outside = smaller(ed.outside);
+        if (rim || !seam) ed.inside = smaller(ed.inside);
+      }
+    } else if (a.notch && /notch/.test(p) && a.notch.width > 12) a.notch.width = half(a.notch.width - 2 * grid(3));
+    else if (/Gap/.test(p)) a.gap = half(a.gap + 2 * grid(3));
+    else if (a.wall < small / 2 - b - 2) a.wall = half(a.wall + grid(3));
     else break;
   }
   a.problems = plan.problems;
@@ -1268,7 +1310,7 @@ if (typeof module !== 'undefined' && module.exports) {
   var $ = function (id) { return document.getElementById(id); };
   var ROOT = document.querySelector('.cb-wrapper');
   var state = {
-    imperial: false, atc: false, changer: false, toolById: false, tools: [], maxFeedMm: null, maxPlungeMm: null, spindleMax: null, spindleMin: null,
+    imperial: false, atc: false, changer: false, autoSizes: false, toolById: false, tools: [], maxFeedMm: null, maxPlungeMm: null, spindleMax: null, spindleMin: null,
     feedsAuto: true, v: {}
   };
   // Every setting, in mm (and mm/min): [field, key, kind, default, optional].
@@ -1288,6 +1330,28 @@ if (typeof module !== 'undefined' && module.exports) {
     ['cb-eout', 'edgeOut', 'length', 1.5, true], ['cb-ein', 'edgeIn', 'length', 0.5, true],
     ['cb-efeed', 'edgeFeed', 'feed', 1500], ['cb-erpm', 'edgeRpm', 'count', 18000]
   ];
+  // What Auto Sizes fills in: [field, its value from autoSizes()]. Typing
+  // in one sets it by hand (Auto Sizes off); Corner Radius stays yours
+  // (only raised to what the lip needs).
+  var AUTO = [
+    ['cb-wall', function (a) { return a.wall; }], ['cb-floor', function (a) { return a.floor; }], ['cb-top-t', function (a) { return a.top; }],
+    ['cb-lip-h', function (a) { return a.lipHeight; }], ['cb-lip-w', function (a) { return a.lipWidth; }], ['cb-clear', function (a) { return a.clearance; }],
+    ['cb-gap', function (a) { return a.gap; }], ['cb-margin', function (a) { return a.margin; }],
+    ['cb-tab-n', function (a) { return a.tabs.count; }], ['cb-tab-w', function (a) { return a.tabs.width; }], ['cb-tab-h', function (a) { return a.tabs.height; }],
+    ['cb-mag-n', function (a) { return a.magnets && a.magnets.count; }],
+    ['cb-notch-w', function (a) { return a.notch && a.notch.width; }], ['cb-notch-d', function (a) { return a.notch && a.notch.depth; }],
+    ['cb-eout', function (a) { return a.edges && a.edges.outside; }], ['cb-ein', function (a) { return a.edges && a.edges.inside; }]
+  ];
+  // Auto Sizes on: the fields filled in for the size, stock, bit and material.
+  function applyAuto() {
+    var v = collect().v, a = autoSizes(planOf(v).o, v.material, state.imperial);
+    AUTO.forEach(function (x) {
+      var mm = x[1](a), kind = FIELDS.filter(function (f) { return f[0] === x[0]; })[0][2];
+      if (mm == null) return;
+      show(x[0], mm, kind);
+    });
+    if (v.shape === 'rect' && a.cornerRadius > v.cornerRadius + 1e-6) show('cb-corner', a.cornerRadius, 'length');
+  }
   // Fields under a switch, and the switch.
   var GROUPS = [['cb-tab-fields', 'cb-tabs-on'], ['cb-mag-fields', 'cb-mag-on'], ['cb-notch-fields', 'cb-notch-on'], ['cb-edge-fields', 'cb-edges-on']];
   // Feeds that must be in range: [field, ok, what's wrong].
@@ -1489,9 +1553,17 @@ if (typeof module !== 'undefined' && module.exports) {
   async function loadTools() {
     try {
       var tools = await (await fetch(BASE_URL + '/api/tools/active')).json();
+      var loaded = 0;
+      try { var st = await (await fetch(BASE_URL + '/api/server-state')).json(); loaded = Number(st && st.machineState && st.machineState.tool) || 0; } catch (e) {}
+      state.loadedTool = loaded;
       state.tools = (tools || []).filter(function (t) { return t.diameter > 0 && t.type !== 'probe' && t.type !== 'pen' && t.type !== 'drag-knife'; })
-        .map(function (t) { return { n: state.toolById ? t.toolId : t.toolNumber, mm: t.diameter, name: t.name || '', flutes: (t.metadata && t.metadata.flutes) || 0, vAngle: vBitOf(t) }; })
-        .filter(function (t) { return t.n > 0; });
+        .map(function (t) {
+          return { n: state.toolById ? t.toolId : t.toolNumber, slot: state.toolById && t.toolNumber > 0 ? t.toolNumber : 0, mm: t.diameter, name: t.name || '',
+                   notes: (t.metadata && t.metadata.notes) || '', flutes: (t.metadata && t.metadata.flutes) || 0, vAngle: vBitOf(t) };
+        })
+        .filter(function (t) { return t.n > 0; })
+        // In the magazine first, by slot; the tool in the spindle first; then by number.
+        .sort(function (a, b) { return (b.slot > 0) - (a.slot > 0) || (b.n === loaded) - (a.n === loaded) || a.slot - b.slot || a.n - b.n; });
       var opts = state.tools.map(function (t) {
         return '<option value="' + t.n + '">T' + t.n + (t.name ? ' ' + t.name.replace(/</g, '&lt;') : '') + ' (' + fmt(t.mm) + ' ' + unit() + ')</option>';
       }).join('');
@@ -1500,7 +1572,131 @@ if (typeof module !== 'undefined' && module.exports) {
         sel.innerHTML = '<option value="">' + x[2] + '</option>' + opts;
         if (toolEntry(keep)) sel.value = String(keep);
       });
-    } catch (e) {}
+    } catch (e) { state.tools = []; }
+    showPickers();
+  }
+
+  // ---------- Tool Library picker (as QuickCut's) ----------
+  // Each Tool Library <select> shows as a row with the picked tool, which
+  // opens the tools with a filter on top: every word of it matches the T
+  // number, name, notes, size or slot. Choosing one sets the <select>.
+  // prefer: the tools listed first (the edge bit's: V-bits, roundovers).
+  var PICKERS = {
+    'cb-tool': { none: 'Type a size', prefer: null },
+    'cb-etool': { none: 'Type its size', prefer: function (t) { return t.vAngle != null || /round\s*-?over/i.test(t.name); } }
+  };
+  var pop = { id: null, active: 0, items: [] };
+  function wirePickers() {
+    Object.keys(PICKERS).forEach(function (id) {
+      var sel = $(id), btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'cb-tool-row'; btn.id = id + '-row';
+      btn.setAttribute('aria-haspopup', 'listbox'); btn.setAttribute('aria-expanded', 'false');
+      sel.hidden = true;
+      sel.parentNode.insertBefore(btn, sel);
+      sel.closest('.cb-field').querySelector('label').setAttribute('for', btn.id);
+      btn.addEventListener('click', function () { if (pop.id === id) closePicker(); else openPicker(id); });
+      btn.addEventListener('keydown', function (e) { if (e.key === 'ArrowDown') { e.preventDefault(); openPicker(id); } });
+    });
+    var el = document.createElement('div');
+    el.className = 'cb-tool-pop'; el.id = 'cb-tool-pop'; el.hidden = true;
+    el.innerHTML = '<input class="cb-input" id="cb-tool-filter" type="text" autocomplete="off" spellcheck="false" placeholder="Filter: T number, name or size" aria-label="Filter the tools">' +
+      '<div class="cb-tool-list" id="cb-tool-list" role="listbox" aria-label="Tool Library"></div>';
+    ROOT.appendChild(el);
+    var filter = $('cb-tool-filter');
+    filter.addEventListener('input', function () { pop.active = 0; renderPicker(); });
+    filter.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); movePicker(e.key === 'ArrowDown' ? 1 : -1); }
+      else if (e.key === 'Enter') { e.preventDefault(); var it = pop.items[pop.active]; if (it) choose(pop.id, it.value); }
+      else if (e.key === 'Escape') { e.preventDefault(); var back = pop.id; closePicker(); $(back + '-row').focus(); }
+    });
+    // A tap or click anywhere else closes it.
+    document.addEventListener('pointerdown', function onDown(e) {
+      if (!document.body.contains(ROOT)) { document.removeEventListener('pointerdown', onDown, true); return; }
+      if (pop.id && !el.contains(e.target) && !$(pop.id + '-row').contains(e.target)) closePicker();
+    }, true);
+    showPickers();
+  }
+  function openPicker(id) {
+    pop.id = id; pop.active = 0;
+    $('cb-tool-filter').value = '';
+    $('cb-tool-pop').hidden = false;
+    Object.keys(PICKERS).forEach(function (k) { $(k + '-row').setAttribute('aria-expanded', String(k === id)); });
+    renderPicker();
+    placePicker();
+    $('cb-tool-filter').focus();
+  }
+  // As wide as its widest tool, then kept that width while filtering;
+  // under the row, or over it when there's no room, inside the dialog.
+  function placePicker() {
+    var btn = $(pop.id + '-row'), el = $('cb-tool-pop');
+    el.style.width = '';
+    el.style.width = (el.offsetWidth + 1) + 'px';
+    var r = btn.getBoundingClientRect(), w = ROOT.getBoundingClientRect();
+    el.style.left = Math.max(8, Math.min(r.left - w.left, w.width - el.offsetWidth - 8)) + 'px';
+    var below = r.bottom - w.top + 4, room = w.height - below - 8;
+    el.style.top = (room >= Math.min(el.offsetHeight, 240) ? below : Math.max(8, r.top - w.top - el.offsetHeight - 4)) + 'px';
+  }
+  function closePicker() {
+    if (!pop.id) return;
+    $(pop.id + '-row').setAttribute('aria-expanded', 'false');
+    pop.id = null;
+    $('cb-tool-pop').hidden = true;
+  }
+  function movePicker(step) {
+    var n = pop.items.length;
+    if (!n) return;
+    pop.active = (pop.active + step + n) % n;
+    renderPicker();
+    var el = $('cb-tool-list').querySelector('.cb-active');
+    if (el) el.scrollIntoView({ block: 'nearest' });
+  }
+  var esc = function (x) { return String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;'); };
+  function toolText(t) {
+    return fmt(t.mm) + ' ' + unit() + (t.vAngle ? ', ' + t.vAngle + '\u00b0 V' : '') + (t.slot ? ', slot ' + t.slot : '') + (t.n === state.loadedTool ? ', in the spindle' : '');
+  }
+  function renderPicker() {
+    var cfg = PICKERS[pop.id], picked = $(pop.id).value, all = state.tools || [];
+    var words = String($('cb-tool-filter').value).toLowerCase().split(/\s+/).filter(Boolean);
+    var tools = all.filter(function (t) {
+      var hay = ('t' + t.n + ' ' + t.name + ' ' + t.notes + ' ' + toolText(t)).toLowerCase();
+      return words.every(function (w) { return hay.indexOf(w) >= 0; });
+    });
+    var first = function (f) { return tools.filter(f).concat(tools.filter(function (t) { return !f(t); })); };
+    if (cfg.prefer) tools = first(cfg.prefer);
+    tools = first(function (t) { return String(t.n) === picked; });
+    pop.items = tools.map(function (t) { return { value: String(t.n), t: t }; }).concat([{ value: '' }]);
+    var html = !all.length ? '<div class="cb-tool-empty">No tools with a diameter in the Tool Library.</div>'
+      : !tools.length ? '<div class="cb-tool-empty">No tool matches \u201c' + esc($('cb-tool-filter').value) + '\u201d.</div>' : '';
+    var pickedFirst = tools.length && String(tools[0].n) === picked;
+    html += pop.items.map(function (it, i) {
+      var t = it.t, sel = it.value === picked;
+      var head = t && sel ? 'Picked' : t && (i === 0 || (i === 1 && pickedFirst)) ? 'Tool Library' : '';
+      return (head ? '<div class="cb-tool-head">' + head + '</div>' : '') +
+        '<button type="button" class="cb-tool-item' + (i === pop.active ? ' cb-active' : '') + '" role="option" aria-selected="' + sel + '" data-v="' + it.value + '">' +
+        (t ? '<b>' + (sel ? '\u2713 ' : '') + 'T' + t.n + '</b>' + (t.name ? '<span class="cb-tool-name">' + esc(t.name) + '</span>' : '') + '<span class="cb-tool-size">' + esc(toolText(t)) + '</span>'
+           : (sel ? '\u2713 ' : '') + cfg.none) + '</button>';
+    }).join('');
+    $('cb-tool-list').innerHTML = html;
+    $('cb-tool-list').querySelectorAll('.cb-tool-item').forEach(function (b) { b.addEventListener('click', function () { choose(pop.id, b.getAttribute('data-v')); }); });
+  }
+  function choose(id, value) {
+    closePicker();
+    $(id).value = value;
+    $(id).dispatchEvent(new Event('change'));
+    showPickers();
+    $(id + '-row').focus();
+  }
+  // Each row: the picked tool, or the way to type a size.
+  function showPickers() {
+    Object.keys(PICKERS).forEach(function (id) {
+      var btn = $(id + '-row');
+      if (!btn) return;
+      var t = toolEntry($(id).value);
+      btn.disabled = $(id).disabled;
+      btn.innerHTML = t ? '<b>T' + t.n + '</b><span>' + esc(t.name || 'Tool ' + t.n) + '</span>'
+        : '<span class="cb-tool-row-empty">' + (state.tools && state.tools.length ? 'Pick a tool, or type its size' : 'No Tool Library: type a size') + '</span>';
+      btn.title = t ? 'T' + t.n + ' ' + (t.name || '') + '\n' + toolText(t) : '';
+    });
   }
   // A tool's V angle when it's a V-bit (0 when its angle isn't known),
   // else null: its taper angle (the Fusion 360 importer fills it), or its
@@ -1537,6 +1733,12 @@ if (typeof module !== 'undefined' && module.exports) {
   // ---------- Update, save, generate ----------
   var saveTimer = null, lastPlan = null;
   function update(save) {
+    if (state.autoSizes) applyAuto();
+    AUTO.forEach(function (x) { $(x[0]).classList.toggle('cb-auto-val', state.autoSizes); });
+    $('cb-auto').checked = state.autoSizes;
+    $('cb-auto-hint').textContent = state.autoSizes
+      ? 'Auto Sizes fills in the sizes in color for this box, stock, bit and Material (Tool & Feeds). Type in one to set it yourself.'
+      : 'Auto Sizes (on the right) fills in sensible sizes for this box, stock, bit and material.';
     var c = collect(), v = c.v, plan = planOf(v);
     lastPlan = { plan: plan, v: v, errs: c.errs };
     FIELDS.forEach(function (f) { $(f[0]).classList.toggle('cb-error', !!c.errs[f[0]]); });
@@ -1577,11 +1779,12 @@ if (typeof module !== 'undefined' && module.exports) {
       ROOT.querySelectorAll('#' + g[0] + ' .cb-input, #' + g[0] + ' .cb-select, #' + g[0] + ' .cb-seg button').forEach(function (el) { el.disabled = !$(g[1]).checked; });
     });
     $('cb-size-round').hidden = v.shape === 'rect'; $('cb-size-rect').hidden = v.shape !== 'rect';
+    showPickers();
     if (save) { clearTimeout(saveTimer); saveTimer = setTimeout(persist, 400); }
   }
   function persist() {
     if (!lastPlan) return;
-    var v = Object.assign({}, lastPlan.v, { feedsAuto: state.feedsAuto });
+    var v = Object.assign({}, lastPlan.v, { feedsAuto: state.feedsAuto, autoSizes: state.autoSizes });
     fetch(BASE_URL + '/api/plugins/' + PLUGIN + '/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ v: v }) }).catch(function () {});
   }
   // The box, or (test) a small one with the same fit to try it first.
@@ -1630,12 +1833,17 @@ if (typeof module !== 'undefined' && module.exports) {
     $('cb-style').value = saved.style || 'average';
     if (saved.flutes) $('cb-flutes').value = String(saved.flutes); else $('cb-flutes').value = '2';
     state.feedsAuto = saved.feedsAuto !== false;
+    // On for a first try; as it was saved after that.
+    state.autoSizes = typeof saved.autoSizes === 'boolean' ? saved.autoSizes : !Object.keys(saved).length;
   }
   function wire() {
     // Lengths and feeds in any unit (1/4", 6.35mm, 60ipm, 12mm + 1/8in):
     // shown in the shop's units on Enter or leaving the field; Up / Down
     // step them.
-    NcUnitInput.wireUnitFields(ROOT, { imperial: function () { return state.imperial; } });
+    wirePickers();
+    NcUnitInput.wireUnitFields(ROOT, { imperial: function () { return state.imperial; }, onStep: function (el) {
+      if (state.autoSizes && AUTO.some(function (x) { return x[0] === el.id; })) { state.autoSizes = false; update(true); }
+    } });
     SEGS.forEach(function (s) {
       ROOT.querySelectorAll('#' + s[0] + ' button').forEach(function (b) {
         b.addEventListener('click', function () {
@@ -1649,10 +1857,12 @@ if (typeof module !== 'undefined' && module.exports) {
       $(f[0]).addEventListener('input', function (e) {
         if (e.isTrusted && FEED_IDS.indexOf(f[0]) >= 0) state.feedsAuto = false;
         if (e.isTrusted && f[0] === 'cb-bit') $('cb-tool').value = '';
+        if (e.isTrusted && AUTO.some(function (x) { return x[0] === f[0]; })) state.autoSizes = false;
         update(true);
       });
       $(f[0]).addEventListener('change', function () { if (f[0] === 'cb-bit' && state.feedsAuto) { fillFeeds(); update(true); } });
     });
+    $('cb-auto').addEventListener('change', function () { state.autoSizes = $('cb-auto').checked; update(true); });
     ['cb-tabs-on', 'cb-mag-on', 'cb-notch-on', 'cb-edges-on'].forEach(function (id) { $(id).addEventListener('change', function () { update(true); }); });
     $('cb-testfit').addEventListener('click', function () { generate('test'); });
     $('cb-edges-only').addEventListener('click', function () { generate('edges'); });
