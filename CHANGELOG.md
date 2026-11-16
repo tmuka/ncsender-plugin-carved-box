@@ -2,6 +2,7 @@
 
 ## Unreleased
 - Stock Thickness: a Stock button puts in Spoilboard Toolbox's stock thickness, when Spoilboard Toolbox is installed and on. Hidden otherwise.
+- Auto Sizes sets the Lid Height to the stock's thickness, so none of the lid's stock is faced away.
 
 ## 0.2.0: Polygon, oval and heart boxes
 - Polygon: 3 to 12 sides across the flats, rounded corners, a flat side to the front so the lid lines up turned over (odd sides too).

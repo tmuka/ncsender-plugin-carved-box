@@ -121,7 +121,7 @@
 
     <div class="cb-cards">
     <div class="cb-card">
-      <h3><span class="cb-grow">Box</span><span class="cb-auto-label">Auto Sizes</span><label class="cb-switch" title="Fill in the wall, floor, top, lip, clearance, gap, margin, tabs, notch, magnet count and edges for this size, stock, bit and material."><input type="checkbox" id="cb-auto" aria-label="Auto Sizes"><span></span></label></h3>
+      <h3><span class="cb-grow">Box</span><span class="cb-auto-label">Auto Sizes</span><label class="cb-switch" title="Fill in the wall, floor, top, lid height (the stock's thickness), lip, clearance, gap, margin, tabs, notch, magnet count and edges for this size, stock, bit and material."><input type="checkbox" id="cb-auto" aria-label="Auto Sizes"><span></span></label></h3>
       <div class="cb-field"><label>Shape</label>
         <div class="cb-seg" id="cb-shape" role="radiogroup" aria-label="Shape">
           <button type="button" role="radio" data-v="circle">Round</button><button type="button" role="radio" data-v="rect">Rectangle</button><button type="button" role="radio" data-v="poly">Polygon</button><button type="button" role="radio" data-v="oval">Oval</button><button type="button" role="radio" data-v="heart">Heart</button>
@@ -1988,14 +1988,17 @@ if (typeof module !== 'undefined' && module.exports) {
     ['cb-mag-n', function (a) { return a.magnets && a.magnets.count; }],
     ['cb-notch-w', function (a) { return a.notch && a.notch.width; }], ['cb-notch-d', function (a) { return a.notch && a.notch.depth; }],
     ['cb-eout', function (a) { return a.edges && a.edges.outside; }], ['cb-ein', function (a) { return a.edges && a.edges.inside; }],
-    ['cb-epk', function (a) { return a.edges && a.edges.pocket; }]
+    ['cb-epk', function (a) { return a.edges && a.edges.pocket; }],
+    ['cb-lid-h', function (a) { return a.lidHeight; }]
   ];
   // Auto Sizes on: the fields filled in for the size, stock, bit and material.
   function applyAuto() {
     // A rectangle's corners: yours, or rounder when the lip needs it (and
     // back to yours when it doesn't).
     var v = collect().v, own = state.cornerOwn != null ? state.cornerOwn : v.cornerRadius;
-    var a = autoSizes(Object.assign({}, planOf(v).o, { cornerRadius: own }), v.material, state.imperial);
+    // The lid as high as the stock: nothing faced away.
+    var a = autoSizes(Object.assign({}, planOf(v).o, { cornerRadius: own, lidHeight: null }), v.material, state.imperial);
+    a.lidHeight = v.stock > 0 ? v.stock : null;
     AUTO.forEach(function (x) {
       var mm = x[1](a), kind = FIELDS.filter(function (f) { return f[0] === x[0]; })[0][2];
       if (mm == null) return;
