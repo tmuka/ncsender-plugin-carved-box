@@ -26,6 +26,8 @@ The previews show both halves on the stock, and the closed box cut through its m
 2. Both outlines, after the insides so the board stays stiff: a helical ramp, through the stock and 0.5 mm into the spoilboard, lifting over each tab on the last passes.
 3. The floor corners, with the corner bit, then the edges, with the edge bit: a ramp down along each, a pass at a time.
 
+Every move sideways is at the machine's safe height (ncSender's **Safe Z** setting, else machine Z0), over any clamps; the bit comes down quickly to 1 mm over the stock, then at the plunge rate.
+
 Put the side of the board you want on the outside of the lid face down: the lid's top is the board's underside.
 
 ## License

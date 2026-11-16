@@ -1134,8 +1134,11 @@ if (typeof module !== 'undefined' && module.exports) {
  * with tabs. Arcs are CCW (G3), as QuickCut's.
  */
 
-// f: { feed, plunge, rpm, delay, doc, stepoverPct, toolNumber, clear, label,
-// edges } (mm, mm/min, seconds; clear: how high to lift between cuts).
+// f: { feed, plunge, rpm, delay, doc, stepoverPct, toolNumber, safeZ, label,
+// corners, edges } (mm, mm/min, seconds; safeZ: ncSender's Safe Z, in
+// machine coordinates, null for machine Z0). Every move sideways between
+// cuts is up there, clear of clamps; the bit comes down to 1 mm over the
+// stock (or over a cut already made) quickly, then at the plunge rate.
 // f.corners, f.edges: { toolNumber, feed, plunge, rpm, delay, doc }: the
 // floor corners' ball or bowl bit's, the edge bit's, for a program that
 // changes to each (M6) and cuts the plan's corners, then its edges, after
@@ -1143,16 +1146,18 @@ if (typeof module !== 'undefined' && module.exports) {
 // those, as their own program (that bit in, Z zeroed on the stock top as
 // for the box).
 function boxProgram(plan, f, only) {
-  var o = plan.o, rb = o.bit / 2, clear = f.clear || 5;
+  var o = plan.o, rb = o.bit / 2, HIGH = 1e6;
+  var safe = typeof f.safeZ === 'number' && isFinite(f.safeZ) ? 'G53 G0 Z' + (+f.safeZ).toFixed(3) : 'G53 G0 Z0';
   var step = Math.max(0.05, Math.min(o.bit * (f.stepoverPct || 40) / 100, o.bit * 0.9));
   var doc = Math.max(0.05, f.doc);
-  var L = [], minutes = 0, x = 0, y = 0, z = clear;
+  var L = [], minutes = 0, x = 0, y = 0, z = HIGH;
   var n3 = function(v) { var s = v.toFixed(3); return s === '-0.000' ? '0.000' : s; };
   var mm3 = function(v) { return +(+v).toFixed(3); };
   var comment = function(s) { L.push('(' + s.replace(/[()!?~]/g, '').slice(0, 77) + ')'); };
 
-  function rapid(px, py) { L.push('G0 X' + n3(px) + ' Y' + n3(py)); x = px; y = py; }
-  function lift() { L.push('G0 Z' + n3(clear)); z = clear; }
+  // Sideways only at safe height.
+  function rapid(px, py) { if (z !== HIGH) lift(); L.push('G0 X' + n3(px) + ' Y' + n3(py)); x = px; y = py; }
+  function lift() { L.push(safe); z = HIGH; }
   // Down to toZ: quickly to 1 mm over the stock, or over the floor of a
   // cut already made there, then at the plunge rate.
   function down(toZ) {
@@ -1354,21 +1359,25 @@ function boxProgram(plan, f, only) {
   });
   L.push('');
   L.push('G21 ; Metric units', 'G17 ; XY plane selection', 'G90 ; Absolute positioning', 'G94 ; Feed rate per minute', '');
-  L.push('G53 G0 Z0 ; Move to machine Z0');
+  L.push(safe + ' ; Up to safe height');
   var spun = false;
   function startBit(g, change) {
     var sf = g ? g.f : f;
     if (change) {
-      L.push('', 'G53 G0 Z0 ; Move to machine Z0');
+      L.push('', safe + ' ; Up to safe height');
       if (spun) L.push('M5 ; Stop spindle');
     }
-    if (sf.toolNumber > 0) L.push('M6 T' + sf.toolNumber + ' ; Tool change' + (g ? ': the ' + g.one + ' bit' : ''));
+    if (sf.toolNumber > 0) {
+      L.push('M6 T' + sf.toolNumber + ' ; Tool change' + (g ? ': the ' + g.one + ' bit' : ''));
+      // A tool change can leave it lower, or other units.
+      L.push('G21 G90 ; Metric, absolute again', safe + ' ; Up to safe height');
+    }
     if (sf.rpm > 0) {
       L.push('M3 S' + Math.round(sf.rpm) + ' ; Start spindle');
       if (sf.delay > 0) L.push('G4 P' + +(+sf.delay).toFixed(1) + ' ; Wait for the spindle');
       spun = true;
     } else spun = false;
-    L.push('G0 Z' + n3(clear));
+    z = HIGH;
   }
 
   if (!only) {
@@ -1397,7 +1406,7 @@ function boxProgram(plan, f, only) {
     });
   });
 
-  L.push('', 'G53 G0 Z0 ; Return to machine Z0');
+  L.push('', safe + ' ; Up to safe height');
   if (spun) L.push('M5 ; Stop spindle');
   L.push('M30 ; Program end');
   return { gcode: L.join('\n') + '\n', minutes: minutes };
@@ -1427,7 +1436,7 @@ if (typeof module !== 'undefined' && module.exports) {
   var $ = function (id) { return document.getElementById(id); };
   var ROOT = document.querySelector('.cb-wrapper');
   var state = {
-    imperial: false, atc: false, changer: false, autoSizes: false, toolById: false, tools: [], maxFeedMm: null, maxPlungeMm: null, spindleMax: null, spindleMin: null,
+    imperial: false, atc: false, changer: false, autoSizes: false, safeZ: null, toolById: false, tools: [], maxFeedMm: null, maxPlungeMm: null, spindleMax: null, spindleMin: null,
     feedsAuto: true, v: {}
   };
   // Every setting, in mm (and mm/min): [field, key, kind, default, optional].
@@ -1552,7 +1561,7 @@ if (typeof module !== 'undefined' && module.exports) {
   function cornersInBox(v) { return !!(v.cornersOn && state.changer && toolEntry(v.cornerTool)); }
   function feedsOf(v) {
     var t = toolEntry(v.tool), more = edgesInBox(v) || cornersInBox(v);
-    return { feed: v.feed, plunge: v.plunge, rpm: v.rpm, delay: v.delay, doc: v.doc, stepoverPct: v.stepoverPct,
+    return { feed: v.feed, plunge: v.plunge, rpm: v.rpm, delay: v.delay, doc: v.doc, stepoverPct: v.stepoverPct, safeZ: state.safeZ,
              toolNumber: (state.atc || more) && t ? t.n : 0, edges: edgesInBox(v) ? edgeFeeds(v) : null, corners: cornersInBox(v) ? cornerFeeds(v) : null };
   }
 
@@ -2049,6 +2058,9 @@ if (typeof module !== 'undefined' && module.exports) {
       state.atc = !!(s.tool && s.tool.source && s.tool.count > 0);
       // Any tool change ncSender handles (a manual one too): M6 to the edge bit.
       state.changer = !!(s.tool && s.tool.source && (s.tool.count > 0 || s.tool.manual));
+      // ncSender's Safe Z (machine coordinates): every move sideways is up there.
+      var sz = Number(s.safeZHeight);
+      state.safeZ = s.safeZHeight != null && s.safeZHeight !== '' && isFinite(sz) ? sz : null;
       state.toolById = !!(s.tool && s.tool.numbering === 'toolId');
     } catch (e) {}
     try {

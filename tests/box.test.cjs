@@ -8,6 +8,7 @@ const { shapeDistance, shapeLoop, loopLength, loopPoint } = require('../lib/box-
 
 const FEEDS = { feed: 1500, plunge: 400, rpm: 18000, delay: 2, doc: 2, stepoverPct: 40, toolNumber: 0 };
 
+const SAFE = 1000;
 // The bit center's path, sampled every half mm or so: { x, y, z, rapid }
 // (rapid: a G0 that moves sideways or goes down; a G0 straight up is a lift).
 function simulate(gcode) {
@@ -15,15 +16,17 @@ function simulate(gcode) {
   let x = 0, y = 0, z = 5;
   for (const raw of gcode.split('\n')) {
     const line = raw.split(';')[0].trim();
-    if (!line || line[0] === '(' || /G53/.test(line)) continue;
+    if (!line || line[0] === '(') continue;
+    // Up to the machine's safe height: far over the stock.
+    if (/G53/.test(line)) { if (/Z/.test(line)) z = SAFE; continue; }
     const w = {};
     for (const m of line.matchAll(/([A-Z])(-?[\d.]+)/g)) w[m[1]] = +m[2];
     const g = w.G;
     const nx = w.X ?? x, ny = w.Y ?? y, nz = w.Z ?? z;
     if (g === 0 || g === 1) {
       const n = Math.max(1, Math.ceil(Math.hypot(nx - x, ny - y, nz - z) / 0.5));
-      const rapid = g === 0 && (nx !== x || ny !== y || nz < z);
-      for (let k = 1; k <= n; k++) pts.push({ x: x + (nx - x) * k / n, y: y + (ny - y) * k / n, z: z + (nz - z) * k / n, rapid, g });
+      const rapid = g === 0 && (nx !== x || ny !== y || nz < z), sideways = g === 0 && (nx !== x || ny !== y);
+      for (let k = 1; k <= n; k++) pts.push({ x: x + (nx - x) * k / n, y: y + (ny - y) * k / n, z: z + (nz - z) * k / n, rapid, sideways, g });
     } else if (g === 2 || g === 3) {
       const cx = x + w.I, cy = y + w.J, r = Math.hypot(x - cx, y - cy);
       let a0 = Math.atan2(y - cy, x - cx), a1 = Math.atan2(ny - cy, nx - cx);
@@ -84,6 +87,7 @@ function check(input, extra) {
   const pts = simulate(gcode);
   for (const p of pts) {
     assert.ok(!(p.rapid && p.z < -1e-6), 'a rapid below the stock top');
+    if (p.rapid && p.z < SAFE) assert.ok(!p.sideways, 'a move sideways under safe height: ' + JSON.stringify(p));
     const half = plan.halves.reduce((a, b) => Math.hypot(p.x - a.at.x, p.y - a.at.y) <= Math.hypot(p.x - b.at.x, p.y - b.at.y) ? a : b);
     assert.ok(allowed(plan, half, p), half.name + ' cut where wood stays: ' + JSON.stringify(p));
   }
@@ -396,4 +400,23 @@ test('the finishing pass: roughing leaves the allowance, a climbing lap cleans e
     }
   }
   assert.ok(boxPlan({ finish: 2 }).problems.some((p) => /Finish Allowance/.test(p)));
+});
+
+test('every move sideways is at the machine\'s safe height, after a tool change too', () => {
+  const plan = boxPlan({ corners: { diameter: 6.35, radius: 3.175 }, edges: { bit: 'v', angle: 60, diameter: 12.7, vtip: 0.3, outside: 0, inside: 0.5, pocket: 0 }, lipOn: 'lid', wall: 10, finish: 0.3 });
+  assert.deepEqual(plan.problems, []);
+  const more = { toolNumber: 3, feed: 1000, plunge: 300, rpm: 16000, doc: 2 };
+  for (const [f, only] of [[{ ...FEEDS, safeZ: -5 }], [{ ...FEEDS, toolNumber: 2, corners: more, edges: { ...more, toolNumber: 4 } }], [{ ...FEEDS, safeZ: -12.5, edges: more }, 'edges'], [{ ...FEEDS, corners: more }, 'corners']]) {
+    const g = boxProgram(plan, f, only).gcode, lines = g.split('\n').map((l) => l.split(';')[0].trim()).filter((l) => l && l[0] !== '(');
+    let atSafe = false;
+    for (const l of lines) {
+      if (/^G53 G0 Z/.test(l)) { atSafe = true; assert.equal(l, 'G53 G0 Z' + (f.safeZ != null ? f.safeZ.toFixed(3) : '0')); continue; }
+      if (/^G0 /.test(l) && /[XY]/.test(l)) assert.ok(atSafe, 'sideways under safe height: ' + l);
+      if (/Z/.test(l) || /^M6/.test(l)) atSafe = false;
+    }
+    // After each tool change: units, absolute and safe height again.
+    const m6 = lines.findIndex((l) => /^M6/.test(l));
+    if (m6 >= 0) { assert.match(lines[m6 + 1], /G21 G90/); assert.match(lines[m6 + 2], /^G53 G0 Z/); }
+    simulate(g).forEach((p) => assert.ok(!(p.sideways && p.z < SAFE), 'sideways move under safe height'));
+  }
 });
