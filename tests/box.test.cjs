@@ -562,3 +562,36 @@ test('an outline whose pocket comes apart: each piece cleared on its own, betwee
     }
   }
 });
+
+test('ovals and hearts: their ends and notch fit, big offsets, tiny pieces, Test Fit', () => {
+  const said = (o, re) => assert.ok(boxPlan(o).problems.some((p) => re.test(p)), JSON.stringify(o) + ' ' + boxPlan(o).problems);
+  // An oval's ends as tight as a corner: the lip has to fit there.
+  said({ shape: 'oval', length: 150, width: 30 }, /ends are too tight/);
+  // A heart's notch: the bit has to get into the lip's side of it.
+  said({ shape: 'heart', length: 100, width: 95, cornerRadius: 12, bit: 9.5, wall: 7, lipWidth: 3, clearance: 0.1, gap: 30 }, /bit gets into the lip's side of the notch/);
+  assert.deepEqual(boxPlan(testFitInput({ shape: 'heart', length: 100, width: 95, cornerRadius: 12, bit: 3.175, wall: 12 })).problems, []);
+  // An outward offset past the grid's usual reach: the lid's facing is cut.
+  const big = { shape: 'oval', length: 200, width: 160, lidHeight: 12, stock: 19, wall: 28, gap: 40, edges: { bit: 'round', radius: 24, tip: 2, outside: 1, inside: 0, pocket: 0 } };
+  const bp = boxPlan(big);
+  assert.deepEqual(bp.problems, []);
+  const g = boxProgram(bp, FEEDS).gcode, face = g.slice(g.indexOf('(Lid: faced down'), g.indexOf('(', g.indexOf('(Lid: faced down') + 1));
+  assert.ok((face.match(/^G1 /gm) || []).length > 50, 'the lid not faced');
+  // A big heart: few lifts, every piece entered gently, floors cleared; at
+  // a big stepover too (short pieces entered on a small circle).
+  for (const stepoverPct of [40, 60]) {
+    const input = { shape: 'heart', length: 150, width: 150, cornerRadius: 8 };
+    const { plan, pts, gcode } = check(input, { stepoverPct });
+    if (stepoverPct === 40) assert.ok((gcode.match(/^G53 G0 Z/gm) || []).length < 40, 'too many lifts');
+    const rb = plan.o.bit / 2, S = plan.shape;
+    for (const half of plan.halves) {
+      const floor = half.height - (half.name === 'lid' ? plan.o.top : plan.o.floor);
+      const deep = pts.filter((p) => Math.abs(p.z + floor) < 1e-6);
+      for (let qx = plan.ext.minX; qx <= plan.ext.maxX; qx += 2) for (let qy = plan.ext.minY; qy <= plan.ext.maxY; qy += 2) {
+        if (shapeDistance(S, plan.tInside, qx, qy) > -0.3) continue;
+        let near = Infinity;
+        for (const p of deep) { const d = Math.hypot(p.x - half.at.x - qx, p.y - half.at.y - qy); if (d < near) near = d; if (near <= rb) break; }
+        assert.ok(near <= rb + 0.35, 'heart ' + half.name + ' floor left at ' + qx.toFixed(1) + ',' + qy.toFixed(1) + ' (' + stepoverPct + '%)');
+      }
+    }
+  }
+});

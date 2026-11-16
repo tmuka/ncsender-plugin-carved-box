@@ -122,7 +122,7 @@
         <div class="cb-field"><label for="cb-length">X Length</label><input class="cb-input" id="cb-length" data-unit="length" title="The outside, along X."></div>
         <div class="cb-field"><label for="cb-width">Y Width</label><input class="cb-input" id="cb-width" data-unit="length" title="The outside, along Y."></div>
         <div class="cb-field"><label for="cb-sides">Sides</label><input class="cb-input" id="cb-sides" title="3 to 12: 6 for a hexagon, 8 for an octagon. A flat side faces the front."></div>
-        <div class="cb-field"><label for="cb-flats">Across Flats</label><input class="cb-input" id="cb-flats" data-unit="length" title="The outside, from one flat side to the one across (or, with an odd number, to the corner across)."></div>
+        <div class="cb-field"><label for="cb-flats">Across Flats</label><input class="cb-input" id="cb-flats" data-unit="length" title="The outside, from one flat side to the one across; with an odd number of sides, across the circle that fits inside (a flat side to the middle, twice)."></div>
         <div class="cb-field"><label for="cb-corner">Corner Radius</label><input class="cb-input" id="cb-corner" data-unit="length" title="Of the outside corners. The inside's are smaller by the wall, and at least half the bit."></div>
       </div>
       <div class="cb-row">
@@ -722,16 +722,19 @@ function outlineDistance(S, x, y) {
   return insideOutline(S.segs, x, y) ? -d : d;
 }
 
-// The distance on a grid round the outline, PAD past it: made once for
+// The distance on a grid round the outline, pad past it (PAD, or more for
+// an offset further out): made once for
 // each outline (by its key), the inside found a row at a time.
 var PAD = 25, GRIDS = {}, GRID_KEYS = [];
-function outlineGrid(S) {
-  if (S.key && GRIDS[S.key]) return GRIDS[S.key];
+function outlineGrid(S, pad) {
+  pad = Math.max(PAD, pad || 0);
+  var key = S.key && S.key + '|' + pad;
+  if (key && GRIDS[key]) return GRIDS[key];
   var pts = S.segs ? outlinePoints(S.segs) : [], x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
   pts.forEach(function(p) { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y); });
   if (S.box) { x0 = S.box.minX; x1 = S.box.maxX; y0 = S.box.minY; y1 = S.box.maxY; }
   var h = S.step || 0.2;
-  x0 -= PAD; y0 -= PAD; x1 += PAD; y1 += PAD;
+  x0 -= pad; y0 -= pad; x1 += pad; y1 += pad;
   var nx = Math.ceil((x1 - x0) / h) + 1, ny = Math.ceil((y1 - y0) / h) + 1, v = new Float64Array(nx * ny), lo = Infinity;
   for (var j = 0; j < ny; j++) {
     var y = y0 + j * h, xs = [];
@@ -754,8 +757,9 @@ function outlineGrid(S) {
     }
   }
   var grid = { x0: x0, y0: y0, h: h, nx: nx, ny: ny, v: v, deepest: -lo };
-  if (S.key) {
-    GRIDS[S.key] = grid; GRID_KEYS.push(S.key);
+  grid.pad = pad; grid.key = key;
+  if (key) {
+    GRIDS[key] = grid; GRID_KEYS.push(key);
     if (GRID_KEYS.length > 6) { var old = GRID_KEYS.shift(); delete GRIDS[old]; delete MEMO[old]; }
   }
   return grid;
@@ -763,11 +767,12 @@ function outlineGrid(S) {
 
 // Where the distance is t: closed loops (CCW, lines), by marching squares.
 function outlineLoops(S, t) {
-  var g = outlineGrid(S), nx = g.nx, ny = g.ny, v = g.v, h = g.h;
+  // Far enough out: a grid with room past t.
+  var g = outlineGrid(S, t > PAD - 3 ? Math.ceil(t + 10) : PAD), nx = g.nx, ny = g.ny, v = g.v, h = g.h;
   // Contours of a shape are asked for many times: kept by level.
-  var memo = S.key ? (MEMO[S.key] = MEMO[S.key] || {}) : null, mk = t.toFixed(6);
+  var memo = g.key ? (MEMO[g.key] = MEMO[g.key] || {}) : null, mk = t.toFixed(6);
   if (memo && memo[mk]) return memo[mk];
-  if (t <= -g.deepest + 1e-9 || t >= PAD - h) return [];
+  if (t <= -g.deepest + 1e-9 || t >= g.pad - h) return [];
   // An edge's crossing point, by its key (a cell's edge, shared).
   var pt = {};
   var cross = function(i0, j0, i1, j1) {
@@ -910,7 +915,9 @@ function ovalShape(A, B) {
     });
     return (px * px) / (a * a) + (py * py) / (b * b) < 1 ? -d : d;
   };
-  return { kind: 'outline', sdf: sdf, box: { minX: -a, maxX: a, minY: -b, maxY: b }, cr: Math.min(a, b), key: 'oval:' + A + ',' + B, step: gridStep(Math.max(A, B)) };
+  return { kind: 'outline', sdf: sdf, box: { minX: -a, maxX: a, minY: -b, maxY: b },
+    // Its tightest round, at the ends of its long way: as a corner's radius.
+    cr: Math.min(a, b) * Math.min(a, b) / Math.max(a, b), key: 'oval:' + A + ',' + B, step: gridStep(Math.max(A, B)) };
 }
 // Fine enough for a small box, not too many points for a big one.
 function gridStep(size) { return Math.max(0.15, Math.min(0.4, size / 600)); }
@@ -1185,7 +1192,7 @@ function boxPlan(input) {
   var problems = [], notes = [];
   var need = function(ok, msg) { if (!ok) problems.push(msg); };
   var rect = o.shape === 'rect', poly = o.shape === 'poly', oval = o.shape === 'oval', heart = o.shape === 'heart';
-  var cornered = rect || poly || heart, rb = o.bit / 2, w = o.wall, T = o.stock;
+  var cornered = rect || poly || heart, rb = o.bit / 2, w = o.wall, T = o.stock, fin0 = o.finish > 0 ? o.finish : 0;
   // A polygon with a flat side to the front (-Y; along Y, -X), so it's the
   // same turned over across the line between the halves.
   var n = Math.round(o.sides), polyRot = (o.layout === 'y' ? Math.PI : -Math.PI / 2) - Math.PI / n;
@@ -1216,7 +1223,13 @@ function boxPlan(input) {
 
   if (rect || oval || heart) need(o.length > 0 && o.width > 0, 'Length and Width must be more than 0');
   if (poly) need(o.flats > 0 && o.sides >= 3 && o.sides <= 12 && o.sides === Math.round(o.sides), 'A polygon needs 3 to 12 sides and a size across the flats');
-  if (cornered) {
+  // An oval's ends are its corners: the lip's must fit the opening's there,
+  // as a rectangle's.
+  if (oval && S.kind === 'outline') need(S.cr + tRabbet >= rb - 1e-9, 'The oval\'s ends are too tight for the lip: make it wider, or the Wall thinner (its ends\' radius must be at least Wall \u2212 Lip Width \u2212 Clearance + half the bit)');
+  // A heart's notch is a corner the other way: the shoulder bit must get
+  // into the lip's side of it.
+  if (heart && S.kind === 'outline') need(w - o.lipWidth - fin0 >= rb - 1e-9, 'Wall must be at least Lip Width + half the bit for a heart, so the bit gets into the lip\'s side of the notch');
+  if (cornered && S.kind !== 'circle') {
     need((o.cornerRadius || 0) >= 0, 'Corner Radius can\'t be negative');
     // Under this, the bit leaves the opening's corners rounder than the
     // lip's, and the lip binds there.
@@ -1234,7 +1247,7 @@ function boxPlan(input) {
   need(deep - w > rb + (o.finish > 0 ? o.finish : 0), 'Wall too thick for the size: the inside must be wider than the bit');
   // A heart's inside in one piece where the walls are (deeper, its pocket
   // can come apart into the lobes, and is cut a piece at a time).
-  if (S.kind === 'outline') need(shapeLoops(S, tInside).length <= 1 && shapeLoops(S, tInside - rb).length <= 1, 'Wall too thick for the heart: its inside comes apart in two');
+  if (S.kind === 'outline') need(shapeLoops(S, tInside).length <= 1 && shapeLoops(S, tInside - rb).length <= 1, 'Wall too thick for the shape: its inside comes apart in two');
   need(w - o.lipWidth - o.clearance >= 1, 'Wall must be at least 1 mm more than Lip Width + Clearance, for the wall outside the lip');
   need(o.lipHeight < height[lipHalf] - under[lipHalf], 'Lip Height must be less than the inside depth of the half with the lip');
   need(rabbetDepth < height[rabbetHalf] - under[rabbetHalf], 'Lip Height + Clearance must be less than the inside depth of the half without the lip');
@@ -1452,12 +1465,19 @@ function boxPlan(input) {
 function testFitInput(input) {
   var o = Object.assign({}, DEFAULTS, input || {});
   var half = o.wall + Math.max(10, 2 * o.bit), deep = o.lipHeight + o.clearance + 2;
+  // A heart's point under its lobes' radius (about half / 1.72).
+  if (o.shape === 'heart') half = Math.max(half, ((o.cornerRadius || 0) + 1) * 1.72);
   var cr = Math.min(o.cornerRadius || 0, half);
-  return Object.assign({}, o, {
-    diameter: 2 * half, length: 2 * half, width: 2 * half, flats: 2 * half, cornerRadius: cr,
-    lidHeight: null, magnets: null, notch: null, edges: null, corners: null,
-    floor: Math.max(1, o.stock - deep), top: Math.max(1, o.stock - deep)
-  });
+  var fit = function(hf) {
+    return Object.assign({}, o, {
+      diameter: 2 * hf, length: 2 * hf, width: 2 * hf, flats: 2 * hf, cornerRadius: cr,
+      lidHeight: null, magnets: null, notch: null, edges: null, corners: null,
+      floor: Math.max(1, o.stock - deep), top: Math.max(1, o.stock - deep)
+    });
+  };
+  // A heart big enough for its inside to stay in one piece at the walls.
+  for (var k = 0; k < 12 && o.shape === 'heart' && boxPlan(fit(half)).problems.some(function(p) { return /comes apart/.test(p); }); k++) half *= 1.1;
+  return fit(half);
 }
 
 // Sizes that suit a box of this size, stock, bit and material, for a
@@ -1520,6 +1540,7 @@ function autoSizes(input, material, imperial) {
       }
     } else if (a.notch && /notch/.test(p) && a.notch.width > 12) a.notch.width = half(a.notch.width - 2 * grid(3));
     else if (/Gap/.test(p)) a.gap = half(a.gap + 2 * grid(3));
+    else if (/ends are too tight/.test(p) && a.wall > 3) a.wall = half(a.wall - grid(3));
     // Only what a thicker wall fixes; anything else is the box's own to say.
     else if (/Magnet|notch|Wall must be at least|Corner Radius must/.test(p) && a.wall < small / 2 - b - 2) a.wall = half(a.wall + grid(3));
     else break;
@@ -1581,7 +1602,7 @@ function boxProgram(plan, f, only) {
   // Too long to load (a bit or a Depth of Cut far too small): stopped
   // early, said why.
   function tooLong() {
-    if (L.length > MAX_LINES) throw new Error('The program would be over ' + MAX_LINES.toLocaleString('en-US') + ' lines: check the bit, the Depth of Cut and the Stepover');
+    if (L.length > MAX_LINES) throw new Error('The program would be over ' + MAX_LINES.toLocaleString('en-US') + ' lines: check the bit, the Depth of Cut and the Stepover, or make the box smaller');
   }
   // F: the feed (a ramp's, going down on the way); else the cutting feed.
   function line(px, py, toZ, F) {
@@ -1684,10 +1705,14 @@ function boxProgram(plan, f, only) {
   // pieces; each piece ramped down along its first ring.
   function pocketOutline(cx, cy, cut, S) {
     var outer = cut.t - (cut.finish || 0) - rb, rings = [];
+    // Islands shorter than the bit, deeper in: the ring round them is in
+    // the bit's reach of all of it (a stepover under its radius).
+    var tiny = step <= 0.9 * rb ? o.bit : 0;
     for (var e = outer, k = 0; k < 5000; k++, e -= step) {
       var ls = shapeLoops(S, e);
+      if (k > 0) ls = ls.filter(function(lp) { return loopLength(lp) >= tiny; });
       if (!ls.length) break;
-      rings.push(ls.map(function(lp) { return { loop: lp, kids: [], parent: null }; }));
+      rings.push(ls.map(function(lp) { return { loop: lp, kids: [], parent: null, inset: outer - e }; }));
     }
     for (var i = 1; i < rings.length; i++) rings[i].forEach(function(nd) {
       var p = loopPoint(nd.loop, 0);
@@ -1705,17 +1730,35 @@ function boxProgram(plan, f, only) {
           var lp = startNear(nd.loop, x - cx, y - cy), p = loopPoint(lp, 0);
           line(cx + p.x, cy + p.y);
           path(lp, cx, cy);
-        } else {
+        } else if (loopLength(nd.loop) >= 2 * o.bit || nd.inset < 0.05) {
           var p0 = loopPoint(nd.loop, 0);
           rapid(cx + p0.x, cy + p0.y);
           down(above);
           ramp(nd.loop, cx, cy, zl, pitch);
+        } else {
+          // Too short to go down along: a little circle round its middle
+          // (inside where the bit may go: no further out than this ring's
+          // inset), then out to the ring.
+          var c = loopMiddle(nd.loop), hr = Math.max(0.05, Math.min(rb * 0.5, nd.inset));
+          var circle = shapeLoop({ kind: 'circle', r: hr }, 0), q0 = loopPoint(circle, 0);
+          rapid(cx + c.x + q0.x, cy + c.y + q0.y);
+          down(above);
+          ramp(circle, cx + c.x, cy + c.y, zl, pitch);
+          var lp2 = startNear(nd.loop, x - cx, y - cy), p2 = loopPoint(lp2, 0);
+          line(cx + p2.x, cy + p2.y);
+          path(lp2, cx, cy);
         }
         prev = nd;
       });
       above = zl;
     });
     lift();
+  }
+  // The middle of a loop's points.
+  function loopMiddle(loop) {
+    var sx = 0, sy = 0;
+    loop.forEach(function(sg) { sx += sg.x0; sy += sg.y0; });
+    return { x: sx / loop.length, y: sy / loop.length };
   }
   // The loop started at its nearest point to (x, y).
   function startNear(loop, px, py) {
@@ -2071,7 +2114,7 @@ if (typeof module !== 'undefined' && module.exports) {
       });
       if (h.name === 'base' && plan.notch) out += '<circle class="cb-cut" cx="' + (cx + plan.notch.dx * s).toFixed(2) + '" cy="' + (cy - plan.notch.dy * s).toFixed(2) + '" r="' + (plan.notch.shape.r * s).toFixed(2) + '"/>';
       if (o.tabs) for (var k = 0; k < o.tabs.count; k++) {
-        var at = tabLen * (1 / 8 + k / o.tabs.count), p = loopPoint(tabLoop, at), q = loopPoint(tabLoop, Math.min(tabLen, at + 0.5));
+        var at = tabLen * (k + 0.5) / o.tabs.count, p = loopPoint(tabLoop, at), q = loopPoint(tabLoop, Math.min(tabLen, at + 0.5));
         var a = Math.atan2(q.y - p.y, q.x - p.x) - Math.PI / 2, tw = o.tabs.width * s;
         out += '<rect class="cb-tab" x="' + (-tw / 2).toFixed(2) + '" y="' + (-rb * s).toFixed(2) + '" width="' + tw.toFixed(2) + '" height="' + (o.bit * s).toFixed(2) +
           '" transform="translate(' + (cx + p.x * s).toFixed(2) + ' ' + (cy - p.y * s).toFixed(2) + ') rotate(' + (90 - a * 180 / Math.PI).toFixed(1) + ')"/>';
