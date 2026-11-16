@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Finishing Pass: its allowance and direction come from the Material (conventional in wood, climb in plastics and aluminum); the card is just the switch.
 - Start: presets to begin from (ring, trinket, keepsake with magnets, hexagon, oval, heart, nested set), and your own settings saved under a name to load again.
 - Three columns on a wide screen (the previews, the cards used most, the rest), two on a tall one; the cards ordered from most used to least.
 - Cut the base or the lid on its own board (Layout → Cut), the lid's from a thinner Lid Board if you like.

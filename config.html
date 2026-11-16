@@ -263,15 +263,7 @@
     </div>
     <div class="cb-card">
       <h3><span class="cb-grow">Finishing Pass</span><label class="cb-switch"><input type="checkbox" id="cb-finish-on" aria-label="Finishing pass"><span></span></label></h3>
-      <div class="cb-row" id="cb-finish-fields">
-        <div class="cb-field"><label for="cb-finish">Allowance</label><input class="cb-input" id="cb-finish" data-unit="length" title="Wood the roughing leaves on the walls for the finishing pass to take off."></div>
-        <div class="cb-field" style="grid-column: span 2"><label>Direction</label>
-          <div class="cb-seg" id="cb-finish-dir" role="radiogroup" aria-label="Finishing direction">
-            <button type="button" role="radio" data-v="conventional">Conventional</button><button type="button" role="radio" data-v="climb">Climb</button>
-          </div>
-        </div>
-      </div>
-      <p class="cb-hint">The roughing leaves the Allowance on the walls (the pockets', the opening's, the lip's); then the box's bit goes once round each for a cleaner wall. Conventional (the wood on the bit's left, as the spindle turns) is gentler and left the cleaner walls in pine; climb (on its right) can shear some woods and plastics cleaner.</p>
+      <p class="cb-hint" id="cb-finish-fields"></p>
     </div>
     <div class="cb-card">
       <h3><span class="cb-grow">Edges</span><label class="cb-switch"><input type="checkbox" id="cb-edges-on" aria-label="Edges"><span></span></label></h3>
@@ -422,7 +414,7 @@
     <div class="cb-card">
       <h3>Tips</h3>
       <ul>
-        <li>The <b>Finishing Pass</b> goes round the walls once more after the roughing, for cleaner walls; Conventional left cleaner walls in pine.</li>
+        <li>The <b>Finishing Pass</b> goes round the walls once more after the roughing, for cleaner walls; how much it takes and which way it goes are set by the <b>Material</b>.</li>
         <li>Keep the <b>Holding Tabs</b> on: they hold the halves while the outlines, corners and edges are cut.</li>
         <li>Field values take either unit and simple math: <b>1/4"</b>, <b>6.35mm</b>, <b>1-1/2 in</b>, <b>1in+4mm</b>.</li>
       </ul>
@@ -1761,6 +1753,16 @@ function setPlan(inputs, wanted) {
 // (0.05 mm). Returns the settings it sets (mm), and problems left when
 // nothing fits.
 var WOOD = { mdf: true, softwood: true, hardwood: true };
+// The finishing pass by material: what the roughing leaves on the walls
+// (mm) and the way round. Conventional left the cleaner walls in pine and
+// is gentler on wood fibres; climb shears plastics and aluminum cleaner,
+// with less rubbing and melting.
+var FINISH = {
+  mdf: { allow: 0.3, dir: 'conventional' }, softwood: { allow: 0.3, dir: 'conventional' }, hardwood: { allow: 0.25, dir: 'conventional' },
+  hdpe: { allow: 0.3, dir: 'climb' }, acrylic: { allow: 0.2, dir: 'climb' }, polycarbonate: { allow: 0.2, dir: 'climb' },
+  aluminum: { allow: 0.15, dir: 'climb' }, foam: { allow: 0.5, dir: 'conventional' }
+};
+function finishFor(material) { return FINISH[material] || FINISH.softwood; }
 var CLEARANCE = { mdf: 0.15, softwood: 0.25, hardwood: 0.2, hdpe: 0.15, acrylic: 0.1, polycarbonate: 0.1, aluminum: 0.05, foam: 0.2 };
 function autoSizes(input, material, imperial) {
   var o = Object.assign({}, DEFAULTS, input || {});
@@ -1832,7 +1834,7 @@ if (typeof module !== 'undefined' && module.exports) {
   var shapeLoop = shapeLib.shapeLoop, shapeDeepest = shapeLib.shapeDeepest, loopLength = shapeLib.loopLength, loopPoint = shapeLib.loopPoint;
   var loopAt = shapeLib.loopAt, loopExtent = shapeLib.loopExtent, shapeLoops = shapeLib.shapeLoops, shapeDistance = shapeLib.shapeDistance;
   var outlineLib = require('./box-outline.cjs'), heartShape = outlineLib.heartShape, ovalShape = outlineLib.ovalShape;
-  module.exports = { boxPlan: boxPlan, testFitInput: testFitInput, autoSizes: autoSizes, nestInputs: nestInputs, setPlan: setPlan, BOX_DEFAULTS: DEFAULTS };
+  module.exports = { boxPlan: boxPlan, testFitInput: testFitInput, autoSizes: autoSizes, nestInputs: nestInputs, setPlan: setPlan, finishFor: finishFor, BOX_DEFAULTS: DEFAULTS };
 }
 /* END lib/box-plan.cjs */
 /* BEGIN lib/box-gcode.cjs */
@@ -2262,7 +2264,7 @@ if (typeof module !== 'undefined' && module.exports) {
     ['cb-eangle', 'edgeAngle', 'count', 90], ['cb-ediam', 'edgeDiameter', 'length', 12.7], ['cb-erad', 'edgeRadius', 'length', 3.175], ['cb-etip', 'edgeTip', 'length', 3.175],
     ['cb-eout', 'edgeOut', 'length', 0, true], ['cb-ein', 'edgeIn', 'length', 1.5, true], ['cb-epk', 'edgePocket', 'length', 0, true],
     ['cb-efeed', 'edgeFeed', 'feed', 1500], ['cb-erpm', 'edgeRpm', 'count', 18000],
-    ['cb-evtip', 'edgeVTip', 'length', 0.3], ['cb-finish', 'finishAllow', 'length', 0.3],
+    ['cb-evtip', 'edgeVTip', 'length', 0.3],
     ['cb-cdiam', 'cornerDiameter', 'length', 6.35], ['cb-crad', 'cornerBitRadius', 'length', 3.175],
     ['cb-cfeed', 'cornerFeed', 'feed', 1500], ['cb-crpm', 'cornerRpm', 'count', 18000]
   ];
@@ -2306,7 +2308,7 @@ if (typeof module !== 'undefined' && module.exports) {
     ['cb-efeed', function (x) { return x >= 25; }, 'must be at least 25 mm/min (1 in/min)'],
     ['cb-cfeed', function (x) { return x >= 25; }, 'must be at least 25 mm/min (1 in/min)'], ['cb-crpm', function (x) { return x >= 0; }, 'can\u2019t be negative'], ['cb-erpm', function (x) { return x >= 0; }, 'can\u2019t be negative']
   ];
-  var SEGS = [['cb-finish-dir', 'finishDir', 'conventional'], ['cb-ebit', 'edgeBit', 'v'], ['cb-shape', 'shape', 'circle'], ['cb-lip-on', 'lipOn', 'base'], ['cb-layout', 'layout', 'x'], ['cb-origin', 'origin', 'front-left'], ['cb-cut', 'cut', 'both']];
+  var SEGS = [['cb-ebit', 'edgeBit', 'v'], ['cb-shape', 'shape', 'circle'], ['cb-lip-on', 'lipOn', 'base'], ['cb-layout', 'layout', 'x'], ['cb-origin', 'origin', 'front-left'], ['cb-cut', 'cut', 'both']];
   var K = function () { return state.imperial ? 25.4 : 1; };
   var round = function (v, dp) { var k = Math.pow(10, dp == null ? (state.imperial ? 4 : 3) : dp); return Math.round(v * k) / k; };
 
@@ -2347,6 +2349,9 @@ if (typeof module !== 'undefined' && module.exports) {
     v.edgesOn = $('cb-edges-on').checked; v.edgeTool = $('cb-etool').value;
     v.cornersOn = $('cb-corners-on').checked; v.cornerTool = $('cb-ctool').value;
     v.finishOn = $('cb-finish-on').checked;
+    // The finishing pass's allowance and way round: the material's.
+    var fin = finishFor($('cb-material').value);
+    v.finishAllow = fin.allow; v.finishDir = fin.dir;
     v.grain = $('cb-grain').checked; v.nestOn = $('cb-nest-on').checked; v.nestCut = +$('cb-nest-cut').value || 0;
     if (v.nestOn && !errs['cb-nest-n'] && !(v.nestCount >= 2 && v.nestCount <= 5 && v.nestCount === Math.round(v.nestCount))) errs['cb-nest-n'] = 'must be 2 to 5';
     if (v.nestOn && !errs['cb-nest-gap'] && !(v.nestGap >= 0)) errs['cb-nest-gap'] = 'can\u2019t be negative';
@@ -2769,6 +2774,9 @@ if (typeof module !== 'undefined' && module.exports) {
     FIELDS.forEach(function (f) { $(f[0]).classList.toggle('cb-error', !!c.errs[f[0]]); });
     var note = $('cb-note'), errKeys = Object.keys(c.errs);
     $('cb-stock-need').textContent = stockSay(plan, v);
+    var mat = $('cb-material').selectedOptions[0];
+    $('cb-finish-fields').textContent = 'For ' + (mat ? mat.textContent : 'this material') + ': the roughing leaves ' + fmt(v.finishAllow) + ' ' + unit() + ' on the walls (the pockets\u2019, the opening\u2019s, the lip\u2019s), then the box\u2019s bit goes once round each, ' +
+      (v.finishDir === 'climb' ? 'climb milling (the wood on its right), which shears plastics and aluminum cleaner.' : 'conventional (the wood on the bit\u2019s left, as the spindle turns), gentler on wood fibres.');
     $('cb-top-title').textContent = 'Top view · ' + (plan.set ? 'the set on the stock' : plan.boxOf ? 'box ' + plan.boxOf.k + ' on its board' : !v.nestOn && v.cut !== 'both' ? 'the ' + v.cut + ' on its board' : 'both halves on the stock');
     var sep = !v.nestOn && v.cut !== 'both';
     $('cb-sep-fields').hidden = !sep;

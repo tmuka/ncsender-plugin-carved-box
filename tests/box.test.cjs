@@ -716,3 +716,12 @@ test('nested sets after the review: refitted after Auto Sizes, clear of floor co
   const tf = boxPlan(testFitInput(boxPlan({ cut: 'lid', grain: true, lidStock: 12 }).o));
   assert.deepEqual(tf.halves.map((h) => h.name), ['base', 'lid']);
 });
+
+test('the finishing pass by material: conventional in wood, climb in plastics and aluminum', () => {
+  const { finishFor } = require('../lib/box-plan.cjs');
+  for (const m of ['mdf', 'softwood', 'hardwood', 'foam']) assert.equal(finishFor(m).dir, 'conventional');
+  for (const m of ['hdpe', 'acrylic', 'polycarbonate', 'aluminum']) assert.equal(finishFor(m).dir, 'climb');
+  for (const m of ['mdf', 'softwood', 'hardwood', 'foam', 'hdpe', 'acrylic', 'polycarbonate', 'aluminum']) assert.ok(finishFor(m).allow > 0 && finishFor(m).allow <= 1);
+  assert.deepEqual(finishFor('unknown'), finishFor('softwood'));
+  for (const m of ['hardwood', 'acrylic']) check({ finish: finishFor(m).allow, finishDir: finishFor(m).dir });
+});
