@@ -5,6 +5,7 @@
 - Oval: an ellipse, its length along X and width along Y.
 - Heart: across its lobes, from its point to the top, its point rounded (enough for the lip to fit); the point to the front. Its pocket comes apart into the lobes deep down, and each piece is cleared on its own.
 - An oval's and a heart's walls and pockets are worked out from their outlines, to within 0.02 mm.
+- Checks that the lip fits an oval's ends and a heart's point and notch; Auto Sizes picks a wall that does. Test Fit makes a small heart for a heart box.
 
 ## 0.1.0: Round and rectangular boxes
 - A round or rectangular box (rounded corners) with a lid, carved side by side from one board: each half pocketed to its wall, floor and top, a lip on either half sliding into the other with the clearance you set, the outlines cut free with holding tabs.
