@@ -326,7 +326,8 @@ test('Auto Sizes: a box that fits together for any size, stock, bit and material
       if (size >= 80) assert.deepEqual(a.problems, [], JSON.stringify(input));
       if (opts.edges && size >= 80) assert.ok(a.edges.outside === 0 && a.edges.inside > 0, 'lead-in left out, or a seam: ' + JSON.stringify(input));
       // The lip half the wall (to the grid), and in wood at least 1/4" high where the box is deep enough.
-      assert.ok(a.lipWidth <= a.wall / 2 + 1e-9 && a.lipWidth > a.wall / 2 - 0.8, 'lip width ' + a.lipWidth + ' of wall ' + a.wall);
+      // With magnets, thinner when their holes need the room, down to 1/4".
+      assert.ok(a.lipWidth <= a.wall / 2 + 1e-9 && (a.lipWidth > a.wall / 2 - 0.8 || (opts.magnets && a.lipWidth >= 6.35 - 1e-9)), 'lip width ' + a.lipWidth + ' of wall ' + a.wall);
       if (material !== 'acrylic' && Math.min(stock - a.floor, stock - a.top) >= 9.35) assert.ok(a.lipHeight >= 6.35 - 1e-9, 'lip height ' + a.lipHeight + ' ' + JSON.stringify(input));
     }
   // A few cut through the simulator.
@@ -724,4 +725,16 @@ test('the finishing pass by material: conventional in wood, climb in plastics an
   for (const m of ['mdf', 'softwood', 'hardwood', 'foam', 'hdpe', 'acrylic', 'polycarbonate', 'aluminum']) assert.ok(finishFor(m).allow > 0 && finishFor(m).allow <= 1);
   assert.deepEqual(finishFor('unknown'), finishFor('softwood'));
   for (const m of ['hardwood', 'acrylic']) check({ finish: finishFor(m).allow, finishDir: finishFor(m).dir });
+});
+
+test('magnets: the lip thinner (down to 1/4") rather than the wall twice as thick', () => {
+  for (const imperial of [false, true]) {
+    const input = { shape: 'rect', length: 152.4, width: 101.6, cornerRadius: 12.7, stock: 31.5, bit: 6.35, magnets: { count: 4, diameter: 7, depth: 2 }, notch: { width: 16, depth: 4 } };
+    const a = autoSizes(input, 'hardwood', imperial);
+    assert.deepEqual(a.problems, []);
+    assert.ok(a.lipWidth >= 6.35 - 1e-9 && a.lipWidth <= a.wall / 2 + 1e-9, JSON.stringify([a.lipWidth, a.wall]));
+    assert.ok(a.wall < 16.5, 'wall ' + a.wall);
+    const p = boxPlan(Object.assign({}, input, a));
+    assert.ok(-p.tRabbet >= 7 + 1.6 - 1e-9);
+  }
 });

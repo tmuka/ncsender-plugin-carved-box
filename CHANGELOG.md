@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Auto Sizes with magnets: the lip down to 1/4" thick rather than the wall twice what the magnets need (a 6" x 4" box with 7 mm magnets: a 5/8" wall, was 0.72").
 - Finishing Pass: its allowance and direction come from the Material (conventional in wood, climb in plastics and aluminum); the card is just the switch.
 - Start: presets to begin from (ring, trinket, keepsake with magnets, hexagon, oval, heart, nested set), and your own settings saved under a name to load again.
 - Three columns on a wide screen (the previews, the cards used most, the rest), two on a tall one; the cards ordered from most used to least.
