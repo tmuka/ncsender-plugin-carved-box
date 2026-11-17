@@ -802,3 +802,25 @@ test('review: a drill, a cut on its own board, a nested set that stops at the la
   if (list.length < 3) assert.match(set.problems[0], /^(Only \d+ boxes|No box) fits?/);
   else assert.deepEqual(set.problems, []);
 });
+
+test('the finishing pass reaches every wall: round, rectangle, polygon, oval and heart', () => {
+  const shapes = [{ shape: 'circle', diameter: 80 }, { shape: 'rect', length: 120, width: 80, cornerRadius: 12 }, { shape: 'poly', sides: 6, flats: 90, cornerRadius: 8 },
+    { shape: 'oval', length: 150, width: 100 }, { shape: 'heart', length: 127, width: 120, cornerRadius: 12.7 }];
+  for (const sh of shapes) for (const lipOn of ['base', 'lid']) {
+    const i = Object.assign({ stock: 25, bit: 3.175, finish: 0.3, lipOn }, sh), a = autoSizes(i, 'hardwood', false);
+    delete a.problems;
+    const { plan, pts } = check(Object.assign({}, i, a, { lipOn }));
+    const rb = plan.o.bit / 2;
+    for (const h of plan.halves) {
+      const near = (p) => Math.hypot(p.x - h.at.x, p.y - h.at.y) < Math.max(plan.halfX, plan.halfY) + 5;
+      const reach = (t, z) => pts.reduce((m, p) => {
+        if (!near(p) || p.z >= z || p.rapid) return m;
+        const d = shapeDistance(h.plan.shape, t, p.x - h.at.x, p.y - h.at.y);
+        return d <= 0.01 && d > m ? d : m;
+      }, -Infinity);
+      const withLip = lipOn === h.name, top = -plan.faces[h.name];
+      assert.ok(reach(plan.tInside - rb, top - plan.o.lipHeight - plan.o.clearance - 1) > -0.02, sh.shape + ' ' + h.name + ' inside');
+      if (!withLip) assert.ok(reach(plan.tRabbet - rb, top - 0.05) > -0.02, sh.shape + ' ' + h.name + ' opening');
+    }
+  }
+});
