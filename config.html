@@ -159,7 +159,6 @@
       <h3>Start</h3>
       <div class="cb-start-row">
         <select class="cb-select" id="cb-preset" aria-label="Presets and your saved settings"></select>
-        <button type="button" class="cb-btn cb-btn-quiet cb-btn-small" id="cb-preset-load">Load</button>
       </div>
       <div class="cb-start-row">
         <input class="cb-input cb-name" id="cb-save-name" maxlength="40" placeholder="Name these settings" aria-label="Name for your saved settings">
@@ -362,7 +361,7 @@
     <div class="cb-card">
       <h3>Getting started</h3>
       <ol>
-        <li>For a quick start, pick a <b>preset</b> in the <b>Start</b> card and press <b>Load</b>: it sets the box's shape, size and options. <b>Save</b> your own settings there under a name, to load again later.</li>
+        <li>For a quick start, pick a <b>preset</b> in the <b>Start</b> card: it loads right away and sets the box's shape, size and options. <b>Save</b> your own settings there under a name, to load again later.</li>
         <li>Measure your board and type its <b>Stock Thickness</b> (or tap <b>Stock</b> beside it, with Spoilboard Toolbox). The base is the full thickness; so is the lid, unless you lower its Lid Height.</li>
         <li>Pick the <b>Shape</b> and type its outside size.</li>
         <li>In <b>Tool &amp; Feeds</b>, pick the bit from the Tool Library and the <b>Material</b>. The feeds fill in for them.</li>
@@ -2992,16 +2991,15 @@ if (typeof module !== 'undefined' && module.exports) {
   }
   function startButtons() {
     var v = $('cb-preset').value, name = $('cb-save-name').value.trim();
-    $('cb-preset-load').disabled = !v;
     $('cb-delete').disabled = v.charAt(0) !== 's';
     $('cb-save').disabled = !name;
-    $('cb-start-hint').textContent = v.charAt(0) === 'p' ? 'Load sets the box\u2019s shape, size and options, and turns Auto Sizes on; your stock, bit and feeds stay.'
-      : v.charAt(0) === 's' ? 'Load brings back everything saved with these settings. Save with the same name to replace them.'
-      : 'Start from a preset, or save these settings to come back to.';
+    $('cb-start-hint').textContent = v.charAt(0) === 'p' ? 'Loaded: the box\u2019s shape, size and options, with Auto Sizes on; your stock, bit and feeds stay.'
+      : v.charAt(0) === 's' ? 'Loaded everything saved with these settings. Save with the same name to replace them.'
+      : 'Pick a preset or your saved settings to load them, or save these settings to come back to.';
   }
   function loadStart() {
     var v = $('cb-preset').value, i = +v.slice(1);
-    if (!v) return;
+    if (!v) return startButtons();
     var now = settingsNow(), from = v.charAt(0) === 'p' ? Object.assign({}, now, PRESET_BASE, PRESETS[i].v) : Object.assign({}, state.saved[i].v);
     // A preset's corners are its own; saved settings say theirs.
     if (v.charAt(0) === 'p') from.cornerOwn = PRESETS[i].v.cornerRadius != null ? PRESETS[i].v.cornerRadius : null;
@@ -3147,10 +3145,9 @@ if (typeof module !== 'undefined' && module.exports) {
     $('cb-note').addEventListener('click', function () { var id = $('cb-note').dataset.field; if (id) focusField(id); });
     // On a touch screen, a tap in a field picks its text, to type over.
     ROOT.querySelectorAll('.cb-input').forEach(function (inp) { inp.addEventListener('focus', function () { setTimeout(function () { try { inp.select(); } catch (e) {} }, 0); }); });
-    $('cb-preset').addEventListener('change', function () { var v = $('cb-preset').value; if (v.charAt(0) === 's') $('cb-save-name').value = state.saved[+v.slice(1)].name; startButtons(); });
+    $('cb-preset').addEventListener('change', loadStart);
     $('cb-save-name').addEventListener('input', startButtons);
     $('cb-save-name').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); saveStart(); } });
-    $('cb-preset-load').addEventListener('click', loadStart);
     $('cb-save').addEventListener('click', saveStart);
     $('cb-delete').addEventListener('click', deleteStart);
     $('cb-grain').addEventListener('change', function () { update(true); });

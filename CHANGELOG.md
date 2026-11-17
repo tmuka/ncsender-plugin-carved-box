@@ -5,6 +5,7 @@
 - Labels on the previews: tap one to go to its field. A problem under the settings goes to its field when tapped. A tap in a field picks its text, to type over.
 - Each shape gets a usable size (round inches on an inch machine) when its saved one is too small or doesn't make the shape (a heart could show 0.003").
 - A nested set without Auto Sizes makes each box's floor, top and lip lower with it.
+- Picking a preset or your saved settings in Start loads them right away (no Load button); Escape or a tap outside the list leaves things as they are.
 - Magnet holes start at 5 mm across (were 1/4"), for common 5 mm magnets; the keepsake preset uses 5 mm.
 - Magnet holes narrower than the bit say to use a smaller bit, and Auto Sizes no longer makes the wall far too thick trying to fix them.
 - Auto Sizes with magnets: the lip down to 1/4" thick rather than the wall twice what the magnets need (a 6" x 4" box with 7 mm magnets: a 5/8" wall, was 0.72").
