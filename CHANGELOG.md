@@ -1,21 +1,17 @@
 # Changelog
 
-## Unreleased
-- Easier to follow: Fit right after Box; the Box card in Outside size, then Board and walls; clearer names (Wall Thickness, Base Floor, Lid Top, Lip Thickness, Clearance Each Side, Gap Between, Edge Margin, Inside Rim, Tabs per Half, Magnets per Half...); shape icons on the shape buttons.
-- Labels on the previews: tap one to go to its field. A problem under the settings goes to its field when tapped. A tap in a field picks its text, to type over.
-- Each shape gets a usable size (round inches on an inch machine) when its saved one is too small or doesn't make the shape (a heart could show 0.003").
-- A nested set without Auto Sizes makes each box's floor, top and lip lower with it.
-- Picking a preset or your saved settings in Start loads them right away (no Load button); Escape or a tap outside the list leaves things as they are.
-- Magnet holes start at 5 mm across (were 1/4"), for common 5 mm magnets; the keepsake preset uses 5 mm.
-- Magnet Bit: with a tool changer, the magnet holes can be cut with a smaller end mill from the Tool Library, after a tool change once the outlines are cut, with starting feeds for its size.
-- Magnet holes narrower than the bit say to use a smaller bit, and Auto Sizes no longer makes the wall far too thick trying to fix them.
-- Auto Sizes with magnets: the lip down to 1/4" thick rather than the wall twice what the magnets need (a 6" x 4" box with 7 mm magnets: a 5/8" wall, was 0.72").
-- Finishing Pass: its allowance and direction come from the Material (conventional in wood, climb in plastics and aluminum); the card is just the switch.
-- Start: presets to begin from (ring, trinket, keepsake with magnets, hexagon, oval, heart, nested set), and your own settings saved under a name to load again.
-- Three columns on a wide screen (the previews, the cards used most, the rest), two on a tall one; the cards ordered from most used to least.
+## 0.3.0: Nested sets, grain matching, presets, Magnet Bit
+- Nested Set: 2 to 5 boxes, each fitting inside the one before, all in one program on one board, or one at a time from boards as thick as each needs.
 - Cut the base or the lid on its own board (Layout → Cut), the lid's from a thinner Lid Board if you like.
 - Grain Match: the base and the lid from the two leaves of a resawn board, the lid cut where it lands on the base, so the grain runs on across the seam.
-- Nested Set: 2 to 5 boxes, each fitting inside the one before, all in one program on one board, or one at a time from boards as thick as each needs.
+- Start: presets to begin from (ring, trinket, keepsake with magnets, hexagon, oval, heart, nested set), and your own settings saved under a name. Picking one loads it right away; Delete asks for a second tap.
+- Magnet Bit: with a tool changer, the magnet holes can be cut with a smaller end mill from the Tool Library, after a tool change once the outlines are cut, with starting feeds for its size.
+- Magnet holes start at 5 mm across (were 1/4"), for common 5 mm magnets.
+- Auto Sizes with magnets: the lip down to 1/4" thick rather than the wall twice what the magnets need (a 6" x 4" box with 7 mm magnets: a 5/8" wall, was 0.72"). It no longer thickens the wall for what a wall can't fix (a hole narrower than the bit, too deep, a drill).
+- Finishing Pass: its allowance and direction come from the Material (conventional in wood, climb in plastics and aluminum); the card is just the switch.
+- Easier to follow: three columns on a wide screen, two on a tall one, the cards ordered from most used to least; Fit right after Box; clearer names (Wall Thickness, Base Floor, Lid Top, Lip Thickness, Clearance Each Side, Gap Between, Edge Margin, Inside Rim...); shape icons.
+- Labels on the previews: tap one to go to its field. A problem under the settings goes to its field when tapped. A tap in a field picks its text, to type over.
+- Each shape gets a usable size (round inches on an inch machine) when its saved one is too small or doesn't make the shape (a heart could show 0.003").
 - A base lower than the stock is faced down first, as a lower lid is.
 
 ## 0.2.1: Help, Stock button, taller lips

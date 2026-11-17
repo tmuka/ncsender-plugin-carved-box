@@ -3057,8 +3057,8 @@ if (typeof module !== 'undefined' && module.exports) {
     if (state.feedsAuto && v.charAt(0) === 'p') fillFeeds();
     update(true);
     // Back to the list's first line, so the same one can be picked again.
-    startSaid = v.charAt(0) === 'p' ? 'Loaded \u201c' + PRESETS[i].name + '\u201d: the box\u2019s shape, size and options, with Auto Sizes on; your stock, bit and feeds stay.'
-      : 'Loaded \u201c' + state.saved[i].name + '\u201d. Save with the same name to replace it.';
+    startSaid = v.charAt(0) === 'p' ? 'Loaded the preset ' + PRESETS[i].name + ': the box\u2019s shape, size and options, with Auto Sizes on; your stock, bit and feeds stay.'
+      : 'Loaded your settings ' + state.saved[i].name + '. Save with the same name to replace them.';
     $('cb-preset').value = '';
     startButtons();
   }
