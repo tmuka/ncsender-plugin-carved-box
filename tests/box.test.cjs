@@ -745,3 +745,13 @@ test('a nested set without Auto Sizes: the floor, top and lip lower with each bo
   assert.ok(set.set[1].o.floor < 12.7 && set.set[2].o.lipHeight < set.set[1].o.lipHeight);
   check(set);
 });
+
+test('magnet holes narrower than the bit: said, without a thicker wall', () => {
+  const input = { shape: 'rect', length: 152.4, width: 101.6, cornerRadius: 12.7, stock: 19.05, magnets: { count: 4, diameter: 5, depth: 3.2 }, notch: { width: 16, depth: 4 } };
+  const small = autoSizes(Object.assign({}, input, { bit: 3.175 }), 'hardwood', true);
+  assert.deepEqual(small.problems, []);
+  const big = autoSizes(Object.assign({}, input, { bit: 6.35 }), 'hardwood', true);
+  assert.equal(big.problems.length, 1);
+  assert.match(big.problems[0], /Magnet holes must be wider than the bit: use a smaller bit/);
+  assert.equal(big.wall, small.wall);
+});
