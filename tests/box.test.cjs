@@ -784,3 +784,21 @@ test('a Magnet Bit: the holes after a tool change, with the smaller bit', () => 
   }
   assert.ok(reach > 2.5 - 3.175 / 2 - 0.05 && deepest > 3.2 - 0.005, JSON.stringify([reach, deepest]));
 });
+
+test('review: a drill, a cut on its own board, a nested set that stops at the last box that can be made', () => {
+  const input = { shape: 'circle', diameter: 100, stock: 19, bit: 6.35, magnets: { count: 4, diameter: 6, depth: 3, bit: 3.175 } };
+  const mill = autoSizes(input, 'hardwood', false), drill = autoSizes(Object.assign({}, input, { magnets: Object.assign({}, input.magnets, { drill: true }) }), 'hardwood', false);
+  assert.equal(drill.wall, mill.wall);
+  assert.match(drill.problems.join(), /is a drill/);
+  assert.equal(autoSizes(Object.assign({}, input, { stock: 12, magnets: { count: 4, diameter: 6, depth: 8 } }), 'hardwood', false).wall < 20, true);
+  for (const cut of ['base', 'lid']) assert.ok(!boxPlan({ cut, gap: 8, bit: 6.35 }).problems.some((p) => /Gap/.test(p)), cut);
+  assert.match(boxPlan({ gap: 8, bit: 6.35 }).problems.join(), /Gap Between/);
+  const rect = { shape: 'rect', length: 140, width: 100, cornerRadius: 12, stock: 19, bit: 6.35, gap: 20, cut: 'both', magnets: { count: 4, diameter: 8, depth: 3 } };
+  const tune = (i) => autoSizes(i, 'hardwood', false), first = Object.assign({}, rect, tune(rect));
+  delete first.problems;
+  const list = nestInputs(first, 3, 4, tune);
+  for (const b of list.slice(1)) assert.deepEqual(boxPlan(b).problems, []);
+  const set = setPlan(list, 3);
+  if (list.length < 3) assert.match(set.problems[0], /^(Only \d+ boxes|No box) fits?/);
+  else assert.deepEqual(set.problems, []);
+});
