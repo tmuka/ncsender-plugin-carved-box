@@ -1,6 +1,10 @@
 # Changelog
 
 ## Unreleased
+- Easier to follow: Fit right after Box; the Box card in Outside size, then Board and walls; clearer names (Wall Thickness, Base Floor, Lid Top, Lip Thickness, Clearance Each Side, Gap Between, Edge Margin, Inside Rim, Tabs per Half, Magnets per Half...); shape icons on the shape buttons.
+- Labels on the previews: tap one to go to its field. A problem under the settings goes to its field when tapped. A tap in a field picks its text, to type over.
+- Each shape gets a usable size (round inches on an inch machine) when its saved one is too small or doesn't make the shape (a heart could show 0.003").
+- A nested set without Auto Sizes makes each box's floor, top and lip lower with it.
 - Auto Sizes with magnets: the lip down to 1/4" thick rather than the wall twice what the magnets need (a 6" x 4" box with 7 mm magnets: a 5/8" wall, was 0.72").
 - Finishing Pass: its allowance and direction come from the Material (conventional in wood, climb in plastics and aluminum); the card is just the switch.
 - Start: presets to begin from (ring, trinket, keepsake with magnets, hexagon, oval, heart, nested set), and your own settings saved under a name to load again.

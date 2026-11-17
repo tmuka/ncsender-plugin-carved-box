@@ -738,3 +738,10 @@ test('magnets: the lip thinner (down to 1/4") rather than the wall twice as thic
     assert.ok(-p.tRabbet >= 7 + 1.6 - 1e-9);
   }
 });
+
+test('a nested set without Auto Sizes: the floor, top and lip lower with each box', () => {
+  const set = setPlan(nestInputs({ diameter: 152.4, stock: 31.5, wall: 12.7, floor: 12.7, top: 6.35, lipHeight: 8.73, lipWidth: 4, lipOn: 'lid', bit: 6.35, gap: 15 }, 3, 1.5), 3);
+  assert.deepEqual(set.problems, []);
+  assert.ok(set.set[1].o.floor < 12.7 && set.set[2].o.lipHeight < set.set[1].o.lipHeight);
+  check(set);
+});
