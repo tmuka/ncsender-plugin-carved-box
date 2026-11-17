@@ -824,3 +824,25 @@ test('the finishing pass reaches every wall: round, rectangle, polygon, oval and
     }
   }
 });
+
+test('finishing: the step floors roughed short, skimmed after all the roughing, then the walls\' laps', () => {
+  for (const sh of [{ shape: 'circle', diameter: 80 }, { shape: 'heart', length: 127, width: 120, cornerRadius: 12.7 }]) {
+    const i = Object.assign({ stock: 25, bit: 3.175, finish: 0.3 }, sh), a = autoSizes(i, 'hardwood', false);
+    delete a.problems;
+    const { plan, gcode } = check(Object.assign({}, i, a));
+    const lines = gcode.split('\n'), at = (re) => lines.findIndex((l) => re.test(l));
+    for (const h of plan.halves) {
+      const H = h.label.charAt(0).toUpperCase() + h.label.slice(1), withLip = (plan.o.lipOn === h.name);
+      const step = withLip ? 'shoulder round the lip' : 'opening widened for the lip';
+      const rough = at(new RegExp('^\\(' + H + ': ' + step + '\\)')), skim = at(new RegExp('^\\(' + H + ': ' + step + ': its floor skimmed'));
+      const lastRough = Math.max(...h.cuts.map((c) => at(new RegExp('^\\(' + H + ': ' + c.what + '\\)'))));
+      const laps = h.cuts.filter((c) => c.finish).map((c) => at(new RegExp('^\\(' + H + ': ' + c.what + ': finishing lap')));
+      assert.ok(rough >= 0 && skim > lastRough && laps.every((l) => l > skim), H + ' ' + JSON.stringify([rough, lastRough, skim, laps]));
+      // The step's roughing stops the allowance over its floor; the skim reaches it.
+      const floorZ = -plan.faces[h.name] - (withLip ? plan.o.lipHeight : plan.rabbetDepth);
+      const deepest = (from, to) => Math.min(...simulate(lines.slice(from, to).join('\n').replace(/^/, 'G0 Z5\n')).map((p) => p.z));
+      assert.ok(Math.abs(deepest(rough + 1, rough + 1 + lines.slice(rough + 1).findIndex((l) => /^\(/.test(l))) - (floorZ + 0.3)) < 1e-3, H + ' rough floor');
+      assert.ok(Math.abs(deepest(skim + 1, skim + 1 + lines.slice(skim + 1).findIndex((l) => /^\(/.test(l))) - floorZ) < 1e-3, H + ' skimmed floor');
+    }
+  }
+});

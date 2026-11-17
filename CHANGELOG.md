@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- Finishing Pass: the steps' floors (the widened opening's, the shoulder round the lip) are roughed a little short too, then skimmed in one light pass; and all of a half's finishing comes after all its roughing (the floors, then the walls' laps), so later roughing no longer tears up a finished edge and a lap cuts off fibers the floor skim lifts over an edge. Less fuzz where the step meets the inside.
+
 ## 0.3.1: Oval and heart lids fit
 - Oval and heart boxes with the Finishing Pass on (the default): the finishing lap round each pocket's wall was left out, so the opening for the lip came out about 0.3 mm smaller each side than planned, and the lid wouldn't go on. Each pocket now gets its lap, as round, rectangular and polygon boxes always did.
 
