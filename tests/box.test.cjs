@@ -755,3 +755,32 @@ test('magnet holes narrower than the bit: said, without a thicker wall', () => {
   assert.match(big.problems[0], /Magnet holes must be wider than the bit: use a smaller bit/);
   assert.equal(big.wall, small.wall);
 });
+
+test('a Magnet Bit: the holes after a tool change, with the smaller bit', () => {
+  const input = { shape: 'rect', length: 152.4, width: 101.6, cornerRadius: 12.7, stock: 19.05, wall: 14, lipWidth: 6.35, bit: 6.35, gap: 20,
+    magnets: { count: 4, diameter: 5, depth: 3.2, bit: 3.175 } };
+  assert.match(boxPlan(Object.assign({}, input, { magnets: { count: 4, diameter: 5, depth: 3.2 } })).problems.join(), /wider than the bit/);
+  assert.match(boxPlan(Object.assign({}, input, { magnets: { count: 4, diameter: 3, depth: 3.2, bit: 3.175 } })).problems.join(), /wider than the Magnet Bit/);
+  assert.match(boxPlan(Object.assign({}, input, { magnets: { count: 4, diameter: 5, depth: 3.2, bit: 3.175, drill: true } })).problems.join(), /is a drill/);
+  const plan = boxPlan(input);
+  assert.deepEqual(plan.problems, []);
+  for (const h of plan.halves) {
+    assert.ok(!h.cuts.some((c) => /magnet/.test(c.what)));
+    assert.equal(plan.magnets[h.name].length, 4);
+  }
+  const { gcode } = boxProgram(plan, Object.assign({}, FEEDS, { toolNumber: 1, magnets: { toolNumber: 2, feed: 900, plunge: 300, rpm: 18000, delay: 2, doc: 1, stepoverPct: 40 } }));
+  const at = gcode.indexOf('M6 T2');
+  assert.ok(at > gcode.indexOf('M6 T1') && at > gcode.lastIndexOf('outline'), 'the magnet bit after the box');
+  const box = simulate(gcode.slice(0, at)), mag = simulate(gcode.slice(at));
+  const half = (p) => plan.halves.reduce((a, b) => Math.hypot(p.x - a.at.x, p.y - a.at.y) <= Math.hypot(p.x - b.at.x, p.y - b.at.y) ? a : b);
+  for (const p of box) assert.ok(allowed(plan, half(p), p), 'box bit: ' + JSON.stringify(p));
+  let reach = 0, deepest = 0;
+  for (const p of mag) {
+    if (p.z > -1e-6) continue;
+    const h = half(p), meet = (input.lipOn || 'base') === h.name ? plan.o.lipHeight : 0, d = plan.faces[h.name] - p.z;
+    const r = Math.min(...plan.magnetAt.map((m) => Math.hypot(p.x - h.at.x - m.dx, p.y - h.at.y - m.dy)));
+    assert.ok(r <= 2.5 - 3.175 / 2 + 0.005 && d <= meet + 3.2 + 0.005, 'magnet bit: ' + JSON.stringify(p));
+    reach = Math.max(reach, r); deepest = Math.max(deepest, d - meet);
+  }
+  assert.ok(reach > 2.5 - 3.175 / 2 - 0.05 && deepest > 3.2 - 0.005, JSON.stringify([reach, deepest]));
+});
