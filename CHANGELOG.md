@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.3.1: Oval and heart lids fit
+- Oval and heart boxes with the Finishing Pass on (the default): the finishing lap round each pocket's wall was left out, so the opening for the lip came out about 0.3 mm smaller each side than planned, and the lid wouldn't go on. Each pocket now gets its lap, as round, rectangular and polygon boxes always did.
+
 ## 0.3.0: Nested sets, grain matching, presets, Magnet Bit
 - Nested Set: 2 to 5 boxes, each fitting inside the one before, all in one program on one board, or one at a time from boards as thick as each needs.
 - Cut the base or the lid on its own board (Layout → Cut), the lid's from a thinner Lid Board if you like.
