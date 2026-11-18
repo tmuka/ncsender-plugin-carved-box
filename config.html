@@ -49,7 +49,13 @@
   .cb-input { text-align: right; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; }
   .cb-input:focus, .cb-select:focus { outline: none; border-color: var(--color-accent); }
   .cb-input.cb-error { border-color: #d32f2f; }
-  .cb-seg { display: flex; border: 1px solid var(--color-border); border-radius: var(--radius-small); overflow: hidden; height: 36px; }
+  /* Buttons in a card, as QuickCut's: filled with the darker plugin
+     background, with an outline that shows in dark mode too (ncSender's
+     --color-border is nearly invisible there). */
+  .cb-wrapper { --cb-edge: color-mix(in srgb, var(--color-text-secondary) 35%, transparent); }
+  .cb-seg { display: flex; border: 1px solid var(--cb-edge); border-radius: var(--radius-small); overflow: hidden; height: 36px; background: var(--color-surface); }
+  .cb-seg button + button { border-left: 1px solid var(--cb-edge) !important; }
+  .cb-seg button:not(.on):hover { color: var(--color-text-primary) !important; }
   .cb-seg button { flex: 1; border: none !important; border-radius: 0 !important; margin: 0 !important; padding: 0 8px !important; background: transparent !important; color: var(--color-text-secondary) !important; font: inherit !important; font-size: 0.85rem !important; cursor: pointer; }
   .cb-seg button.on { background: var(--color-accent) !important; color: #fff !important; font-weight: 600 !important; }
   .cb-switch { position: relative; width: 38px; height: 22px; flex: none; }
@@ -104,7 +110,9 @@
   .cb-help li { margin: 3px 0; }
   .cb-help p { font-size: 0.9rem; }
   .cb-help-pics { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-top: 10px; }
-  .cb-btn-quiet { background: transparent !important; color: var(--color-text-primary) !important; border: 1px solid var(--color-border) !important; }
+  .cb-btn-quiet { background: var(--color-surface) !important; color: var(--color-text-primary) !important; border: 1px solid var(--cb-edge) !important; }
+  .cb-btn-quiet:not(:disabled):hover { border-color: var(--color-accent) !important; }
+  .cb-select { border-color: var(--cb-edge); }
   /* Preview colours */
   .cb-stock { fill: color-mix(in srgb, #c8a77a 55%, var(--color-surface)); stroke: color-mix(in srgb, #c8a77a 70%, var(--color-text-secondary)); stroke-width: 0.6; }
   .cb-wood { fill: #d9bc8c; }
@@ -129,7 +137,7 @@
   /* Tool Library picker (as QuickCut's): the picked tool, a list with a filter. */
   .cb-wrapper { position: relative; }
   button.cb-tool-row { -webkit-appearance: none; appearance: none; display: flex; align-items: center; gap: 8px; width: 100%; height: 36px; margin: 0 !important; padding: 0 30px 0 10px !important;
-    border: 1px solid var(--color-border) !important; border-radius: var(--radius-small) !important; color: var(--color-text-primary) !important; font: inherit !important; font-size: 0.9rem !important; text-align: left; cursor: pointer;
+    border: 1px solid var(--cb-edge) !important; border-radius: var(--radius-small) !important; color: var(--color-text-primary) !important; font: inherit !important; font-size: 0.9rem !important; text-align: left; cursor: pointer;
     background: var(--color-surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2393a2b4' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 12px center / 10px 6px !important; }
   button.cb-tool-row b { color: var(--color-accent); font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; }
   button.cb-tool-row span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
