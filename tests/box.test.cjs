@@ -2,7 +2,7 @@
 // bit's center goes, at what depth, against what must be left standing.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { boxPlan, testFitInput, autoSizes, nestInputs, setPlan, BOX_DEFAULTS } = require('../lib/box-plan.cjs');
+const { boxPlan, testFitInput, autoSizes, fitOption, nestInputs, setPlan, BOX_DEFAULTS } = require('../lib/box-plan.cjs');
 const { boxProgram, MAX_LINES } = require('../lib/box-gcode.cjs');
 const { shapeDistance, shapeLoop, shapeLoops, loopLength, loopPoint } = require('../lib/box-shape.cjs');
 
@@ -1055,7 +1055,7 @@ test('a sloped lip: the V-bit slopes the lip and the opening alike, cutting noth
 test('a sloped lip that doesn\'t fit says why; Auto Sizes and Test Fit keep it', () => {
   const V = { bit: 'v', angle: 90, diameter: 12.7, outside: 0, inside: 0, pocket: 0, slope: true };
   const said = (input, re) => assert.ok(boxPlan(input).problems.some((p) => re.test(p)), JSON.stringify(boxPlan(input).problems));
-  said({ wall: 10, lipWidth: 5, lipHeight: 6, edges: V }, /^Sloped lip: .* the lip's top would be/);
+  said({ wall: 10, lipWidth: 5, lipHeight: 6, edges: V }, /^Sloped lip: .*needs 1 mm more than the slant/);
   said({ wall: 16, lipWidth: 10, lipHeight: 8, edges: { ...V, diameter: 12.7 } }, /sloped lip needs one/);
   said({ shape: 'rect', length: 120, width: 80, cornerRadius: 4, wall: 12, lipWidth: 7, lipHeight: 5, edges: V }, /sloped lip's slant/);
   // A small V-bit: Auto Sizes lowers the lip to fit it, and says so.
@@ -1074,4 +1074,29 @@ test('a sloped lip that doesn\'t fit says why; Auto Sizes and Test Fit keep it',
     assert.deepEqual(tf.problems, []);
     assert.ok(tf.slope > 0 && tf.halves.every((h) => tf.edges[h.name].length === 1), 'Test Fit keeps just the slopes');
   }
+});
+
+test('an option switched on that doesn\'t fit: only the sizes it needs change', () => {
+  const box = { diameter: 57.15, stock: 19.05, wall: 6.35, lidHeight: 12.7, floor: 4.762, top: 4.762, lipHeight: 6.35, lipWidth: 2.794, clearance: 0.254, bit: 6.35, gap: 15 };
+  const V = { bit: 'v', angle: 90, vtip: 0.254, diameter: 25.4, outside: 1, inside: 1.5, pocket: 1 };
+  const cases = [
+    { ...box, edges: { ...V, slope: true } },
+    { ...box, edges: { ...V, outside: 2, pocket: 2 } },
+    { ...box, wall: 12, lipWidth: 6, bit: 3.175, gap: 12, magnets: { count: 8, diameter: 6, depth: 3 } },
+    { ...box, wall: 10, lipWidth: 4, notch: { width: 30, depth: 4 } },
+    { ...box, shape: 'rect', length: 120, width: 80, cornerRadius: 2, edges: { ...V, angle: 60, slope: true } }
+  ];
+  for (const imperial of [false, true]) for (const input of cases) {
+    assert.ok(boxPlan(input).problems.length, 'a case that needs fitting: ' + JSON.stringify(input));
+    const r = fitOption(input, imperial);
+    assert.deepEqual(r.problems, [], JSON.stringify([input, r]));
+    // Never the box's size, wall, stock, bit or Lead-In under a sloped lip.
+    for (const key of Object.keys(r.set)) assert.match(key, /^(lipHeight|lipWidth|cornerRadius|edges\.(outside|pocket|inside)|notch\.(width|depth)|magnets\.count)$/);
+    if (input.edges && input.edges.slope) assert.ok(!('edges.inside' in r.set));
+  }
+  // A sloped lip on a thin wall: as thick as the wall leaves room, then lower.
+  const r = fitOption(cases[0], false);
+  assert.ok(r.set.lipWidth > box.lipWidth && box.wall - r.set.lipWidth - box.clearance >= 1 - 1e-9 && r.set.lipHeight < box.lipHeight, JSON.stringify(r.set));
+  // Nothing to fit: nothing changed.
+  assert.deepEqual(fitOption({}, false).set, {});
 });

@@ -2192,7 +2192,8 @@ function boxPlan(input) {
     // What each edge leaves: the rim between the outline and the widened
     // opening, the shoulder outside the lip, the lip itself.
     need(eOut + eRim <= -tRabbet - 0.5, 'Edges too big for the rim round the widened opening: make them smaller, or the wall thicker');
-    if (slope) need(eIn + ePk <= o.lipWidth - 1, 'Sloped lip: at the V-bit\'s angle, the lip\'s top would be ' + Math.max(0, o.lipWidth - eIn - ePk).toFixed(2) + ' mm thick (it needs 1 mm): make the Lip Thickness wider, the Lip Height lower, or use a V-bit with a narrower angle');
+    if (slope) need(eIn + ePk <= o.lipWidth - 1, 'Sloped lip: at the V-bit\'s ' + +(+ed.angle).toFixed(1) + '\u00b0, the lip slants in ' + (eIn + ePk).toFixed(2) + ' mm' + (ePk > 0 ? ' (with the Inside Rim)' : '') +
+      ', and the lip is ' + (+o.lipWidth).toFixed(2) + ' mm thick: it needs 1 mm more than the slant. Make the Lip Thickness ' + (eIn + ePk + 1).toFixed(2) + ' mm or more, the Lip Height lower, or use a V-bit with a narrower angle');
     else need(eIn + ePk <= o.lipWidth - 0.3, 'Lead-In and Inside Rim too big for the lip: they take ' + (eIn + ePk).toFixed(2) + ' mm of it');
     // The step the lip sits on, in the other half: its inner edge is down
     // at the step, the widened opening's wall above it.
@@ -2602,13 +2603,82 @@ function autoSizes(input, material, imperial) {
   return a;
 }
 
+// With Auto Sizes off, an option just switched on that doesn't fit: only
+// the sizes it needs changed (never the box's size, wall, stock or bit),
+// a step at a time until its problems go. A sloped lip: the lip thicker
+// as far as the wall leaves room, then lower; edges and the notch
+// smaller; fewer magnets, or the lip thinner beside them; a rectangle's
+// corners rounder. Returns { set: { key: mm } (keys as 'lipHeight',
+// 'edges.pocket'), problems left }.
+function fitOption(input, imperial) {
+  var o = JSON.parse(JSON.stringify(Object.assign({}, DEFAULTS, input || {})));
+  if (input && input.outline) o.outline = input.outline;
+  var grid = function(v) { return imperial ? (v < 1 ? 0.127 : 25.4 / 32) : (v < 1 ? 0.05 : 0.5); };
+  var half = function(v) { var g = grid(v); return Math.max(g, Math.round(v / g) * g); };
+  var upHalf = function(v) { var g = grid(v); return Math.ceil(v / g - 1e-9) * g; };
+  var down = function(v) { return Math.floor(v / grid(v) + 1e-9) * grid(v); };
+  var smaller = function(d) { return d > 0.3 ? half(d * 0.7) : 0; };
+  var ed = o.edges, slope = !!(ed && ed.slope && ed.bit !== 'round'), slant = slope ? Math.tan((ed.angle || 90) * Math.PI / 360) : 0;
+  var set = {}, put = function(key, v) {
+    var at = key.split('.');
+    if (at.length > 1) o[at[0]][at[1]] = v; else o[key] = v;
+    set[key] = v;
+  };
+  var lower = function() {
+    var to = half(o.lipHeight - grid(3));
+    if (to - o.clearance < 1.5) return false;
+    put('lipHeight', to);
+    return true;
+  };
+  var shrink = function(key) { var at = key.split('.'), d = o[at[0]][at[1]]; if (!(d > 0)) return false; put(key, smaller(d)); return true; };
+  var plan;
+  for (var k = 0; k < 80; k++) {
+    plan = boxPlan(o);
+    // The first problem one of these changes fixes (the rest are left to say).
+    if (!plan.problems.filter(fixable).some(fix)) break;
+  }
+  function fix(p) {
+    var ok = false;
+    if (/^Sloped lip:/.test(p)) {
+      // Thicker, leaving the rim outside it 1 mm (and the magnets' room).
+      var room = down(o.wall - o.clearance - 1 - (o.magnets ? o.magnets.diameter + 0.6 : 0));
+      var want = upHalf((o.lipHeight - o.clearance) * slant + (ed.pocket || 0) * slant + 1.05);
+      if (o.lipWidth < Math.min(room, want) - 1e-9) { put('lipWidth', Math.min(room, want)); ok = true; }
+      else ok = (ed.pocket > 0 && shrink('edges.pocket')) || lower();
+    } else if (/sloped lip needs/.test(p)) ok = lower();
+    else if (/Corner Radius must be at least/.test(p) && (o.shape === 'rect' || o.shape === 'poly' || o.shape === 'heart' || o.shape === 'custom')) {
+      var need = o.wall - o.lipWidth - o.clearance + o.bit / 2 + (slope ? o.lipHeight * slant : 0);
+      if (o.cornerRadius < need - 1e-9) { put('cornerRadius', upHalf(need)); ok = true; } else ok = slope && lower();
+    } else if (/ends are too tight/.test(p)) ok = slope && lower();
+    else if (ed && /Inside Rim/.test(p)) ok = shrink('edges.pocket');
+    else if (ed && /seam/.test(p)) ok = shrink('edges.outside');
+    else if (ed && /Lead-In/.test(p)) ok = shrink('edges.inside');
+    // (A sloped lip has no lead-in: its size is left as it is.)
+    else if (ed && /^Edges/.test(p)) ok = ['edges.outside', 'edges.inside', 'edges.pocket'].filter(function(key) { return !(slope && key === 'edges.inside'); }).sort(function(a, b) { return (o.edges[b.slice(6)] || 0) - (o.edges[a.slice(6)] || 0); }).some(shrink);
+    else if (o.notch && /notch/.test(p)) {
+      // Down to a bit wider than the bit; its depth isn't what's in the way.
+      var least = Math.max(8, upHalf(o.bit + 1));
+      if (o.notch.width > least + 1e-9) { put('notch.width', Math.max(least, half(o.notch.width - 2 * grid(3)))); ok = true; }
+    } else if (o.magnets && /Magnet holes too wide|Wall must be at least .*magnet/i.test(p)) {
+      var thin = down(o.wall - o.clearance - o.magnets.diameter - 1.6 - 0.05);
+      if (thin >= 2 && thin < o.lipWidth - 1e-9) { put('lipWidth', thin); ok = true; }
+    }
+    if (!ok && o.magnets && /Too many magnets|runs into a magnet hole/.test(p)) {
+      var fewer = o.magnets.count - (o.shape === 'rect' ? 2 : 1);
+      if (fewer >= 2) { put('magnets.count', fewer); ok = true; }
+    }
+    return ok;
+  }
+  return { set: set, problems: plan.problems };
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   var shapeLib = require('./box-shape.cjs');
   var shapeLoop = shapeLib.shapeLoop, shapeDeepest = shapeLib.shapeDeepest, loopLength = shapeLib.loopLength, loopPoint = shapeLib.loopPoint;
   var loopAt = shapeLib.loopAt, loopNearest = shapeLib.loopNearest, loopExtent = shapeLib.loopExtent, shapeLoops = shapeLib.shapeLoops, shapeDistance = shapeLib.shapeDistance;
   var outlineLib = require('./box-outline.cjs'), heartShape = outlineLib.heartShape, ovalShape = outlineLib.ovalShape;
   var customShape = outlineLib.customShape, selfCrossing = outlineLib.selfCrossing;
-  module.exports = { boxPlan: boxPlan, testFitInput: testFitInput, autoSizes: autoSizes, nestInputs: nestInputs, setPlan: setPlan, finishFor: finishFor, BOX_DEFAULTS: DEFAULTS };
+  module.exports = { boxPlan: boxPlan, testFitInput: testFitInput, autoSizes: autoSizes, fitOption: fitOption, nestInputs: nestInputs, setPlan: setPlan, finishFor: finishFor, BOX_DEFAULTS: DEFAULTS };
 }
 /* END lib/box-plan.cjs */
 /* BEGIN lib/box-gcode.cjs */
@@ -3095,6 +3165,24 @@ if (typeof module !== 'undefined' && module.exports) {
     ['cb-epk', function (a) { return a.edges && a.edges.pocket; }],
     ['cb-lid-h', function (a) { return a.lidHeight; }]
   ];
+  // Auto Sizes off, an option just switched on that doesn't fit: only the
+  // sizes it needs changed (fitOption), and said in the note.
+  var FIT_FIELDS = { lipHeight: 'cb-lip-h', lipWidth: 'cb-lip-w', cornerRadius: 'cb-corner', 'edges.outside': 'cb-eout', 'edges.inside': 'cb-ein',
+    'edges.pocket': 'cb-epk', 'notch.width': 'cb-notch-w', 'notch.depth': 'cb-notch-d', 'magnets.count': 'cb-mag-n' };
+  function fitSwitched(id) {
+    state.fitSay = '';
+    if (state.autoSizes || !$(id).checked || id === 'cb-tabs-on' || id === 'cb-nest-on') return;
+    var v = collect().v, input = inputOf(v);
+    if (!boxPlan(input).problems.length) return;
+    var r = fitOption(input, state.imperial), said = [];
+    Object.keys(r.set).forEach(function (key) {
+      var fid = FIT_FIELDS[key], f = FIELDS.filter(function (x) { return x[0] === fid; })[0], was = v[f[1]];
+      if (was != null && Math.abs(was - r.set[key]) < 1e-6) return;
+      show(fid, r.set[key], f[2]);
+      said.push($(fid).closest('.cb-field').querySelector('label').textContent.replace(/\s*\(.*\)$/, '') + ' ' + (f[2] === 'count' ? r.set[key] : r.set[key] > 0 ? fmt(r.set[key]) + ' ' + unit() : 'none'));
+    });
+    if (said.length) state.fitSay = 'To fit the ' + ($(id).getAttribute('aria-label') || 'option').toLowerCase() + ': ' + said.join(', ') + '.';
+  }
   // Auto Sizes on: the fields filled in for the size, stock, bit and material.
   function applyAuto() {
     // A rectangle's corners: yours, or rounder when the lip needs it (and
@@ -3350,17 +3438,22 @@ if (typeof module !== 'undefined' && module.exports) {
       // The base, 0 to T (its top at T); the lid's rim at T - lipHeight when the lip is on the base.
       // A sloped lip: its top in by its slant, the opening's floor too.
       var up = plan.lipUp, shoulder = lipBase ? T - up : T, lidRim = shoulder, sl = plan.slope || 0;
+      // A slant wider than the lip (a problem the note says): the lip comes
+      // to a point where its slope meets its inner wall, and the opening's
+      // slope meets the inside wall above its floor, as the V-bit would cut them.
+      var lipUpTo = sl > 0 ? Math.min(up, o.lipWidth / sl) : up, lipTopX = Ri + o.lipWidth - lipUpTo * sl;
+      var openTo = function (rab) { return sl > 0 ? Math.min(up + c, (rab - Ri) / sl) : up + c; };
       if (lipBase) {
-        out += poly([[f(Ri), o.floor, fl], [f(Ri), T, eLipIn], [f(Ri + o.lipWidth - up * sl), T, eLipOut], [f(Ri + o.lipWidth), shoulder], [f(R), shoulder, eSeamL], [f(R), 0], [0, 0], [0, o.floor]], 'cb-wood');
+        out += poly([[f(Ri), o.floor, fl], [f(Ri), shoulder + lipUpTo, lipUpTo < up ? null : eLipIn], [f(lipTopX), shoulder + lipUpTo, eLipOut], [f(Ri + o.lipWidth), shoulder], [f(R), shoulder, eSeamL], [f(R), 0], [0, 0], [0, o.floor]], 'cb-wood');
         // The lid, upside down on the shoulder: its rabbet round the lip.
-        var top = lidRim + LH, rab = Ri + o.lipWidth + c;
-        out += poly([[f(Ri), top - o.top, fl && cove(top - o.top - (lidRim + up + c))], [f(Ri), lidRim + up + c, eStep], [f(rab - (up + c) * sl), lidRim + up + c], [f(rab), lidRim, eOpen], [f(R), lidRim, eSeamR], [f(R), top], [0, top], [0, top - o.top]], 'cb-wood-dark');
+        var top = lidRim + LH, rab = Ri + o.lipWidth + c, oD = openTo(rab);
+        out += poly([[f(Ri), top - o.top, fl && cove(top - o.top - (lidRim + oD))], [f(Ri), lidRim + oD, oD < up + c ? null : eStep], [f(rab - oD * sl), lidRim + oD], [f(rab), lidRim, eOpen], [f(R), lidRim, eSeamR], [f(R), top], [0, top], [0, top - o.top]], 'cb-wood-dark');
       } else {
         // Lip on the lid: the base's opening is widened; the lid's lip hangs down into it.
-        var rabB = Ri + o.lipWidth + c, rimB = T;
-        out += poly([[f(Ri), o.floor, fl && cove(T - up - c - o.floor)], [f(Ri), T - up - c, eStep], [f(rabB - (up + c) * sl), T - up - c], [f(rabB), T, eOpen], [f(R), T, eSeamR], [f(R), 0], [0, 0], [0, o.floor]], 'cb-wood');
+        var rabB = Ri + o.lipWidth + c, rimB = T, oB = openTo(rabB);
+        out += poly([[f(Ri), o.floor, fl && cove(T - oB - o.floor)], [f(Ri), T - oB, oB < up + c ? null : eStep], [f(rabB - oB * sl), T - oB], [f(rabB), T, eOpen], [f(R), T, eSeamR], [f(R), 0], [0, 0], [0, o.floor]], 'cb-wood');
         var top2 = T + LH - up;
-        out += poly([[f(Ri), top2 - o.top, fl], [f(Ri), rimB - up, eLipIn], [f(Ri + o.lipWidth - up * sl), rimB - up, eLipOut], [f(Ri + o.lipWidth), rimB], [f(R), rimB, eSeamL], [f(R), top2], [0, top2], [0, top2 - o.top]], 'cb-wood-dark');
+        out += poly([[f(Ri), top2 - o.top, fl], [f(Ri), rimB - lipUpTo, lipUpTo < up ? null : eLipIn], [f(lipTopX), rimB - lipUpTo, eLipOut], [f(Ri + o.lipWidth), rimB], [f(R), rimB, eSeamL], [f(R), top2], [0, top2], [0, top2 - o.top]], 'cb-wood-dark');
       }
     });
     return out;
@@ -3659,6 +3752,7 @@ if (typeof module !== 'undefined' && module.exports) {
       if (pf && !$(pf).closest('[hidden]') && !$(pf).closest('.cb-off')) { note.classList.add('cb-go'); note.dataset.field = pf; note.title = 'Go to the field'; }
     } else {
       var warns = plan.notes.slice();
+      if (state.fitSay) warns.unshift(state.fitSay);
       if (!(v.rpm > 0)) warns.push('Spindle RPM 0: the program won\u2019t start the spindle.');
       if (v.edgesOn && !(v.edgeRpm > 0)) warns.push('Edge RPM 0: the edges are cut with the spindle off.');
       if (v.cornersOn && !(v.cornerRpm > 0)) warns.push('Corner RPM 0: the corners are cut with the spindle off.');
@@ -4023,6 +4117,7 @@ if (typeof module !== 'undefined' && module.exports) {
     };
     FIELDS.forEach(function (f) {
       $(f[0]).addEventListener('input', function (e) {
+        if (e.isTrusted) state.fitSay = '';
         if (e.isTrusted && FEED_IDS.indexOf(f[0]) >= 0) state.feedsAuto = false;
         if (e.isTrusted && f[0] === 'cb-bit') $('cb-tool').value = '';
         if (e.isTrusted && AUTO.some(function (x) { return x[0] === f[0]; })) state.autoSizes = false;
@@ -4038,7 +4133,7 @@ if (typeof module !== 'undefined' && module.exports) {
       $(f[0]).addEventListener('change', function () { if (f[0] === 'cb-bit' && state.feedsAuto) { fillFeeds(); update(true); } });
     });
     $('cb-auto').addEventListener('change', function () { state.autoSizes = $('cb-auto').checked; update(true); });
-    ['cb-tabs-on', 'cb-mag-on', 'cb-notch-on', 'cb-corners-on', 'cb-edges-on', 'cb-nest-on'].forEach(function (id) { $(id).addEventListener('change', function () { update(true); }); });
+    ['cb-tabs-on', 'cb-mag-on', 'cb-notch-on', 'cb-corners-on', 'cb-edges-on', 'cb-nest-on'].forEach(function (id) { $(id).addEventListener('change', function () { fitSwitched(id); update(true); }); });
     $('cb-testfit').addEventListener('click', function () { generate('test'); });
     $('cb-help-btn').addEventListener('click', function () { showHelp($('cb-help').hidden); });
     ['cb-top', 'cb-side'].forEach(function (id) {
@@ -4062,7 +4157,7 @@ if (typeof module !== 'undefined' && module.exports) {
     $('cb-save').addEventListener('click', saveStart);
     $('cb-delete').addEventListener('click', deleteStart);
     $('cb-grain').addEventListener('change', function () { update(true); });
-    $('cb-slope').addEventListener('change', function () { update(true); });
+    $('cb-slope').addEventListener('change', function () { fitSwitched('cb-slope'); update(true); });
     $('cb-nest-cut').addEventListener('change', function () { update(true); });
     $('cb-edges-only').addEventListener('click', function () { generate('edges'); });
     $('cb-corners-only').addEventListener('click', function () { generate('corners'); });
