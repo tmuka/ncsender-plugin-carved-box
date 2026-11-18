@@ -3437,6 +3437,13 @@ if (typeof module !== 'undefined' && module.exports) {
       out += '<text class="cb-tag" data-field="cb-gap" text-anchor="middle" x="' + X((a.x + b.x) / 2).toFixed(2) + '" y="' + (Y((a.y + b.y) / 2) + 0.9).toFixed(2) + '">Gap</text>';
     }
     out += '<text class="cb-tag" data-field="cb-margin" x="' + (pad + 1) + '" y="' + (pad + 3.4) + '">Margin</text>';
+    // The base's first magnet hole and its finger notch, labelled beside them.
+    var baseH0 = !plan.set && plan.halves.filter(function (h) { return h.name === 'base'; })[0];
+    if (baseH0) {
+      var bp = baseH0.plan || plan, bx = X(baseH0.at.x), by = Y(baseH0.at.y), m0 = (baseH0.magnetAt || bp.magnetAt)[0];
+      if (m0 && bp.o.magnets) out += '<text class="cb-tag" data-field="cb-mag-d" text-anchor="middle" x="' + (bx + m0.dx * s).toFixed(2) + '" y="' + (by - m0.dy * s - bp.o.magnets.diameter / 2 * s - 0.8).toFixed(2) + '">Magnets</text>';
+      if (bp.notch) out += '<text class="cb-tag" data-field="cb-notch-w" text-anchor="middle" x="' + (bx + bp.notch.dx * s).toFixed(2) + '" y="' + (by - bp.notch.dy * s + (bp.notch.dy < 0 ? bp.notch.shape.r * s + 2.6 : -bp.notch.shape.r * s - 0.8)).toFixed(2) + '">Notch</text>';
+    }
     // X0 Y0
     var ox = X(0), oy = Y(0);
     out += '<line class="cb-axis-x" x1="' + ox + '" y1="' + oy + '" x2="' + (ox + 8) + '" y2="' + oy + '"/><line class="cb-axis-y" x1="' + ox + '" y1="' + oy + '" x2="' + ox + '" y2="' + (oy - 8) + '"/>';
@@ -3548,6 +3555,23 @@ if (typeof module !== 'undefined' && module.exports) {
       ['cb-wall', 'Wall', -(Ri + R) / 2, lipBot * 0.45],
       ['cb-floor', 'Base Floor', -R * 0.4, o.floor / 2]
     ];
+    // The edges and floor corners, where they're cut: the seam at the
+    // outside, the lead-in or slope on the lip's outside, the Inside Rim
+    // on its inside, the cove at the base's floor.
+    var lipOnBase = o.lipOn !== 'lid', upP = P0.lipUp, lipH = lipOnBase ? 'base' : 'lid', rabH = lipOnBase ? 'lid' : 'base';
+    var edgeAt = function (half, what) { return P0.edges[half].filter(function (e) { return e.what === what; })[0]; };
+    // Down from the lip's top edge (the lid's lip hangs down from the base's rim).
+    var lipY = function (d) { return lipOnBase ? lipTop - d : lipTop - upP + d; };
+    var eSeam = edgeAt(lipH, 'outside seam edge') || edgeAt(rabH, 'outside seam edge');
+    if (eSeam) tags.push(['cb-eout', 'Outside Seam', -(R - eSeam.width / 2), (lipOnBase ? lipBot : lipTop) + (lipOnBase ? -1 : 1) * eSeam.depth / 3]);
+    var eLead = edgeAt(lipH, 'lip\'s outer edge');
+    if (eLead) tags.push(['cb-ein', 'Lead-In', -(Ri + lw - eLead.width / 3), lipY(eLead.depth / 3)]);
+    if (P0.slope > 0) tags.push(['cb-eslope', 'Slope Height', -(Ri + lw - P0.slopeUp * P0.slope / 2), lipY(P0.slopeUp / 2)]);
+    var eRim = edgeAt(lipH, 'lip\'s inner edge');
+    if (eRim) tags.push(['cb-epk', 'Inside Rim', -(Ri + eRim.width / 3), lipY(eRim.depth / 3)]);
+    if (o.corners && P0.corners.base.length) tags.push(['cb-crad', 'Cove Radius', -(Ri - o.corners.radius * 0.3), o.floor + o.corners.radius * 0.3]);
+    // Top to bottom, as they're spaced down the left.
+    tags.sort(function (a, b) { return b[3] - a[3]; });
     var ty = -Infinity, tx = pad + G - 2;
     tags.forEach(function (t) {
       var py = Y(t[3]), y = Math.max(py + 0.9, ty + 3.6);
