@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Slope Height** for the Sloped Lip: only the lip's top that far is sloped, and the lip is straight below it, so the lid centers itself and still grips at the Clearance. The opening narrows to match at its floor in small steps of the box's bit. Empty slopes the whole lip, as before.
+- Help: How the lid fits now lists the ways a lid can go on and what holds it: a straight lip, the Lead-In, a whole sloped lip (no grip: add magnets), a sloped top, and magnets.
 - With Auto Sizes off, switching on an option that doesn't fit your sizes (Sloped Lip, Edges, Magnets, Finger Notch, Floor Corners) now changes just the sizes it needs, never the box's size, wall, stock or bit, and the note says what changed. A sloped lip gets thicker as far as the wall leaves room, then lower; edges and the notch get smaller; magnets fewer, or the lip thinner beside them; a rectangle's corners rounder.
 - The side view no longer draws a sloped lip whose slant is wider than the lip as a shape that crosses itself: it comes to a point, as the V-bit would leave it. The sloped-lip problem now gives the slant and the Lip Thickness it needs.
 - **Sloped Lip** (Edges, with a V-bit): the lip's outer side and the opening's wall cut at the V-bit's angle, so the lid centers itself as it closes, with the Clearance kept all the way down. It takes the Lead-In's place. Auto Sizes makes the lip thick enough and low enough for the V-bit, and Test Fit cuts the slopes too.

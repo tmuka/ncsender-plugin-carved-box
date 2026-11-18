@@ -68,8 +68,9 @@ function allowed(set, half, p) {
   const rc = o.corners ? o.corners.radius : 0;
   if (at(plan.tInside - rb) <= eps && d <= floor + eps && (d <= floor - rc + eps || at(plan.tInside - rc - rb) <= eps)) return true;
   if (withLip && at(plan.tLip + rb) >= -eps && d <= plan.lipUp + eps) return true;
-  // A sloped lip's opening: the box's bit only to its floor's width.
-  if (!withLip && at((plan.tOpen ?? plan.tRabbet) - rb) <= eps && d <= plan.rabbetDepth + eps) return true;
+  // The widened opening, by depth: a sloped lip's only to its floor's
+  // width, a part slope's narrowing in steps.
+  if (!withLip && (plan.openSteps || [{ d0: 0, d1: plan.rabbetDepth, t: plan.tRabbet }]).some((st) => d > st.d0 - eps && d <= st.d1 + eps && at(st.t - rb) <= eps)) return true;
   for (const m of half.magnetAt || plan.magnetAt) {
     if (Math.hypot(px - m.dx, py - m.dy) <= o.magnets.diameter / 2 - rb + eps && d <= meet + o.magnets.depth + eps) return true;
   }
@@ -1099,4 +1100,35 @@ test('an option switched on that doesn\'t fit: only the sizes it needs change', 
   assert.ok(r.set.lipWidth > box.lipWidth && box.wall - r.set.lipWidth - box.clearance >= 1 - 1e-9 && r.set.lipHeight < box.lipHeight, JSON.stringify(r.set));
   // Nothing to fit: nothing changed.
   assert.deepEqual(fitOption({}, false).set, {});
+});
+
+test('a sloped top: the lip straight below its Slope Height, the opening narrowed in steps to match', () => {
+  const EF = { toolNumber: 5, feed: 1000, plunge: 300, rpm: 16000, delay: 2, doc: 1.5 };
+  for (const lipOn of ['base', 'lid']) for (const shape of [{}, { shape: 'rect', length: 130, width: 90, cornerRadius: 16 }]) for (const angle of [60, 90]) {
+    const edges = { bit: 'v', angle, diameter: 12.7, vtip: 0.2, outside: 0.5, inside: 1, pocket: 0, slope: true, slopeHeight: 2 };
+    const input = Object.assign({ lipOn, wall: 12, lipWidth: 5, lipHeight: 6, clearance: 0.25, lidHeight: 16, finish: 0.3, edges }, shape);
+    const { plan } = check(input);
+    const slant = Math.tan(angle * Math.PI / 360), straight = plan.lipUp - 2;
+    assert.equal(plan.slopeUp, 2);
+    // The V-bit only chamfers the lip's top; the opening's narrowing is the box bit's.
+    const lipHalf = lipOn, rabHalf = lipOn === 'lid' ? 'base' : 'lid';
+    assert.deepEqual(plan.edges[lipHalf].map((e) => e.what).filter((w) => /lip's|opening/.test(w)), ["lip's sloped top"]);
+    assert.ok(!plan.edges[rabHalf].some((e) => /sloped|opening edge/.test(e.what)));
+    // Straight down to where the lip's slope starts (closed), then never
+    // closer to the lip than the Clearance, and within a step of it.
+    const steps = plan.openSteps;
+    assert.ok(Math.abs(steps[0].d1 - straight) < 1e-9 && steps[0].t === plan.tRabbet && Math.abs(steps.at(-1).d1 - plan.rabbetDepth) < 1e-9);
+    for (const st of steps.slice(1)) for (const d of [st.d0, (st.d0 + st.d1) / 2, st.d1]) {
+      const lip = plan.tLip - Math.max(0, d - straight) * slant, gap = st.t - lip;
+      assert.ok(gap >= plan.o.clearance - 1e-9 && gap <= plan.o.clearance + 0.25 * slant + 1e-9, 'gap ' + gap + ' at ' + d);
+    }
+    checkEdges(plan, boxProgram(plan, Object.assign({}, FEEDS, { edges: EF }), 'edges').gcode);
+  }
+  // Too short a slope, or (with a V-bit too narrow) said; empty: the whole lip.
+  assert.ok(boxPlan({ wall: 12, lipWidth: 5, lipHeight: 6, edges: { bit: 'v', angle: 90, diameter: 12.7, outside: 0, inside: 0, pocket: 0, slope: true, slopeHeight: 0.3 } }).problems.some((p) => /Slope Height/.test(p)));
+  assert.equal(boxPlan({ wall: 12, lipWidth: 8, lipHeight: 5, edges: { bit: 'v', angle: 90, diameter: 12.7, outside: 0, inside: 0, pocket: 0, slope: true } }).slopeUp, 5 - 0.2);
+  // Fitting a part slope too wide for the lip: the lip thicker, then the slope lower.
+  const r = fitOption({ wall: 8, lipWidth: 3, lipHeight: 8, gap: 12, edges: { bit: 'v', angle: 90, diameter: 16, outside: 0, inside: 0, pocket: 0, slope: true, slopeHeight: 7 } }, false);
+  assert.deepEqual(r.problems, []);
+  assert.ok(r.set.lipWidth > 3 && r.set['edges.slopeHeight'] < 7 && !('lipHeight' in r.set), JSON.stringify(r.set));
 });
