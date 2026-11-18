@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- The Finishing Pass card is gone: the finishing pass is always on, set by the Material as before. Settings saved with it off now get it too.
+
 ## 0.3.2: Your own shapes, cleaner steps, a tighter lip
 
 - **Lip and opening:** the other half's opening is now cut just the Lip Height deep (it was Lip Height + Clearance), and the lip stands up the Clearance less, so the clearance no longer eats into the lid or base and the halves still close tight on the shoulder. A box closes the Clearance lower than before.

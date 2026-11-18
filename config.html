@@ -283,10 +283,6 @@
       <p class="cb-hint">The outlines are cut after the insides, a little into the spoilboard, leaving tabs to hold the halves (through the corner and edge bits' cuts too).</p>
     </div>
     <div class="cb-card">
-      <h3><span class="cb-grow">Finishing Pass</span><label class="cb-switch"><input type="checkbox" id="cb-finish-on" aria-label="Finishing pass"><span></span></label></h3>
-      <p class="cb-hint" id="cb-finish-fields"></p>
-    </div>
-    <div class="cb-card">
       <h3><span class="cb-grow">Edges</span><label class="cb-switch"><input type="checkbox" id="cb-edges-on" aria-label="Edges"><span></span></label></h3>
       <div class="cb-edge-fields" id="cb-edge-fields">
         <div class="cb-row cb-row-2">
@@ -445,7 +441,7 @@
     <div class="cb-card">
       <h3>Tips</h3>
       <ul>
-        <li>The <b>Finishing Pass</b> goes round the walls once more after the roughing, for cleaner walls; how much it takes and which way it goes are set by the <b>Material</b>.</li>
+        <li>A <b>finishing pass</b> always goes round the walls once more after the roughing, for cleaner walls; how much it takes and which way it goes are set by the <b>Material</b>.</li>
         <li>Keep the <b>Holding Tabs</b> on: they hold the halves while the outlines, corners and edges are cut.</li>
         <li>Tap a label on the pictures (Wall, Lip Height, Clearance, Gap&hellip;) to go to its field; tap a problem under the settings to go to the field it's about.</li>
         <li>Field values take either unit and simple math: <b>1/4"</b>, <b>6.35mm</b>, <b>1-1/2 in</b>, <b>1in+4mm</b>.</li>
@@ -3086,7 +3082,7 @@ if (typeof module !== 'undefined' && module.exports) {
     if (v.shape !== 'circle' && a.cornerRadius != null && Math.abs(a.cornerRadius - v.cornerRadius) > 1e-6) show('cb-corner', a.cornerRadius, 'length');
   }
   // Fields under a switch, and the switch.
-  var GROUPS = [['cb-tab-fields', 'cb-tabs-on'], ['cb-mag-fields', 'cb-mag-on'], ['cb-notch-fields', 'cb-notch-on'], ['cb-finish-fields', 'cb-finish-on'], ['cb-corner-fields', 'cb-corners-on'], ['cb-edge-fields', 'cb-edges-on'], ['cb-nest-fields', 'cb-nest-on']];
+  var GROUPS = [['cb-tab-fields', 'cb-tabs-on'], ['cb-mag-fields', 'cb-mag-on'], ['cb-notch-fields', 'cb-notch-on'], ['cb-corner-fields', 'cb-corners-on'], ['cb-edge-fields', 'cb-edges-on'], ['cb-nest-fields', 'cb-nest-on']];
   // Feeds that must be in range: [field, ok, what's wrong].
   var RANGES = [
     ['cb-feed', function (x) { return x >= 25; }, 'must be at least 25 mm/min (1 in/min)'], ['cb-plunge', function (x) { return x >= 10; }, 'must be at least 10 mm/min (0.4 in/min)'],
@@ -3135,7 +3131,6 @@ if (typeof module !== 'undefined' && module.exports) {
     v.tabsOn = $('cb-tabs-on').checked; v.magOn = $('cb-mag-on').checked; v.notchOn = $('cb-notch-on').checked;
     v.edgesOn = $('cb-edges-on').checked; v.edgeTool = $('cb-etool').value;
     v.cornersOn = $('cb-corners-on').checked; v.cornerTool = $('cb-ctool').value; v.magTool = $('cb-mtool').value;
-    v.finishOn = $('cb-finish-on').checked;
     // The finishing pass's allowance and way round: the material's.
     var fin = finishFor($('cb-material').value);
     v.finishAllow = fin.allow; v.finishDir = fin.dir;
@@ -3174,7 +3169,7 @@ if (typeof module !== 'undefined' && module.exports) {
       tabs: v.tabsOn ? { count: Math.round(v.tabCount), width: v.tabWidth, height: v.tabHeight } : null,
       edges: v.edgesOn ? { bit: v.edgeBit === 'round' ? 'round' : 'v', angle: v.edgeAngle, diameter: v.edgeDiameter, vtip: v.edgeVTip, radius: v.edgeRadius, tip: v.edgeTip, outside: v.edgeOut || 0, inside: v.edgeIn || 0, pocket: v.edgePocket || 0 } : null,
       corners: v.cornersOn ? { diameter: v.cornerDiameter, radius: v.cornerBitRadius } : null,
-      finish: v.finishOn ? v.finishAllow : 0, finishDir: v.finishDir,
+      finish: v.finishAllow, finishDir: v.finishDir,
       cut: v.nestOn ? 'both' : v.cut, lidStock: v.lidStock, grain: v.cut !== 'both' && v.grain
     });
   }
@@ -3601,9 +3596,6 @@ if (typeof module !== 'undefined' && module.exports) {
     FIELDS.forEach(function (f) { $(f[0]).classList.toggle('cb-error', !!c.errs[f[0]]); });
     var note = $('cb-note'), errKeys = Object.keys(c.errs);
     $('cb-stock-need').textContent = stockSay(plan, v);
-    var mat = $('cb-material').selectedOptions[0];
-    $('cb-finish-fields').textContent = 'For ' + (mat ? mat.textContent : 'this material') + ': the roughing leaves ' + fmt(v.finishAllow) + ' ' + unit() + ' on the walls (the pockets\u2019, the opening\u2019s, the lip\u2019s) and on the steps\u2019 floors (the opening\u2019s, the shoulder round the lip). After all of a half\u2019s roughing, the box\u2019s bit skims the step floors, then goes once round each wall, ' +
-      (v.finishDir === 'climb' ? 'climb milling (the wood on its right), which shears plastics and aluminum cleaner.' : 'conventional (the wood on the bit\u2019s left, as the spindle turns), gentler on wood fibres.');
     $('cb-top-title').textContent = 'Top view · ' + (plan.set ? 'the set on the stock' : plan.boxOf ? 'box ' + plan.boxOf.k + ' on its board' : !v.nestOn && v.cut !== 'both' ? 'the ' + v.cut + ' on its board' : 'both halves on the stock');
     var sep = !v.nestOn && v.cut !== 'both';
     $('cb-sep-fields').hidden = !sep;
@@ -3812,7 +3804,7 @@ if (typeof module !== 'undefined' && module.exports) {
   // ---------- Start: presets, and your own saved settings ----------
   // A preset sets the box and its options (Auto Sizes fills in the rest
   // for your stock, bit and material); saved settings bring back all.
-  var PRESET_BASE = { autoSizes: true, lipOn: 'base', cut: 'both', grain: false, nestOn: false, tabsOn: true, finishOn: true, magOn: false, notchOn: false, edgesOn: false, cornersOn: false, lidHeight: null };
+  var PRESET_BASE = { autoSizes: true, lipOn: 'base', cut: 'both', grain: false, nestOn: false, tabsOn: true, magOn: false, notchOn: false, edgesOn: false, cornersOn: false, lidHeight: null };
   var PRESETS = [
     { name: 'Ring box, round 2"', v: { shape: 'circle', diameter: 50.8, notchOn: true } },
     { name: 'Trinket box, round 3"', v: { shape: 'circle', diameter: 76.2 } },
@@ -3937,7 +3929,6 @@ if (typeof module !== 'undefined' && module.exports) {
     $('cb-tabs-on').checked = saved.tabsOn !== false;
     $('cb-edges-on').checked = !!saved.edgesOn;
     $('cb-corners-on').checked = !!saved.cornersOn;
-    $('cb-finish-on').checked = saved.finishOn !== false;
     $('cb-grain').checked = !!saved.grain; $('cb-nest-on').checked = !!saved.nestOn;
     if (saved.nestOn && saved.nestCut > 0) $('cb-nest-cut').innerHTML = '<option value="0">The whole set</option><option value="' + saved.nestCut + '">Box ' + saved.nestCut + ' on its own</option>';
     $('cb-nest-cut').value = String(saved.nestOn && saved.nestCut > 0 ? saved.nestCut : 0);
@@ -4005,7 +3996,7 @@ if (typeof module !== 'undefined' && module.exports) {
       $(f[0]).addEventListener('change', function () { if (f[0] === 'cb-bit' && state.feedsAuto) { fillFeeds(); update(true); } });
     });
     $('cb-auto').addEventListener('change', function () { state.autoSizes = $('cb-auto').checked; update(true); });
-    ['cb-tabs-on', 'cb-mag-on', 'cb-notch-on', 'cb-finish-on', 'cb-corners-on', 'cb-edges-on', 'cb-nest-on'].forEach(function (id) { $(id).addEventListener('change', function () { update(true); }); });
+    ['cb-tabs-on', 'cb-mag-on', 'cb-notch-on', 'cb-corners-on', 'cb-edges-on', 'cb-nest-on'].forEach(function (id) { $(id).addEventListener('change', function () { update(true); }); });
     $('cb-testfit').addEventListener('click', function () { generate('test'); });
     $('cb-help-btn').addEventListener('click', function () { showHelp($('cb-help').hidden); });
     ['cb-top', 'cb-side'].forEach(function (id) {
