@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Enlarge the previews:** a click on a blank spot of the top or side view (or ⤢ by its title) shows it over the whole window, to zoom in with the mouse wheel, a pinch or −, + and Fit, and drag around. Words stay readable. Esc, × or another click goes back.
 - **Slope Height** for the Sloped Lip: only the lip's top that far is sloped, and the lip is straight below it, so the lid centers itself and still grips at the Clearance. The opening narrows to match at its floor in small steps of the box's bit. Empty slopes the whole lip, as before.
 - Help: How the lid fits now lists the ways a lid can go on and what holds it: a straight lip, the Lead-In, a whole sloped lip (no grip: add magnets), a sloped top, and magnets.
 - With Auto Sizes off, switching on an option that doesn't fit your sizes (Sloped Lip, Edges, Magnets, Finger Notch, Floor Corners) now changes just the sizes it needs, never the box's size, wall, stock or bit, and the note says what changed. A sloped lip gets thicker as far as the wall leaves room, then lower; edges and the notch get smaller; magnets fewer, or the lip thinner beside them; a rectangle's corners rounder.

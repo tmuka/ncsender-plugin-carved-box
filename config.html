@@ -5,7 +5,7 @@
   .cb-wrapper {
     width: calc(100vw - 48px) !important; height: calc(100vh - 48px) !important;
     display: flex; flex-direction: column; background: var(--color-surface); border-radius: var(--radius-medium);
-    overflow: hidden; color: var(--color-text-primary); font-family: inherit;
+    overflow: hidden; color: var(--color-text-primary); font-family: inherit; position: relative;
   }
   .cb-wrapper p { margin: 0 !important; line-height: 1.45; }
   .cb-wrapper [hidden] { display: none !important; }
@@ -68,6 +68,28 @@
   .cb-view { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 10px; padding: 8px; }
   .cb-view-title { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-secondary); text-align: center; margin-bottom: 4px; }
   .cb-view svg { width: 100%; height: auto; max-height: 34vh; display: block; }
+  /* A preview enlarged over the whole window (as Gears'): the wheel zooms
+     at the pointer, two fingers pinch, a drag moves it; words stay readable. */
+  .cb-previews .cb-view { position: relative; }
+  .cb-previews .cb-view svg { cursor: zoom-in; }
+  .cb-zoom-open { position: absolute; top: 4px; right: 6px; width: 28px; height: 24px; padding: 0 !important; margin: 0 !important; border: none !important; border-radius: 6px !important;
+    background: transparent !important; color: var(--color-text-secondary) !important; font-size: 1rem !important; line-height: 1; cursor: pointer; }
+  .cb-zoom-open:hover { color: var(--color-accent) !important; }
+  .cb-previews .cb-view.cb-big { position: fixed; inset: 12px; z-index: 1000; display: flex; flex-direction: column; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45); padding-top: 10px; }
+  .cb-view.cb-big .cb-zoom-open { display: none; }
+  .cb-previews:has(.cb-big) { z-index: 1000; position: relative; }
+  .cb-view.cb-big svg { flex: 1 1 auto; min-height: 0; max-height: none; height: 100%; touch-action: none; cursor: grab; }
+  .cb-view.cb-big svg:active { cursor: grabbing; }
+  .cb-view.cb-big .cb-dim { font-size: calc(3.2px * var(--cb-ts, 1)); }
+  .cb-view.cb-big .cb-tag { font-size: calc(2.7px * var(--cb-ts, 1)); stroke-width: calc(0.9px * var(--cb-ts, 1)); }
+  .cb-view.cb-big .cb-tag-line { stroke-width: calc(0.25px * var(--cb-ts, 1)); }
+  .cb-view.cb-big .cb-tag-dot { r: calc(0.45px * var(--cb-ts, 1)); }
+  .cb-view.cb-big .cb-dim-line { stroke-width: calc(0.6px * var(--cb-ts, 1)); }
+  .cb-zoom-bar { position: absolute; top: 6px; right: 10px; display: inline-flex; align-items: center; gap: 4px; z-index: 1; }
+  .cb-view.cb-big .cb-view-title { padding: 6px 220px 8px; }
+  .cb-zoom-bar .cb-btn { min-width: 40px; height: 32px; padding: 0 10px !important; }
+  .cb-zoom-level { min-width: 2.6em; text-align: center; }
+  .cb-big-hint { text-align: center; font-size: 0.78rem; color: var(--color-text-secondary); margin-top: 4px; }
   .cb-footer { display: flex; align-items: center; gap: 14px; padding: 12px 20px; border-top: 1px solid var(--color-border); }
   .cb-note { flex: 1; font-size: 0.85rem; color: var(--color-text-secondary); }
   .cb-note.cb-bad, .cb-hint.cb-bad { color: #e57373; }
@@ -154,8 +176,8 @@
 
   <div class="cb-body">
     <div class="cb-previews">
-      <div class="cb-view"><div class="cb-view-title" id="cb-top-title">Top view · both halves on the stock</div><svg id="cb-top" viewBox="0 0 100 60"></svg></div>
-      <div class="cb-view"><div class="cb-view-title">Side view · the lid on the base, cut through the middle</div><svg id="cb-side" viewBox="0 0 100 40"></svg></div>
+      <div class="cb-view"><div class="cb-view-title" id="cb-top-title">Top view · both halves on the stock</div><button type="button" class="cb-zoom-open" aria-label="Enlarge the top view" title="See it over the whole window, to zoom in">⤢</button><svg id="cb-top" viewBox="0 0 100 60"></svg></div>
+      <div class="cb-view"><div class="cb-view-title">Side view · the lid on the base, cut through the middle</div><button type="button" class="cb-zoom-open" aria-label="Enlarge the side view" title="See it over the whole window, to zoom in">⤢</button><svg id="cb-side" viewBox="0 0 100 40"></svg></div>
     </div>
 
     <div class="cb-settings">
@@ -452,6 +474,7 @@
       <h3>Tips</h3>
       <ul>
         <li>A <b>finishing pass</b> always goes round the walls once more after the roughing, for cleaner walls; how much it takes and which way it goes are set by the <b>Material</b>.</li>
+        <li><b>Enlarge a picture</b>: click a blank spot on the top or side view (or ⤢ by its title) to see it over the whole window. There the mouse wheel zooms at the pointer, two fingers pinch, and zoomed in a drag moves it; or use <b>&minus;</b>, <b>+</b> and <b>Fit</b> at the top. Click a blank spot, &times;, or press Esc to go back. A tap on a label still goes to its setting.</li>
         <li>Keep the <b>Holding Tabs</b> on: they hold the halves while the outlines, corners and edges are cut.</li>
         <li>Tap a label on the pictures (Wall, Lip Height, Clearance, Gap&hellip;) to go to its field; tap a problem under the settings to go to the field it's about.</li>
         <li>Field values take either unit and simple math: <b>1/4"</b>, <b>6.35mm</b>, <b>1-1/2 in</b>, <b>1in+4mm</b>.</li>
@@ -4180,8 +4203,16 @@ if (typeof module !== 'undefined' && module.exports) {
     $('cb-testfit').addEventListener('click', function () { generate('test'); });
     $('cb-help-btn').addEventListener('click', function () { showHelp($('cb-help').hidden); });
     ['cb-top', 'cb-side'].forEach(function (id) {
-      $(id).addEventListener('click', function (e) { var t = e.target.closest && e.target.closest('[data-field]'); if (t) focusField(t.getAttribute('data-field')); });
+      $(id).addEventListener('click', function (e) {
+        var t = e.target.closest && e.target.closest('[data-field]');
+        if (t) { closeBig(); focusField(t.getAttribute('data-field')); return; }
+        // A click on a blank spot (not the end of a drag): enlarged, or back.
+        if (bigDown && Math.hypot(e.clientX - bigDown.x, e.clientY - bigDown.y) > 5) return;
+        setBig($(id).closest('.cb-view'), !$(id).closest('.cb-big'));
+      });
     });
+    ROOT.querySelectorAll('.cb-zoom-open').forEach(function (b) { b.addEventListener('click', function () { setBig(b.closest('.cb-view'), true); }); });
+    wireZoom();
     $('cb-note').addEventListener('click', function () { var id = $('cb-note').dataset.field; if (id) focusField(id); });
     // On a touch screen, a tap in a field picks its text, to type over.
     ROOT.querySelectorAll('.cb-input').forEach(function (inp) { inp.addEventListener('focus', function () { setTimeout(function () { try { inp.select(); } catch (e) {} }, 0); }); });
@@ -4216,6 +4247,138 @@ if (typeof module !== 'undefined' && module.exports) {
 
   // Go to a field (from a label on a preview, or the note about it):
   // in view, focused, its text picked, a flash round it.
+  // ---------- An enlarged preview ----------
+  // The drawing sets its own viewBox each time it's drawn; the zoom is put
+  // on top of that. Its words grow with it only to 1.3 times their size.
+  var ZOOM_MAX = 20, bigDown = null;
+  function viewZoom(svg) { return svg.cbZoom ? svg.cbZoom.s : 1; }
+  function showZoom(svg) {
+    var b = svg.cbBase, z = svg.cbZoom;
+    if (!b) return;
+    var vb = !z || z.s <= 1 ? [b.x, b.y, b.w, b.h]
+      : [Math.min(Math.max(z.cx, b.x), b.x + b.w) - b.w / z.s / 2, Math.min(Math.max(z.cy, b.y), b.y + b.h) - b.h / z.s / 2, b.w / z.s, b.h / z.s];
+    svg.cbShown = vb.join(' ');
+    svg.setAttribute('viewBox', svg.cbShown);
+    svg.style.setProperty('--cb-ts', (svg.cbTextScale || 1) / viewZoom(svg));
+    var lv = $('cb-zoom-level');
+    if (lv) lv.textContent = (Math.round(viewZoom(svg) * 10) / 10) + '\u00d7';
+  }
+  function watchZoom(svg, on) {
+    if (svg.cbWatch) { svg.cbWatch.disconnect(); svg.cbWatch = null; }
+    if (svg.cbBase) svg.setAttribute('viewBox', [svg.cbBase.x, svg.cbBase.y, svg.cbBase.w, svg.cbBase.h].join(' '));
+    svg.cbBase = null; svg.cbZoom = null; svg.cbShown = null;
+    if (!on) return;
+    var take = function () {
+      var v = svg.getAttribute('viewBox');
+      if (!v || v === svg.cbShown) return;
+      var n = v.split(/[\s,]+/).map(Number);
+      svg.cbBase = { x: n[0], y: n[1], w: n[2], h: n[3] };
+      showZoom(svg);
+    };
+    take();
+    svg.cbWatch = new MutationObserver(take);
+    svg.cbWatch.observe(svg, { attributes: true, attributeFilter: ['viewBox'] });
+  }
+  // Zoom to s with the drawing's point p (its units) at the screen point at.
+  function zoomAt(svg, s, p, at) {
+    var b = svg.cbBase, m = svg.getScreenCTM();
+    if (!b || !m) return;
+    s = Math.min(ZOOM_MAX, Math.max(1, s));
+    var s0 = viewZoom(svg), z = svg.cbZoom || { s: 1, cx: b.x + b.w / 2, cy: b.y + b.h / 2 };
+    var mid = { x: m.a * z.cx + m.e, y: m.d * z.cy + m.f }, k = m.a * s / s0;
+    svg.cbZoom = s <= 1 ? null : { s: s, cx: p.x - (at.x - mid.x) / k, cy: p.y - (at.y - mid.y) / k };
+    showZoom(svg);
+  }
+  function svgPoint(svg, x, y) {
+    var pt = svg.createSVGPoint(); pt.x = x; pt.y = y;
+    return pt.matrixTransform(svg.getScreenCTM().inverse());
+  }
+  function bigSvg() { var v = ROOT.querySelector('.cb-view.cb-big'); return v ? v.querySelector('svg') : null; }
+  // The bar's buttons: twice or half, about the middle; Fit.
+  function zoomBy(f) {
+    var svg = bigSvg();
+    if (!svg || !svg.cbBase) return;
+    var r = svg.getBoundingClientRect(), at = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    zoomAt(svg, f ? viewZoom(svg) * f : 1, svgPoint(svg, at.x, at.y), at);
+  }
+  function setBig(view, big) {
+    var svg = view.querySelector('svg'), before = svg.getScreenCTM() ? svg.getScreenCTM().a : 0;
+    watchZoom(svg, false);
+    view.classList.toggle('cb-big', big);
+    var k = before > 0 && svg.getScreenCTM() ? svg.getScreenCTM().a / before : 1;
+    svg.cbTextScale = big && k > 1.3 ? 1.3 / k : 1;
+    svg.style.setProperty('--cb-ts', svg.cbTextScale);
+    watchZoom(svg, big);
+    var bar = view.querySelector('.cb-zoom-bar'), hint = view.querySelector('.cb-big-hint');
+    if (big && !bar) {
+      bar = document.createElement('div');
+      bar.className = 'cb-zoom-bar';
+      bar.innerHTML = '<button type="button" class="cb-btn cb-btn-quiet" data-zoom="0.5" aria-label="Zoom out" title="Zoom out (or the mouse wheel, or pinch)">&minus;</button>' +
+        '<span class="cb-hint cb-zoom-level" id="cb-zoom-level">1&times;</span>' +
+        '<button type="button" class="cb-btn cb-btn-quiet" data-zoom="2" aria-label="Zoom in" title="Zoom in (or the mouse wheel, or pinch)">+</button>' +
+        '<button type="button" class="cb-btn cb-btn-quiet" data-zoom="0" title="Show all of it again">Fit</button>' +
+        '<button type="button" class="cb-btn cb-btn-quiet" data-close aria-label="Close" title="Back to the settings (Esc)">&times;</button>';
+      bar.addEventListener('click', function (e) {
+        var b = e.target.closest('button');
+        if (!b) return;
+        if (b.hasAttribute('data-close')) closeBig(); else zoomBy(+b.dataset.zoom);
+      });
+      view.appendChild(bar);
+      hint = document.createElement('div');
+      hint.className = 'cb-big-hint';
+      hint.textContent = 'Scroll or pinch to zoom, drag to move. Click a blank spot or press Esc to go back.';
+      view.appendChild(hint);
+    } else if (!big) { if (bar) bar.remove(); if (hint) hint.remove(); }
+  }
+  function closeBig() {
+    var v = ROOT.querySelector('.cb-view.cb-big');
+    if (v) setBig(v, false);
+    return !!v;
+  }
+  function wireZoom() {
+    ROOT.addEventListener('pointerdown', function (e) { bigDown = { x: e.clientX, y: e.clientY }; }, true);
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && closeBig()) { e.preventDefault(); e.stopPropagation(); } }, true);
+    ROOT.addEventListener('wheel', function (e) {
+      var svg = bigSvg();
+      if (!svg || !svg.contains(e.target)) return;
+      e.preventDefault();
+      if (!e.deltaY) return;
+      // A mouse notch (about 100) 1.25 times; a trackpad's small steps a little each.
+      var dy = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
+      zoomAt(svg, viewZoom(svg) * Math.pow(1.25, -Math.max(-3, Math.min(3, dy / 100))), svgPoint(svg, e.clientX, e.clientY), { x: e.clientX, y: e.clientY });
+    }, { passive: false });
+    // One pointer down on the enlarged drawing drags it; two pinch.
+    var pts = new Map(), g = null;
+    var start = function (svg) {
+      var list = Array.from(pts.values());
+      if (list.length === 1) g = { svg: svg, s: viewZoom(svg), p: svgPoint(svg, list[0].x, list[0].y) };
+      else {
+        var a = list[0], b = list[1], mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+        g = { svg: svg, s: viewZoom(svg), p: svgPoint(svg, mid.x, mid.y), d: Math.hypot(a.x - b.x, a.y - b.y) || 1 };
+      }
+    };
+    ROOT.addEventListener('pointerdown', function (e) {
+      var svg = bigSvg();
+      if (!svg || !svg.contains(e.target) || e.target.closest('[data-field]') || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      if (e.isPrimary) { pts.clear(); g = null; }
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pts.size > 2) return;
+      start(svg);
+    });
+    ROOT.addEventListener('pointermove', function (e) {
+      if (!g || !pts.has(e.pointerId)) return;
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      var list = Array.from(pts.values()), svg = g.svg;
+      if (list.length === 1) { if (!g.ignore && viewZoom(svg) > 1) zoomAt(svg, g.s, g.p, list[0]); return; }
+      var a = list[0], b = list[1];
+      zoomAt(svg, g.s * Math.hypot(a.x - b.x, a.y - b.y) / g.d, g.p, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+    });
+    // A pinch ends when either finger lifts; the other doesn't start a drag.
+    var end = function (e) { if (!pts.delete(e.pointerId)) return; if (!pts.size) g = null; else if (g && g.d) g.ignore = true; };
+    ROOT.addEventListener('pointerup', end);
+    ROOT.addEventListener('pointercancel', end);
+  }
+
   function focusField(id) {
     var inp = $(id);
     if (!inp) return;
