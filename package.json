@@ -1,6 +1,6 @@
 {
   "name": "ncsender-plugin-carved-box",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "license": "GPL-3.0-only",
   "description": "ncSender plugin: carve a two-part box with a lid from one board",
   "private": true,
