@@ -2578,6 +2578,8 @@ function autoSizes(input, material, imperial) {
     if (slope && /sloped lip needs/.test(p)) {
       if (a.lipHeight - grid(3) < 2) break;
       a.lipHeight = half(a.lipHeight - grid(3));
+      // Said on the page: the lip's as tall as the V-bit allows.
+      a.lipForBit = true;
     } else if (ed && /[Ee]dge|seam|Inside Rim/.test(p) && !/Gap/.test(p) && (ed.outside > 0 || ed.inside > 0 || ed.pocket > 0)) {
       var seam = /seam/.test(p), lead = /Lead-In/.test(p), pk = /Inside Rim/.test(p), any = !seam && !lead && !pk;
       if (edgeWall === null) edgeWall = Math.max(half(small / 6), a.wall + 2);
@@ -3101,7 +3103,7 @@ if (typeof module !== 'undefined' && module.exports) {
     // The lid as high as the stock: nothing faced away.
     var a = autoSizes(Object.assign({}, boxPlan(inputOf(v)).o, { cornerRadius: own, lidHeight: null }), v.material, state.imperial);
     a.lidHeight = lidBoard(v) > 0 ? lidBoard(v) : null;
-    state.lidOwn = false;
+    state.lidOwn = false; state.lipForBit = !!a.lipForBit;
     AUTO.forEach(function (x) {
       var mm = x[1](a), kind = FIELDS.filter(function (f) { return f[0] === x[0]; })[0][2];
       if (mm == null) return;
@@ -3660,6 +3662,14 @@ if (typeof module !== 'undefined' && module.exports) {
       if (!(v.rpm > 0)) warns.push('Spindle RPM 0: the program won\u2019t start the spindle.');
       if (v.edgesOn && !(v.edgeRpm > 0)) warns.push('Edge RPM 0: the edges are cut with the spindle off.');
       if (v.cornersOn && !(v.cornerRpm > 0)) warns.push('Corner RPM 0: the corners are cut with the spindle off.');
+      // A sloped lip held low by a small V-bit: how tall a bigger one allows.
+      if (plan.halves.some(function (h) { return h.plan.slope; })) {
+        var lipTall = state.imperial ? 3.175 : 3, lowered = state.autoSizes && state.lipForBit, vbitT = toolEntry(v.edgeTool);
+        var bigger = function (deg) { return (6.35 - (v.edgeVTip || 0) / 2) / Math.tan(deg * Math.PI / 360); };
+        if (lowered || v.lipHeight < lipTall) warns.push((lowered ? 'Lip Height ' + fmt(v.lipHeight) + ' ' + unit() + ': lowered to fit ' + (vbitT ? 'T' + vbitT.n + ', ' : 'the V-bit, ') + fmt(v.edgeDiameter) + ' ' + unit() + ' across.'
+          : 'A sloped lip under ' + fmt(lipTall) + ' ' + unit() + ' tall holds the lid loosely.') + ' A ' + (state.imperial ? '1/2"' : '12.7 mm') + ' 60\u00b0 V-bit allows about ' + fmt(bigger(60)) + ' ' + unit() +
+          ', a 90\u00b0 one about ' + fmt(bigger(90)) + ' ' + unit() + '.');
+      }
       note.textContent = 'About ' + (minutes < 1.5 ? '1 min' : Math.round(minutes) + ' min') + '. Closed: ' + fmt(plan.closedHeight) + ' ' + unit() +
         ' high, ' + fmt(plan.insideHeight) + ' ' + unit() + ' inside.' + (warns.length ? ' ' + warns.join(' ') : '');
       if (warns.length) note.classList.add('cb-warn');

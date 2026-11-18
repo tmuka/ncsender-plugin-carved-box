@@ -1058,6 +1058,10 @@ test('a sloped lip that doesn\'t fit says why; Auto Sizes and Test Fit keep it',
   said({ wall: 10, lipWidth: 5, lipHeight: 6, edges: V }, /^Sloped lip: .* the lip's top would be/);
   said({ wall: 16, lipWidth: 10, lipHeight: 8, edges: { ...V, diameter: 12.7 } }, /sloped lip needs one/);
   said({ shape: 'rect', length: 120, width: 80, cornerRadius: 4, wall: 12, lipWidth: 7, lipHeight: 5, edges: V }, /sloped lip's slant/);
+  // A small V-bit: Auto Sizes lowers the lip to fit it, and says so.
+  const small = autoSizes({ stock: 25.4, bit: 6.35, edges: { ...V, diameter: 6.35, vtip: 0.2 } }, 'hardwood', true);
+  assert.ok(small.lipForBit && small.lipHeight < 3.2 && small.problems.length === 0, JSON.stringify(small));
+  assert.ok(!autoSizes({ stock: 25.4, bit: 6.35, edges: { ...V, angle: 60, diameter: 25.4 } }, 'hardwood', true).lipForBit);
   // A roundover bit has no slope: the lip stays straight.
   assert.equal(boxPlan({ edges: { bit: 'round', radius: 2, tip: 3, outside: 0, inside: 0, slope: true } }).slope, 0);
   for (const shape of [{ diameter: 100 }, { shape: 'rect', length: 150, width: 90 }, { shape: 'oval', length: 160, width: 100 }]) for (const angle of [60, 90]) {
