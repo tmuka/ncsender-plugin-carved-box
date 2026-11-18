@@ -68,7 +68,8 @@ function allowed(set, half, p) {
   const rc = o.corners ? o.corners.radius : 0;
   if (at(plan.tInside - rb) <= eps && d <= floor + eps && (d <= floor - rc + eps || at(plan.tInside - rc - rb) <= eps)) return true;
   if (withLip && at(plan.tLip + rb) >= -eps && d <= plan.lipUp + eps) return true;
-  if (!withLip && at(plan.tRabbet - rb) <= eps && d <= plan.rabbetDepth + eps) return true;
+  // A sloped lip's opening: the box's bit only to its floor's width.
+  if (!withLip && at((plan.tOpen ?? plan.tRabbet) - rb) <= eps && d <= plan.rabbetDepth + eps) return true;
   for (const m of half.magnetAt || plan.magnetAt) {
     if (Math.hypot(px - m.dx, py - m.dy) <= o.magnets.diameter / 2 - rb + eps && d <= meet + o.magnets.depth + eps) return true;
   }
@@ -223,9 +224,11 @@ function checkEdges(plan, gcode) {
   const all = plan.halves.flatMap((h) => plan.edges[h.name].map((e) => ({ h, e })));
   for (const p of pts) {
     assert.ok(!p.rapid, 'a rapid below the stock top');
-    const on = all.filter(({ h, e }) => Math.abs(shapeDistance(e.shape, e.t, p.x - h.at.x, p.y - h.at.y)) < 0.005 && p.z >= e.z0 - e.depth - 1e-6);
+    // An outline's loops are straight lines kept to 0.02 mm of its curve.
+    const tol = (e) => e.shape.kind === 'outline' ? 0.03 : 0.005;
+    const on = all.filter(({ h, e }) => Math.abs(shapeDistance(e.shape, e.t, p.x - h.at.x, p.y - h.at.y)) < tol(e) && p.z >= e.z0 - e.depth - 1e-6);
     // Above an edge's top, going down to it in the air.
-    const above = all.some(({ h, e }) => Math.abs(shapeDistance(e.shape, e.t, p.x - h.at.x, p.y - h.at.y)) < 0.005 && p.z >= e.z0 - 1e-6);
+    const above = all.some(({ h, e }) => Math.abs(shapeDistance(e.shape, e.t, p.x - h.at.x, p.y - h.at.y)) < tol(e) && p.z >= e.z0 - 1e-6);
     assert.ok(on.length || above, 'edge bit off its edges: ' + JSON.stringify(p));
     // Below an edge's top, the bit's bottom stays on the air side: a
     // V-bit's point on the edge, a roundover bit's flat end beside it.
@@ -233,11 +236,12 @@ function checkEdges(plan, gcode) {
     for (const { h, e } of on) {
       if (p.z >= e.z0 - 1e-6) continue;
       const out = e.u * shapeDistance(e.shape, e.at, p.x - h.at.x, p.y - h.at.y);
-      assert.ok(Math.abs(out - half) < 0.01, h.name + ' ' + e.what + ': bit ' + out.toFixed(3) + ' off the edge, not ' + half);
+      assert.ok(Math.abs(out - half) < tol(e) + 0.005, h.name + ' ' + e.what + ': bit ' + out.toFixed(3) + ' off the edge, not ' + half);
     }
   }
   for (const { h, e } of all) {
-    assert.ok(pts.some((p) => Math.abs(p.z - (e.z0 - e.depth)) < 1e-6 && Math.abs(shapeDistance(e.shape, e.t, p.x - h.at.x, p.y - h.at.y)) < 0.005), h.name + ' ' + e.what + ' not cut');
+    const t = e.shape.kind === 'outline' ? 0.03 : 0.005;
+    assert.ok(pts.some((p) => Math.abs(p.z - (e.z0 - e.depth)) < 1e-6 && Math.abs(shapeDistance(e.shape, e.t, p.x - h.at.x, p.y - h.at.y)) < t), h.name + ' ' + e.what + ' not cut');
   }
 }
 
@@ -1002,3 +1006,68 @@ test('review fixes: drawings from underneath, rounded drawings centered, holes o
   assert.ok(Math.abs(big.size.w - 100) < 0.01 && Date.now() - t < 1500, 'joined in ' + (Date.now() - t) + ' ms');
 });
 function plan0() { return 0; }
+
+test('a sloped lip: the V-bit slopes the lip and the opening alike, cutting nothing that stays', () => {
+  const EF = { toolNumber: 5, feed: 1000, plunge: 300, rpm: 16000, delay: 2, doc: 1.5 };
+  for (const lipOn of ['base', 'lid']) for (const shape of [{}, { shape: 'rect', length: 130, width: 90, cornerRadius: 16 }, { shape: 'heart', length: 120, width: 110, cornerRadius: 14 }]) {
+    for (const edges of [{ bit: 'v', angle: 90, diameter: 12.7, vtip: 0.3, outside: 0, inside: 1.5, pocket: 0, slope: true }, { bit: 'v', angle: 60, diameter: 12.7, outside: 1, inside: 0, pocket: 0.5, slope: true }]) {
+      const input = Object.assign({ lipOn, wall: 14, lipWidth: 8, lipHeight: 5, lidHeight: 16, finish: 0.3, edges }, shape);
+      const { plan } = check(input);
+      const slant = Math.tan(edges.angle * Math.PI / 360), tip = (edges.vtip || 0) / 2;
+      assert.ok(Math.abs(plan.slope - slant) < 1e-12 && Math.abs(plan.tOpen - (plan.tRabbet - plan.rabbetDepth * slant)) < 1e-12);
+      const lipHalf = lipOn, rabHalf = lipOn === 'lid' ? 'base' : 'lid';
+      // No lead-in with a sloped lip: the slopes take its place.
+      assert.ok(!plan.edges[lipHalf].some((e) => /lip's outer edge/.test(e.what)) && !plan.edges[rabHalf].some((e) => /opening edge/.test(e.what)));
+      const lipE = plan.edges[lipHalf].find((e) => /sloped side/.test(e.what)), openE = plan.edges[rabHalf].find((e) => /sloped wall/.test(e.what));
+      assert.ok(lipE && openE, 'both slopes');
+      // Closed, the gap is the Clearance all the way down: the lip h above
+      // its shoulder, the opening h below its rim.
+      for (const h of [0, 1, 2.5, plan.lipUp]) {
+        const lipAt = lipE.at - h * slant, openAt = openE.at + (openE.depth - h) * slant;
+        assert.ok(Math.abs(openAt - lipAt - plan.o.clearance) < 1e-9, 'gap at ' + h);
+      }
+      const gcode = boxProgram(plan, Object.assign({}, FEEDS, { edges: EF }), 'edges').gcode;
+      checkEdges(plan, gcode);
+      // The V-bit's cone, its tip at each point, clear of what stays: the
+      // lip inside its sloped face, the rim outside the opening's, and
+      // nothing below the shoulder or the opening's floor.
+      for (const p of simulate(gcode).filter((q) => q.z < 0)) {
+        // The half it's on (its edges are inside its outline).
+        const near = (h) => shapeDistance(h.shape || plan.shape, 0, p.x - h.at.x, p.y - h.at.y);
+        for (const half of [plan.halves.reduce((a, b) => near(a) <= near(b) ? a : b)]) {
+          const S = half.shape || plan.shape, px = p.x - half.at.x, py = p.y - half.at.y, top = -plan.faces[half.name];
+          // An outline's loops are straight lines kept to 0.02 mm of its curve.
+          const tol = S.kind === 'outline' ? 0.03 : 0.01;
+          for (let z = 0; z <= 6.35 / slant; z += 0.25) {
+            const lvl = p.z + z, r = Math.min(tip + z * slant, 6.35), d = top - lvl;
+            if (d < -1e-9) break;
+            // (The Inside Rim's bit chamfers the lip from inside: not this.)
+            if (half.name === lipHalf && d <= plan.lipUp && shapeDistance(S, plan.tInside, px, py) > 0.05) assert.ok(shapeDistance(S, plan.tLip - (plan.lipUp - d) * slant, px, py) >= r - tol, 'into the lip: ' + JSON.stringify(p));
+            // (The outside seam's bit chamfers the rim from outside: not this.)
+            if (half.name === rabHalf && d <= plan.rabbetDepth && shapeDistance(S, plan.tRabbet, px, py) < -0.05) assert.ok(-shapeDistance(S, plan.tRabbet - d * slant, px, py) >= r - tol, 'into the rim: ' + JSON.stringify(p));
+          }
+        }
+      }
+    }
+  }
+});
+
+test('a sloped lip that doesn\'t fit says why; Auto Sizes and Test Fit keep it', () => {
+  const V = { bit: 'v', angle: 90, diameter: 12.7, outside: 0, inside: 0, pocket: 0, slope: true };
+  const said = (input, re) => assert.ok(boxPlan(input).problems.some((p) => re.test(p)), JSON.stringify(boxPlan(input).problems));
+  said({ wall: 10, lipWidth: 5, lipHeight: 6, edges: V }, /^Sloped lip: .* the lip's top would be/);
+  said({ wall: 16, lipWidth: 10, lipHeight: 8, edges: { ...V, diameter: 12.7 } }, /sloped lip needs one/);
+  said({ shape: 'rect', length: 120, width: 80, cornerRadius: 4, wall: 12, lipWidth: 7, lipHeight: 5, edges: V }, /sloped lip's slant/);
+  // A roundover bit has no slope: the lip stays straight.
+  assert.equal(boxPlan({ edges: { bit: 'round', radius: 2, tip: 3, outside: 0, inside: 0, slope: true } }).slope, 0);
+  for (const shape of [{ diameter: 100 }, { shape: 'rect', length: 150, width: 90 }, { shape: 'oval', length: 160, width: 100 }]) for (const angle of [60, 90]) {
+    const input = Object.assign({ stock: 25.4, bit: 6.35, edges: { ...V, angle, vtip: 0.2 } }, shape);
+    const a = autoSizes(input, 'hardwood', true);
+    assert.deepEqual(a.problems, [], JSON.stringify([input, a]));
+    const plan = boxPlan(Object.assign({}, input, a));
+    assert.ok(plan.slope > 0 && plan.o.lipWidth - (plan.lipUp + (a.edges.pocket || 0)) * plan.slope >= 1 - 1e-9);
+    const tf = boxPlan(testFitInput(Object.assign({}, input, a)));
+    assert.deepEqual(tf.problems, []);
+    assert.ok(tf.slope > 0 && tf.halves.every((h) => tf.edges[h.name].length === 1), 'Test Fit keeps just the slopes');
+  }
+});

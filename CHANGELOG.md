@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Sloped Lip** (Edges, with a V-bit): the lip's outer side and the opening's wall cut at the V-bit's angle, so the lid centers itself as it closes, with the Clearance kept all the way down. It takes the Lead-In's place. Auto Sizes makes the lip thick enough and low enough for the V-bit, and Test Fit cuts the slopes too.
 - The Finishing Pass card is gone: the finishing pass is always on, set by the Material as before. Settings saved with it off now get it too.
 
 ## 0.3.2: Your own shapes, cleaner steps, a tighter lip

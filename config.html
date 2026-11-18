@@ -298,6 +298,7 @@
           <div class="cb-field"><label for="cb-evtip">Tip Diameter</label><input class="cb-input" id="cb-evtip" data-unit="length" title="Across the V-bit's flat tip (no V-bit comes to a true point): the bit goes half of it off the edge, so the chamfer starts right at the edge."></div>
           <div class="cb-field"><label for="cb-ediam">V-Bit Diameter</label><input class="cb-input" id="cb-ediam" data-unit="length" title="Across the top of the V: how wide a chamfer it can cut, and how far it reaches round an edge below the stock top."></div>
         </div>
+        <div class="cb-grain-row" id="cb-slope-row"><label class="cb-switch" title="The lip's side and the opening's wall cut at the V-bit's angle, so the lid centers itself as it closes. In place of the Lead-In."><input type="checkbox" id="cb-slope" aria-label="Sloped lip"><span></span></label><span class="cb-hint">Sloped Lip: the lid centers itself as it closes</span></div>
         <div class="cb-row" id="cb-eround-fields">
           <div class="cb-field"><label for="cb-erad">Roundover Radius</label><input class="cb-input" id="cb-erad" data-unit="length" title="The radius the bit leaves on the edge."></div>
           <div class="cb-field"><label for="cb-etip">Tip Diameter</label><input class="cb-input" id="cb-etip" data-unit="length" title="Across the flat end of the bit, below the curve."></div>
@@ -432,7 +433,7 @@
     <div class="cb-card">
       <h3>Other bits: floor corners and edges</h3>
       <p><b>Magnets:</b> with a tool changer set up in ncSender, pick a smaller <b>Magnet Bit</b> (an end mill, not a drill) from the Tool Library: the program changes to it for the holes after the outlines, with starting feeds for its size in your material. A 1/4" box bit can't cut 5 mm holes, a 1/8" one can.</p>
-      <p><b>Floor Corners</b> rounds where each pocket's floor meets its wall, with a ball or bowl bit. <b>Edges</b> chamfers or rounds the edges with a V-bit or roundover bit: the <b>Lead-In</b> on the lip's outer edge and the opening's edge helps the lid find its way on. Both are cut after the outlines, while the tabs still hold the halves.</p>
+      <p><b>Floor Corners</b> rounds where each pocket's floor meets its wall, with a ball or bowl bit. <b>Edges</b> chamfers or rounds the edges with a V-bit or roundover bit: the <b>Lead-In</b> on the lip's outer edge and the opening's edge helps the lid find its way on. With a V-bit, <b>Sloped Lip</b> cuts the lip's whole side and the opening's wall at the V-bit's angle instead, the opening narrower at its floor by as much as the lip is at its top, so the lid centers itself as it closes; the V-bit has to be at least twice the Lip Height across (at 90°), and the lip thicker than its slant. Both are cut after the outlines, while the tabs still hold the halves.</p>
       <ul>
         <li>With a tool changer set up in ncSender (a manual one too) and the bits picked from the Tool Library, Generate makes one program that changes bits (M6).</li>
         <li>Otherwise, cut the box, put the other bit in, zero Z on the top of the stock (keep X and Y), and run <b>Corners Only</b> or <b>Edges Only</b>.</li>
@@ -1944,7 +1945,9 @@ if (typeof module !== 'undefined' && module.exports) {
  * chamfered or rounded edges (a V-bit or roundover bit), both cut after
  * the outlines: the outside seam (each rim's outer edge), the lead-in (the
  * lip's outer edge, the opening's) and the pocket edges (the lip's inner
- * edge, the step's).
+ * edge, the step's). A sloped lip (edges.slope, a V-bit): the lip's outer
+ * side and the opening's wall cut at the V-bit's angle, the opening that
+ * much narrower at its floor, so the lid centers itself as it closes.
  *
  * A cut: { op: 'pocket' (inside the outline moved t), op: 'ring' (between
  * the outline moved tIn and tOut), shape (its own, for a hole; else the
@@ -1960,7 +1963,8 @@ if (typeof module !== 'undefined' && module.exports) {
 // tip: the diameter of its flat end), outside (the seam), inside (the
 // lead-in: the lip's outer edge, the opening's), pocket (each pocket's
 // top edge: the lip's inner edge, the step's in the other half): how far
-// down each edge is cut, 0 for none }. magnets: { count, diameter,
+// down each edge is cut, 0 for none; slope: a V-bit cuts the lip's
+// side and the opening's wall sloped, in place of the lead-in }. magnets: { count, diameter,
 // depth, bit, drill }: bit, a smaller bit's diameter for the holes, cut
 // after a tool change (plan.magnets), or null for the box's bit; drill:
 // it's a drill, which can't. corners: { diameter, radius }: a
@@ -2024,6 +2028,10 @@ function boxPlan(input) {
   // lower (its shoulder cut that much less), so it doesn't touch the
   // bottom of the opening and the halves still meet on the shoulder.
   var rabbetDepth = o.lipHeight, lipUp = o.lipHeight - o.clearance;
+  // A sloped lip: the opening as much narrower at its floor as the lip is
+  // at its top, at the V-bit's slant, so the gap stays the Clearance.
+  var slope = !!(o.edges && o.edges.slope && o.edges.bit !== 'round'), slant = slope ? Math.tan((o.edges.angle || 90) * Math.PI / 360) : 0;
+  var tOpen = tRabbet - rabbetDepth * slant, slantSay = slope ? ', plus the sloped lip\'s slant (' + (rabbetDepth * slant).toFixed(2) + ' mm)' : '';
   var height = { base: baseH, lid: lidH }, under = { base: o.floor, lid: o.top };
   var lipHalf = lipOnLid ? 'lid' : 'base', rabbetHalf = lipOnLid ? 'base' : 'lid';
 
@@ -2037,7 +2045,7 @@ function boxPlan(input) {
   if (poly) need(o.flats > 0 && o.sides >= 3 && o.sides <= 12 && o.sides === Math.round(o.sides), 'A polygon needs 3 to 12 sides and a size across the flats');
   // An oval's ends are its corners: the lip's must fit the opening's there,
   // as a rectangle's.
-  if (oval && S.kind === 'outline') need(S.cr + tRabbet >= rb - 1e-9, 'The oval\'s ends are too tight for the lip: make it wider, or the Wall thinner (its ends\' radius must be at least Wall \u2212 Lip Thickness \u2212 Clearance + half the bit)');
+  if (oval && S.kind === 'outline') need(S.cr + tOpen >= rb - 1e-9, 'The oval\'s ends are too tight for the lip: make it wider, or the Wall thinner (its ends\' radius must be at least Wall \u2212 Lip Thickness \u2212 Clearance + half the bit' + slantSay + ')');
   // A heart's notch is a corner the other way: the shoulder bit must get
   // into the lip's side of it.
   if (heart && S.kind === 'outline') need(w - o.lipWidth - fin0 >= rb - 1e-9, 'Wall must be at least Lip Thickness + half the bit for a heart, so the bit gets into the lip\'s side of the notch');
@@ -2045,7 +2053,7 @@ function boxPlan(input) {
     need((o.cornerRadius || 0) >= 0, 'Corner Radius can\'t be negative');
     // Under this, the bit leaves the opening's corners rounder than the
     // lip's, and the lip binds there.
-    need(S.cr + tRabbet >= rb - 1e-9, 'Corner Radius must be at least Wall \u2212 Lip Thickness \u2212 Clearance + half the bit, so the lip\'s corners fit the opening');
+    need(S.cr + tOpen >= rb - 1e-9, 'Corner Radius must be at least Wall \u2212 Lip Thickness \u2212 Clearance + half the bit' + slantSay + ', so the lip\'s corners fit the opening');
   } else need(o.diameter > 0, 'Diameter must be more than 0');
   need(T > 0, 'Stock Thickness must be more than 0');
   need(lidH <= B.lid + 1e-9, B.sep ? 'Lid Height can\'t be more than the lid\'s board' : 'Lid Height can\'t be more than the stock thickness');
@@ -2145,7 +2153,7 @@ function boxPlan(input) {
   // bit reaches, for the waste round a seam below the stock top to be
   // cleared that far first.
   var edgeAt = { base: [], lid: [] }, ed = o.edges, reachOut = { base: 0, lid: 0 };
-  if (ed && (ed.outside > 0 || ed.inside > 0 || ed.pocket > 0)) {
+  if (ed && (ed.outside > 0 || ed.inside > 0 || ed.pocket > 0 || slope)) {
     // tip: the flat end's diameter (a V-bit's is small, not a point).
     var vbit = ed.bit !== 'round', tan = Math.tan((ed.angle || 90) * Math.PI / 360), R = ed.radius, tip = (vbit ? ed.vtip : ed.tip) || 0;
     if (vbit) {
@@ -2155,8 +2163,13 @@ function boxPlan(input) {
     need(!(ed.outside < 0 || ed.inside < 0 || ed.pocket < 0), 'Edges: sizes can\'t be negative');
     if (!vbit && R > 0) need(!(ed.outside > R + 1e-9 || ed.inside > R + 1e-9 || ed.pocket > R + 1e-9), 'Edges: a roundover can\'t go deeper than the bit\'s radius');
     var width = function(d) { return !(d > 0) ? 0 : vbit ? d * tan : R - Math.sqrt(Math.max(0, R * R - d * d)); };
-    var eOut = width(ed.outside), eIn = width(ed.inside), ePk = width(ed.pocket), eMax = Math.max(eOut, eIn, ePk);
-    if (vbit) need(eMax + tip / 2 <= ed.diameter / 2 + 1e-9, 'Edges: the V-bit is too small: the widest edge needs one ' + (2 * eMax + tip).toFixed(2) + ' mm across');
+    // A sloped lip takes the lead-in's place: the lip's side all the way
+    // down to the shoulder, the opening's wall to its floor. eIn: what's
+    // off the lip's top; eRim: off the rim round the opening.
+    var lead = slope ? 0 : ed.inside;
+    var eOut = width(ed.outside), eIn = slope ? width(lipUp) : width(lead), eRim = slope ? 0 : eIn, ePk = width(ed.pocket);
+    var eMax = Math.max(eOut, eIn, ePk, slope ? width(rabbetDepth) : 0);
+    if (vbit) need(eMax + tip / 2 <= ed.diameter / 2 + 1e-9, 'Edges: the V-bit is too small: the ' + (slope && eMax > Math.max(eOut, ePk) ? 'sloped lip' : 'widest edge') + ' needs one ' + (2 * eMax + tip).toFixed(2) + ' mm across' + (slope && eMax > Math.max(eOut, ePk) ? ', or a lower Lip Height' : ''));
     need(tip >= 0 && (!vbit || tip < ed.diameter), 'Edges: the tip diameter must be 0 or more, and less than the bit\'s');
     // An inside pocket's corners are at least the bit's radius: an edge
     // there follows them.
@@ -2167,20 +2180,27 @@ function boxPlan(input) {
     var tops = { base: -faces.base, lid: -faces.lid };
     add(rabbetHalf, 0, 1, tops[rabbetHalf], ed.outside, 'outside seam edge');
     add(lipHalf, 0, 1, tops[lipHalf] - lipUp, ed.outside, 'outside seam edge');
-    add(rabbetHalf, tRabbet, -1, tops[rabbetHalf], ed.inside, 'opening edge');
-    add(lipHalf, tLip, 1, tops[lipHalf], ed.inside, 'lip\'s outer edge');
+    add(rabbetHalf, tRabbet, -1, tops[rabbetHalf], lead, 'opening edge');
+    add(lipHalf, tLip, 1, tops[lipHalf], lead, 'lip\'s outer edge');
+    // The V-bit's tip at the foot of each slope: the opening's floor, the shoulder.
+    if (slope) {
+      add(rabbetHalf, tOpen, -1, tops[rabbetHalf], rabbetDepth, 'opening\'s sloped wall');
+      add(lipHalf, tLip, 1, tops[lipHalf], lipUp, 'lip\'s sloped side');
+    }
     add(lipHalf, tInside, -1, tops[lipHalf], ed.pocket, 'lip\'s inner edge');
     add(rabbetHalf, tInside, -1, tops[rabbetHalf] - rabbetDepth, ed.pocket, 'step\'s inner edge');
     // What each edge leaves: the rim between the outline and the widened
     // opening, the shoulder outside the lip, the lip itself.
-    need(eOut + eIn <= -tRabbet - 0.5, 'Edges too big for the rim round the widened opening: make them smaller, or the wall thicker');
-    need(eIn + ePk <= o.lipWidth - 0.3, 'Lead-In and Inside Rim too big for the lip: they take ' + (eIn + ePk).toFixed(2) + ' mm of it');
+    need(eOut + eRim <= -tRabbet - 0.5, 'Edges too big for the rim round the widened opening: make them smaller, or the wall thicker');
+    if (slope) need(eIn + ePk <= o.lipWidth - 1, 'Sloped lip: at the V-bit\'s angle, the lip\'s top would be ' + Math.max(0, o.lipWidth - eIn - ePk).toFixed(2) + ' mm thick (it needs 1 mm): make the Lip Thickness wider, the Lip Height lower, or use a V-bit with a narrower angle');
+    else need(eIn + ePk <= o.lipWidth - 0.3, 'Lead-In and Inside Rim too big for the lip: they take ' + (eIn + ePk).toFixed(2) + ' mm of it');
     // The step the lip sits on, in the other half: its inner edge is down
     // at the step, the widened opening's wall above it.
     if (ed.pocket > 0) {
-      var step = o.lipWidth + o.clearance, upStep = rabbetDepth + ed.pocket;
+      // A sloped opening's wall leans away as the V-bit's cone does.
+      var step = tOpen - tInside, upStep = rabbetDepth + ed.pocket;
       need(ePk <= step - 0.3, 'Inside Rim too big for the step the lip sits on');
-      need((vbit ? Math.min(upStep * tan, ed.diameter / 2) : R) <= step - 0.3, 'The Inside Rim\'s bit would cut into the widened opening\'s wall: make it smaller, the Lip Thickness wider, or use a narrower V-bit');
+      need((vbit ? (slope ? ePk : Math.min(upStep * tan, ed.diameter / 2)) : R) <= step - 0.3, 'The Inside Rim\'s bit would cut into the widened opening\'s wall: make it smaller, the Lip Thickness wider, or use a narrower V-bit');
       need(!(ed.pocket >= Math.min(baseH - o.floor, lidH - o.top) - rabbetDepth - 1), 'Inside Rim too deep for the inside');
     }
     // The seam on the half with the lip is down at the shoulder: the bit,
@@ -2197,17 +2217,17 @@ function boxPlan(input) {
     }
     // The bit's tip stays above what's below the edges inside: the
     // shoulder by the lip, the widened opening's floor.
-    need(!(ed.inside >= lipUp - 0.2) && !(ed.inside > rabbetDepth - 0.2), 'Lead-In edges must be less deep than the Lip Height');
+    need(!(lead >= lipUp - 0.2) && !(lead > rabbetDepth - 0.2), 'Lead-In edges must be less deep than the Lip Height');
     need(!(ed.outside >= Math.min(baseH, lidH) - lipUp - (o.tabs ? o.tabs.height : 0) - 1), 'Outside seam edge too deep for the halves');
     // An inside edge's bit fits across the inside.
-    var reach = vbit ? tip + Math.max(eIn, ePk) : tip + R;
-    if (ed.inside > 0 || ed.pocket > 0) need(deep + tInside > reach + 0.5, 'Edges: the inside is too small for the edge bit');
+    var reach = vbit ? tip + Math.max(eIn, ePk, slope ? width(rabbetDepth) : 0) : tip + R;
+    if (lead > 0 || ed.pocket > 0 || slope) need(deep + tInside > reach + 0.5, 'Edges: the inside is too small for the edge bit');
     // Beside the finger notch and the magnet holes.
     if (notchCut) {
       need(!(ed.outside > o.notch.depth - 0.3), 'The outside seam must be less deep than the finger notch');
-      if (lipOnLid) need(notchCut.shape.r <= -tRabbet - eIn - 0.8, 'Finger notch too wide for the rim left by the opening\'s edge');
+      if (lipOnLid) need(notchCut.shape.r <= -tRabbet - eRim - 0.8, 'Finger notch too wide for the rim left by the opening\'s edge');
     }
-    if (magnetAt.length) need(Math.max(eOut, eIn) + o.magnets.diameter / 2 <= -tRabbet / 2 - 0.5, 'Edges too big beside the magnet holes');
+    if (magnetAt.length) need(Math.max(eOut, eRim) + o.magnets.diameter / 2 <= -tRabbet / 2 - 0.5, 'Edges too big beside the magnet holes');
     // Clearing that far round the seam stays clear of the other half.
     if (!B.sep) need(Math.max(reachOut.base, reachOut.lid) + 1 <= o.gap - o.bit, 'The outside seam\'s bit reaches too far for the Gap: make the Gap wider');
   }
@@ -2272,7 +2292,7 @@ function boxPlan(input) {
     var z0 = -faces[name], cuts = [];
     var waste = Math.max(2 * rb, reachOut[name] + 1);
     if (faces[name] > 1e-9) cuts.push({ op: 'pocket', t: waste, dx: 0, dy: 0, z0: 0, depth: faces[name], what: 'faced down to the ' + name + ' height' });
-    if (name === rabbetHalf) cuts.push({ op: 'pocket', t: tRabbet, dx: 0, dy: 0, z0: z0, depth: rabbetDepth, finish: fin, floor: fin, floorFrom: tInside, what: 'opening widened for the lip' });
+    if (name === rabbetHalf) cuts.push({ op: 'pocket', t: tOpen, dx: 0, dy: 0, z0: z0, depth: rabbetDepth, finish: fin, floor: fin, floorFrom: tInside, what: 'opening widened for the lip' + (slope ? ' (its floor\'s width; the V-bit slopes its wall)' : '') });
     var inDepth = height[name] - under[name];
     if (rc > 0) {
       cuts.push({ op: 'pocket', t: tInside, dx: 0, dy: 0, z0: z0, depth: inDepth - rc, finish: fin, what: 'inside' });
@@ -2300,7 +2320,7 @@ function boxPlan(input) {
   var one = halves[0];
   var plan = {
     o: o, problems: problems, notes: notes, shape: S, mirror: mirror, halfX: halfX, halfY: halfY, ext: ext, margin: m,
-    tInside: tInside, tRabbet: tRabbet, tLip: tLip, rabbetDepth: rabbetDepth, lipUp: lipUp, lidHeight: lidH, baseHeight: baseH, face: face, faces: faces,
+    tInside: tInside, tRabbet: tRabbet, tLip: tLip, tOpen: tOpen, slope: slope ? slant : 0, rabbetDepth: rabbetDepth, lipUp: lipUp, lidHeight: lidH, baseHeight: baseH, face: face, faces: faces,
     halves: halves, magnetAt: magnetAt, magnets: magnetCuts, notch: notchCut, edges: edgeAt, corners: cornerAt, boards: B, originSay: originSay,
     // The stock needed: its size and front-left corner.
     stock: B.sep ? { w: stockW, h: stockH, x0: one.at.x + all.minX - m, y0: one.at.y + all.minY - m, thick: one.name === 'lid' ? B.lid : T }
@@ -2335,7 +2355,7 @@ function boardsOf(o) {
 
 // A small box with the same fit, only as deep inside as the lip needs:
 // cut it first to try the Clearance, both halves from one board. No
-// magnets, notch, edges or faced lid. A
+// magnets, notch, edges (but a sloped lip) or faced lid. A
 // rectangle keeps its corner radius (where a lip fits worst).
 function testFitInput(input) {
   var o = Object.assign({}, DEFAULTS, input || {});
@@ -2348,7 +2368,8 @@ function testFitInput(input) {
   var fit = function(hf) {
     return Object.assign({}, o, {
       diameter: 2 * hf, length: k ? 2 * hf * o.length * k : 2 * hf, width: k ? 2 * hf * o.width * k : 2 * hf, flats: 2 * hf, cornerRadius: cr,
-      lidHeight: null, baseHeight: null, magnets: null, notch: null, edges: null, corners: null, cut: 'both', grain: false,
+      lidHeight: null, baseHeight: null, magnets: null, notch: null, corners: null, cut: 'both', grain: false,
+      edges: o.edges && o.edges.slope ? Object.assign({}, o.edges, { outside: 0, inside: 0, pocket: 0 }) : null,
       floor: Math.max(1, B.base - deep), top: Math.max(1, B.base - deep)
     });
   };
@@ -2529,6 +2550,7 @@ function autoSizes(input, material, imperial) {
   if (o.notch) a.notch = { width: half(clamp(small * 0.18, 10, 20)), depth: Math.min(half(clamp(a.lipHeight, 3, 6)), Math.max(grid(1), Math.floor(notchRoom / grid(notchRoom)) * grid(notchRoom))) };
   // Edges: a lead-in for the lid to find its way on, no outside seam.
   if (o.edges) a.edges = Object.assign({}, o.edges, { outside: 0, inside: half(o.edges.bit === 'round' ? Math.min(o.edges.radius || 1.5, 1.5) : 1.5), pocket: half(0.5) });
+  var slope = !!(o.edges && o.edges.slope && o.edges.bit !== 'round'), slant = slope ? Math.tan((o.edges.angle || 90) * Math.PI / 360) : 0;
   // Edges get room from a lower lip and a wall up to a sixth of the size
   // or 2 mm more than it was (in wood, the wall first and the lip not
   // under 1/4"); then they're made smaller. A notch narrower, to 12 mm.
@@ -2541,7 +2563,9 @@ function autoSizes(input, material, imperial) {
     var down = function(v) { return Math.floor(v / grid(v) + 1e-9) * grid(v); };
     a.lipWidth = Math.max(grid(1), down(a.wall / 2));
     if (a.magnets) a.lipWidth = Math.min(a.lipWidth, Math.max(6.35, down(a.wall - a.clearance - a.magnets.diameter - 1.6 - 0.05)));
-    if (rect || poly || o.shape === 'heart' || o.shape === 'custom') a.cornerRadius = Math.max(o.cornerRadius || 0, upHalf(a.wall - a.lipWidth - a.clearance + b / 2));
+    // A sloped lip as thick as its slant at the V-bit's angle, and 1 mm more at its top.
+    if (slope) a.lipWidth = Math.max(a.lipWidth, upHalf((a.lipHeight - a.clearance) * slant + (a.edges.pocket || 0) * slant + 1.05));
+    if (rect || poly || o.shape === 'heart' || o.shape === 'custom') a.cornerRadius = Math.max(o.cornerRadius || 0, upHalf(a.wall - a.lipWidth - a.clearance + b / 2 + a.lipHeight * slant));
     // A heart's point under its lobes' radius.
     if (o.shape === 'heart') a.cornerRadius = Math.min(a.cornerRadius, Math.max(o.cornerRadius || 0, (o.length || 0) / 2 / 1.72 - 1));
     plan = boxPlan(Object.assign({}, o, a));
@@ -2550,7 +2574,11 @@ function autoSizes(input, material, imperial) {
     // hole too deep) is left to say: the rest still fit.
     var p = plan.problems.filter(fixable)[0], ed = a.edges;
     if (!p) break;
-    if (ed && /[Ee]dge|seam|Inside Rim/.test(p) && !/Gap/.test(p) && (ed.outside > 0 || ed.inside > 0 || ed.pocket > 0)) {
+    // A V-bit too small for the sloped lip: a lower lip.
+    if (slope && /sloped lip needs/.test(p)) {
+      if (a.lipHeight - grid(3) < 2) break;
+      a.lipHeight = half(a.lipHeight - grid(3));
+    } else if (ed && /[Ee]dge|seam|Inside Rim/.test(p) && !/Gap/.test(p) && (ed.outside > 0 || ed.inside > 0 || ed.pocket > 0)) {
       var seam = /seam/.test(p), lead = /Lead-In/.test(p), pk = /Inside Rim/.test(p), any = !seam && !lead && !pk;
       if (edgeWall === null) edgeWall = Math.max(half(small / 6), a.wall + 2);
       var lower = (seam || pk) && a.lipHeight - grid(3) >= minLip - 1e-9;
@@ -2565,7 +2593,7 @@ function autoSizes(input, material, imperial) {
     else if (/Gap/.test(p)) a.gap = half(a.gap + 2 * grid(3));
     else if (/ends are too tight/.test(p) && a.wall > 3) a.wall = half(a.wall - grid(3));
     // Only what a thicker wall fixes; anything else is the box's own to say.
-    else if (/Magnet holes too wide|Too many magnets|notch|Wall must be at least|Corner Radius must/.test(p) && a.wall < small / 2 - b - 2) a.wall = half(a.wall + grid(3));
+    else if (/Magnet holes too wide|Too many magnets|notch|Wall must be at least|Corner Radius must|^Sloped lip/.test(p) && a.wall < small / 2 - b - 2) a.wall = half(a.wall + grid(3));
     else break;
   }
   a.problems = plan.problems;
@@ -2895,7 +2923,7 @@ function boxProgram(plan, f, only) {
     comment('Box ' + (i + 1) + ': ' + boxSize(p, mm3, unit) + ', ' + n3(p.closedHeight) + unit + ' closed, ' + n3(p.insideHeight) + unit + ' inside');
   });
   comment('Wall ' + mm3(o.wall) + ', floor ' + mm3(o.floor) + ', top ' + mm3(o.top) + unit);
-  comment('Lip on the ' + o.lipOn + ': ' + mm3(plan.lipUp) + ' high, ' + mm3(o.lipWidth) + ' wide, ' + mm3(o.clearance) + unit + ' clearance');
+  comment('Lip on the ' + o.lipOn + ': ' + mm3(plan.lipUp) + ' high, ' + mm3(o.lipWidth) + (plan.slope ? ' wide at its foot, its side sloped, ' : ' wide, ') + mm3(o.clearance) + unit + ' clearance');
   if (!plan.set) ['base', 'lid'].forEach(function(h) {
     if (plan.faces && plan.faces[h] > 0 && plan.halves.some(function(x) { return x.name === h; })) comment(cap(h) + ' ' + n3(h === 'lid' ? plan.lidHeight : plan.baseHeight) + unit + ' high: its area faced down ' + n3(plan.faces[h]) + unit + ' first');
   });
@@ -2920,7 +2948,7 @@ function boxProgram(plan, f, only) {
       about: co && 'Floor corners rounded ' + mm3(co.radius) + unit },
     { key: 'edges', name: 'Edges', one: 'edge', cuts: plan.edges, f: f.edges,
       bit: ed && (ed.bit === 'round' ? 'a ' + mm3(ed.radius) + unit + ' roundover bit' : 'a ' + mm3(ed.angle) + ' degree V-bit'),
-      about: ed && 'Edges down: seam ' + mm3(ed.outside || 0) + ', lead-in ' + mm3(ed.inside || 0) + ', pocket ' + mm3(ed.pocket || 0) + unit }
+      about: ed && 'Edges down: seam ' + mm3(ed.outside || 0) + (plan.slope ? ', the lip sloped' : ', lead-in ' + mm3(ed.inside || 0)) + ', pocket ' + mm3(ed.pocket || 0) + unit }
   ].filter(function(g) { return plan.halves.some(function(h) { return h.plan[g.key] && h.plan[g.key][h.name].length > 0; }); });
   var mine = SECOND.filter(function(g) { return only ? g.key === only : g.f; });
   SECOND.forEach(function(g) {
@@ -3115,7 +3143,8 @@ if (typeof module !== 'undefined' && module.exports) {
     var unused = (shp === 'rect' || shp === 'heart' || shp === 'custom' ? ['cb-diameter', 'cb-sides', 'cb-flats'] : shp === 'oval' ? ['cb-diameter', 'cb-sides', 'cb-flats', 'cb-corner']
       : shp === 'poly' ? ['cb-diameter', 'cb-length', 'cb-width'] : ['cb-length', 'cb-width', 'cb-corner', 'cb-sides', 'cb-flats'])
       .concat(seg('cb-ebit') === 'round' ? ['cb-eangle', 'cb-ediam', 'cb-evtip'] : ['cb-erad', 'cb-etip'])
-      .concat(seg('cb-cut') === 'both' || $('cb-nest-on').checked ? ['cb-lid-stock'] : []);
+      .concat(seg('cb-cut') === 'both' || $('cb-nest-on').checked ? ['cb-lid-stock'] : [])
+      .concat(seg('cb-ebit') !== 'round' && $('cb-slope').checked ? ['cb-ein'] : []);
     var off = function (id) {
       return unused.indexOf(id) >= 0 || GROUPS.some(function (g) { return !$(g[1]).checked && $(g[0]).contains($(id)); });
     };
@@ -3129,7 +3158,7 @@ if (typeof module !== 'undefined' && module.exports) {
     SEGS.forEach(function (s) { var on = ROOT.querySelector('#' + s[0] + ' button.on'); v[s[1]] = on ? on.dataset.v : s[2]; });
     RANGES.forEach(function (r) { var id = r[0], key = FIELDS.filter(function (f) { return f[0] === id; })[0][1]; if (!errs[id] && !off(id) && !r[1](v[key])) errs[id] = r[2]; });
     v.tabsOn = $('cb-tabs-on').checked; v.magOn = $('cb-mag-on').checked; v.notchOn = $('cb-notch-on').checked;
-    v.edgesOn = $('cb-edges-on').checked; v.edgeTool = $('cb-etool').value;
+    v.edgesOn = $('cb-edges-on').checked; v.edgeTool = $('cb-etool').value; v.slope = $('cb-slope').checked;
     v.cornersOn = $('cb-corners-on').checked; v.cornerTool = $('cb-ctool').value; v.magTool = $('cb-mtool').value;
     // The finishing pass's allowance and way round: the material's.
     var fin = finishFor($('cb-material').value);
@@ -3167,7 +3196,7 @@ if (typeof module !== 'undefined' && module.exports) {
       lipOn: v.lipOn, lipHeight: v.lipHeight, lipWidth: v.lipWidth, clearance: v.clearance,
       gap: v.gap, layout: v.layout, origin: v.origin, margin: v.margin, bit: v.bit,
       tabs: v.tabsOn ? { count: Math.round(v.tabCount), width: v.tabWidth, height: v.tabHeight } : null,
-      edges: v.edgesOn ? { bit: v.edgeBit === 'round' ? 'round' : 'v', angle: v.edgeAngle, diameter: v.edgeDiameter, vtip: v.edgeVTip, radius: v.edgeRadius, tip: v.edgeTip, outside: v.edgeOut || 0, inside: v.edgeIn || 0, pocket: v.edgePocket || 0 } : null,
+      edges: v.edgesOn ? { bit: v.edgeBit === 'round' ? 'round' : 'v', angle: v.edgeAngle, diameter: v.edgeDiameter, vtip: v.edgeVTip, radius: v.edgeRadius, tip: v.edgeTip, outside: v.edgeOut || 0, inside: v.edgeIn || 0, pocket: v.edgePocket || 0, slope: v.slope && v.edgeBit !== 'round' } : null,
       corners: v.cornersOn ? { diameter: v.cornerDiameter, radius: v.cornerBitRadius } : null,
       finish: v.finishAllow, finishDir: v.finishDir,
       cut: v.nestOn ? 'both' : v.cut, lidStock: v.lidStock, grain: v.cut !== 'both' && v.grain
@@ -3317,18 +3346,19 @@ if (typeof module !== 'undefined' && module.exports) {
     [1, -1].forEach(function (side) {
       var f = function (x) { return side * x; };
       // The base, 0 to T (its top at T); the lid's rim at T - lipHeight when the lip is on the base.
-      var up = plan.lipUp, shoulder = lipBase ? T - up : T, lidRim = shoulder;
+      // A sloped lip: its top in by its slant, the opening's floor too.
+      var up = plan.lipUp, shoulder = lipBase ? T - up : T, lidRim = shoulder, sl = plan.slope || 0;
       if (lipBase) {
-        out += poly([[f(Ri), o.floor, fl], [f(Ri), T, eLipIn], [f(Ri + o.lipWidth), T, eLipOut], [f(Ri + o.lipWidth), shoulder], [f(R), shoulder, eSeamL], [f(R), 0], [0, 0], [0, o.floor]], 'cb-wood');
+        out += poly([[f(Ri), o.floor, fl], [f(Ri), T, eLipIn], [f(Ri + o.lipWidth - up * sl), T, eLipOut], [f(Ri + o.lipWidth), shoulder], [f(R), shoulder, eSeamL], [f(R), 0], [0, 0], [0, o.floor]], 'cb-wood');
         // The lid, upside down on the shoulder: its rabbet round the lip.
         var top = lidRim + LH, rab = Ri + o.lipWidth + c;
-        out += poly([[f(Ri), top - o.top, fl && cove(top - o.top - (lidRim + up + c))], [f(Ri), lidRim + up + c, eStep], [f(rab), lidRim + up + c], [f(rab), lidRim, eOpen], [f(R), lidRim, eSeamR], [f(R), top], [0, top], [0, top - o.top]], 'cb-wood-dark');
+        out += poly([[f(Ri), top - o.top, fl && cove(top - o.top - (lidRim + up + c))], [f(Ri), lidRim + up + c, eStep], [f(rab - (up + c) * sl), lidRim + up + c], [f(rab), lidRim, eOpen], [f(R), lidRim, eSeamR], [f(R), top], [0, top], [0, top - o.top]], 'cb-wood-dark');
       } else {
         // Lip on the lid: the base's opening is widened; the lid's lip hangs down into it.
         var rabB = Ri + o.lipWidth + c, rimB = T;
-        out += poly([[f(Ri), o.floor, fl && cove(T - up - c - o.floor)], [f(Ri), T - up - c, eStep], [f(rabB), T - up - c], [f(rabB), T, eOpen], [f(R), T, eSeamR], [f(R), 0], [0, 0], [0, o.floor]], 'cb-wood');
+        out += poly([[f(Ri), o.floor, fl && cove(T - up - c - o.floor)], [f(Ri), T - up - c, eStep], [f(rabB - (up + c) * sl), T - up - c], [f(rabB), T, eOpen], [f(R), T, eSeamR], [f(R), 0], [0, 0], [0, o.floor]], 'cb-wood');
         var top2 = T + LH - up;
-        out += poly([[f(Ri), top2 - o.top, fl], [f(Ri), rimB - up, eLipIn], [f(Ri + o.lipWidth), rimB - up, eLipOut], [f(Ri + o.lipWidth), rimB], [f(R), rimB, eSeamL], [f(R), top2], [0, top2], [0, top2 - o.top]], 'cb-wood-dark');
+        out += poly([[f(Ri), top2 - o.top, fl], [f(Ri), rimB - up, eLipIn], [f(Ri + o.lipWidth - up * sl), rimB - up, eLipOut], [f(Ri + o.lipWidth), rimB], [f(R), rimB, eSeamL], [f(R), top2], [0, top2], [0, top2 - o.top]], 'cb-wood-dark');
       }
     });
     return out;
@@ -3637,10 +3667,11 @@ if (typeof module !== 'undefined' && module.exports) {
     var anyEdges = plan.halves.some(function (h) { return h.plan.edges[h.name].length > 0; }), et = toolEntry(v.edgeTool);
     $('cb-edge-note').textContent = !v.edgesOn ? 'Chamfer or round over the seam where the halves meet, the lip and the pockets\u2019 edges, with a V-bit or roundover bit, after the outlines.'
       : !anyEdges ? 'Give the Outside Seam, Lead-In or Inside Rim a size.'
-      : edgesInBox(v) ? 'Cut last, after the outlines: the program changes to T' + et.n + '.' +
+      : (edgesInBox(v) ? 'Cut last, after the outlines: the program changes to T' + et.n + '.' +
         (toolEntry(v.tool) ? '' : ' Pick the box\u2019s bit from the Tool Library too, so the program starts by changing back to it.')
       : state.changer ? 'Pick the edge bit from the Tool Library to have the program change to it; or cut the edges with Edges Only after the box.'
-      : 'No tool changer is set up in ncSender: cut the box, put the edge bit in, zero Z on the stock top (keep X Y), and run Edges Only.';
+      : 'No tool changer is set up in ncSender: cut the box, put the edge bit in, zero Z on the stock top (keep X Y), and run Edges Only.') +
+        (plan.halves.some(function (h) { return h.plan.slope; }) ? ' The sloped lip needs the V-bit: the box\u2019s bit leaves the opening narrower at its floor, and the lid won\u2019t go on until the V-bit slopes it.' : '');
     $('cb-edges-only').disabled = !!(errKeys.length || plan.problems.length || edgeWrong || !anyEdges);
     var mt = toolEntry(v.magTool), mf = magnetsInBox(v) && magnetFeeds(v);
     $('cb-mtool-field').hidden = !state.changer;
@@ -3655,7 +3686,8 @@ if (typeof module !== 'undefined' && module.exports) {
       : state.changer ? 'Pick the corner bit from the Tool Library to have the program change to it; or cut the corners with Corners Only after the box.'
       : 'No tool changer is set up in ncSender: cut the box, put the corner bit in, zero Z on the stock top (keep X Y), and run Corners Only.';
     $('cb-corners-only').disabled = !!(errKeys.length || plan.problems.length || !plan.halves.some(function (h) { return h.plan.corners[h.name].length > 0; }));
-    $('cb-ev-fields').hidden = v.edgeBit === 'round'; $('cb-eround-fields').hidden = v.edgeBit !== 'round';
+    $('cb-ev-fields').hidden = $('cb-slope-row').hidden = v.edgeBit === 'round'; $('cb-eround-fields').hidden = v.edgeBit !== 'round';
+    $('cb-ein').closest('.cb-field').hidden = v.slope && v.edgeBit !== 'round';
     $('cb-generate').disabled = !!(errKeys.length || probs.length || tooBig);
     $('cb-testfit').disabled = !!(errKeys.length || plan.problems.length || tooBig);
     if (!errKeys.length) {
@@ -3804,7 +3836,7 @@ if (typeof module !== 'undefined' && module.exports) {
   // ---------- Start: presets, and your own saved settings ----------
   // A preset sets the box and its options (Auto Sizes fills in the rest
   // for your stock, bit and material); saved settings bring back all.
-  var PRESET_BASE = { autoSizes: true, lipOn: 'base', cut: 'both', grain: false, nestOn: false, tabsOn: true, magOn: false, notchOn: false, edgesOn: false, cornersOn: false, lidHeight: null };
+  var PRESET_BASE = { autoSizes: true, lipOn: 'base', cut: 'both', grain: false, nestOn: false, tabsOn: true, magOn: false, notchOn: false, edgesOn: false, slope: false, cornersOn: false, lidHeight: null };
   var PRESETS = [
     { name: 'Ring box, round 2"', v: { shape: 'circle', diameter: 50.8, notchOn: true } },
     { name: 'Trinket box, round 3"', v: { shape: 'circle', diameter: 76.2 } },
@@ -3927,7 +3959,7 @@ if (typeof module !== 'undefined' && module.exports) {
       ROOT.querySelectorAll('#' + s[0] + ' button').forEach(function (b) { var on = b.dataset.v === want; b.classList.toggle('on', on); b.setAttribute('aria-checked', String(on)); });
     });
     $('cb-tabs-on').checked = saved.tabsOn !== false;
-    $('cb-edges-on').checked = !!saved.edgesOn;
+    $('cb-edges-on').checked = !!saved.edgesOn; $('cb-slope').checked = !!saved.slope;
     $('cb-corners-on').checked = !!saved.cornersOn;
     $('cb-grain').checked = !!saved.grain; $('cb-nest-on').checked = !!saved.nestOn;
     if (saved.nestOn && saved.nestCut > 0) $('cb-nest-cut').innerHTML = '<option value="0">The whole set</option><option value="' + saved.nestCut + '">Box ' + saved.nestCut + ' on its own</option>';
@@ -4020,6 +4052,7 @@ if (typeof module !== 'undefined' && module.exports) {
     $('cb-save').addEventListener('click', saveStart);
     $('cb-delete').addEventListener('click', deleteStart);
     $('cb-grain').addEventListener('change', function () { update(true); });
+    $('cb-slope').addEventListener('change', function () { update(true); });
     $('cb-nest-cut').addEventListener('change', function () { update(true); });
     $('cb-edges-only').addEventListener('click', function () { generate('edges'); });
     $('cb-corners-only').addEventListener('click', function () { generate('corners'); });
@@ -4044,7 +4077,7 @@ if (typeof module !== 'undefined' && module.exports) {
     inp.classList.remove('cb-flash'); void inp.offsetWidth; inp.classList.add('cb-flash');
   }
   // The field a problem is about, from the names it uses.
-  var PROBLEM_FIELDS = [[/^The drawing|^Open a drawing/, 'cb-drawing-btn'], [/^Edges: the V-bit.s angle/, 'cb-eangle'], [/^Edges: (give the V-bit.s diameter|the V-bit is too small)/, 'cb-ediam'],
+  var PROBLEM_FIELDS = [[/^The drawing|^Open a drawing/, 'cb-drawing-btn'], [/^Sloped lip/, 'cb-lip-w'], [/^Edges: the V-bit.s angle/, 'cb-eangle'], [/^Edges: (give the V-bit.s diameter|the V-bit is too small)/, 'cb-ediam'],
     [/^Edges: the tip diameter/, 'cb-evtip'], [/^Edges: (give the roundover|a roundover)/, 'cb-erad'], [/^Edges:|^T\d+ is(n\u2019t)? a V-bit/, 'cb-etool-row'],
     [/^Finger notch depth/, 'cb-notch-d'], [/^Only \d+ boxes fit|^No box fits/, 'cb-nest-n'],
     [/^Magnets: the count|even number of magnets|^Too many magnets/, 'cb-mag-n'], [/^Magnet hole depth|^Magnet holes too deep/, 'cb-mag-depth'],
