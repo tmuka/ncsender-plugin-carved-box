@@ -925,3 +925,22 @@ test('drawings: what can\'t be cut is said; Test Fit and nested sets keep its pr
   for (let k = 0; k < 200; k++) { const q = loopPoint(lp, len * k / 200); assert.ok(shapeDistance(outer.shape, -(outer.o.wall + 1.5), q.x + sx, q.y + sy) <= 0.03, 'box 2 sticks out'); }
   check(set);
 });
+
+test('drawings: a DXF file\'s outline, its arcs and joined pieces, in its units', () => {
+  const { drawingOutline } = require('../lib/box-drawing.cjs');
+  const dxf = (header, ents) => ['0', 'SECTION', '2', 'HEADER', ...header, '0', 'ENDSEC', '0', 'SECTION', '2', 'ENTITIES', ...ents, '0', 'ENDSEC', '0', 'EOF'].join('\n');
+  const ent = (type, g) => ['0', type, ...g.flatMap(([c, v]) => [String(c), String(v)])];
+  // 3 x 2 in, its right end a half circle (a bulge of 1): 4 x 2 in.
+  const poly = drawingOutline(dxf(['9', '$INSUNITS', '70', '1'], ent('LWPOLYLINE', [[90, 4], [70, 1], [10, 0], [20, 0], [10, 3], [20, 0], [42, 1], [10, 3], [20, 2], [10, 0], [20, 2]])), 'a.dxf');
+  assert.deepEqual([+poly.size.w.toFixed(3), +poly.size.h.toFixed(3), poly.sized], [101.6, 50.8, true]);
+  // The same from lines and an arc, one line the other way round; a small circle left out.
+  const parts = drawingOutline(dxf([], [...ent('LINE', [[10, 0], [20, 0], [11, 3], [21, 0]]), ...ent('ARC', [[10, 3], [20, 1], [40, 1], [50, 270], [51, 90]]),
+    ...ent('LINE', [[10, 0], [20, 2], [11, 3], [21, 2]]), ...ent('LINE', [[10, 0], [20, 2], [11, 0], [21, 0]]), ...ent('CIRCLE', [[10, 50], [20, 50], [40, 0.2]])]), 'b.dxf');
+  assert.deepEqual([+parts.size.w.toFixed(3), +parts.size.h.toFixed(3), parts.sized, parts.others], [4, 2, false, 1]);
+  // As a box: the half circle's end is round, the other end square but for the Corner Radius.
+  const plan = boxPlan(Object.assign({ shape: 'custom', outline: { pts: poly.pts }, length: 101.6, width: 50.8, stock: 20 }, (() => { const a = autoSizes({ shape: 'custom', outline: { pts: poly.pts }, length: 101.6, width: 50.8, stock: 20 }, 'mdf', false); delete a.problems; return a; })()));
+  assert.deepEqual(plan.problems, []);
+  assert.ok(Math.abs(shapeDistance(plan.shape, 0, 50.8, 0)) < 0.05 && Math.abs(shapeDistance(plan.shape, 0, 25.4, 25.4)) < 0.05);
+  assert.match(drawingOutline(dxf([], ent('LINE', [[10, 0], [20, 0], [11, 3], [21, 0]])), 'e.dxf').problem, /no closed shape/);
+  assert.match(drawingOutline('AutoCAD Binary DXF\r\n\x1a\x00', 'f.dxf').problem, /binary DXF/);
+});
