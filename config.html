@@ -211,13 +211,13 @@
       </div>
       <div class="cb-field" id="cb-drawing-field" role="group" aria-labelledby="cb-drawing-label"><label id="cb-drawing-label">Drawing</label>
         <div class="cb-drawing-row"><button type="button" class="cb-btn cb-btn-quiet cb-btn-small" id="cb-drawing-btn" title="An SVG or DXF file: its biggest closed shape is the box's outline, as seen from above (the top of the drawing to the back).">Open SVG or DXF&hellip;</button><input type="file" id="cb-drawing-file" accept=".svg,.dxf,image/svg+xml" hidden><span class="cb-hint" id="cb-drawing-name"></span></div>
-        <div class="cb-grain-row"><label class="cb-switch" title="Typing the Length sets the Width to match, and the other way round, so the drawing isn't stretched."><input type="checkbox" id="cb-keep" aria-label="Keep its proportions"><span></span></label><span class="cb-hint">Keep its proportions</span></div>
+        <div class="cb-grain-row"><label class="cb-switch" title="Typing the Width sets the Length to match, and the other way round, so the drawing isn't stretched."><input type="checkbox" id="cb-keep" aria-label="Keep its proportions"><span></span></label><span class="cb-hint">Keep its proportions</span></div>
       </div>
       <div class="cb-sub-h">Outside size</div>
       <div class="cb-row" id="cb-size-rect">
         <div class="cb-field" id="cb-size-round"><label for="cb-diameter">Diameter</label><input class="cb-input" id="cb-diameter" data-unit="length" title="Across the outside of the box."></div>
-        <div class="cb-field"><label for="cb-length">Length (X)</label><input class="cb-input" id="cb-length" data-unit="length" title="The outside, left to right (along X)."></div>
-        <div class="cb-field"><label for="cb-width">Width (Y)</label><input class="cb-input" id="cb-width" data-unit="length" title="The outside, front to back (along Y)."></div>
+        <div class="cb-field"><label for="cb-length">Width (X)</label><input class="cb-input" id="cb-length" data-unit="length" title="The outside, left to right (along X)."></div>
+        <div class="cb-field"><label for="cb-width">Length (Y)</label><input class="cb-input" id="cb-width" data-unit="length" title="The outside, front to back (along Y)."></div>
         <div class="cb-field"><label for="cb-sides">Sides</label><input class="cb-input" id="cb-sides" title="3 to 12: 6 for a hexagon, 8 for an octagon. A flat side faces the front."></div>
         <div class="cb-field"><label for="cb-flats">Across Flats</label><input class="cb-input" id="cb-flats" data-unit="length" title="The outside, from one flat side to the one across; with an odd number of sides, across the circle that fits inside (a flat side to the middle, twice)."></div>
         <div class="cb-field"><label for="cb-corner">Corner Radius</label><input class="cb-input" id="cb-corner" data-unit="length" title="How round the outside corners are. The inside's are smaller by the wall, and at least half the bit."></div>
@@ -417,7 +417,7 @@
     </div>
     <div class="cb-card">
       <h3>Your own shape</h3>
-      <p>Pick <b>Drawing</b> and open an <b>SVG</b> or <b>DXF</b> file (from Inkscape, Illustrator, Affinity, Fusion, a CAD program, or a free shape online). Its biggest closed shape is the box's outline, seen from above with the top of the drawing to the back; text, open lines and smaller shapes are left out. In a DXF, lines and arcs that meet end to end make one shape; shapes inside blocks aren't read (explode them first). The <b>Length</b> and <b>Width</b> stretch it to size, starting at the file's own size when it says one (in mm or inches); with <b>Keep its proportions</b> on, typing one sets the other.</p>
+      <p>Pick <b>Drawing</b> and open an <b>SVG</b> or <b>DXF</b> file (from Inkscape, Illustrator, Affinity, Fusion, a CAD program, or a free shape online). Its biggest closed shape is the box's outline, seen from above with the top of the drawing to the back; text, open lines and smaller shapes are left out. In a DXF, lines and arcs that meet end to end make one shape; shapes inside blocks aren't read (explode them first). The <b>Width</b> and <b>Length</b> stretch it to size, starting at the file's own size when it says one (in mm or inches); with <b>Keep its proportions</b> on, typing one sets the other.</p>
       <p>The <b>Corner Radius</b> rounds the drawing's outside corners, as the lip needs (Auto Sizes sets it); its inside corners stay as drawn, and a bit can't cut them sharper than its own radius, so the outline's are rounded that much. The lid is cut as the drawing's mirror image, so it lands on the base when it's turned over. An outline that crosses itself can't be cut; nor can a neck narrower than the Corner Radius rounds away. The drawing is saved with your settings.</p>
     </div>
     <div class="cb-card">
@@ -2052,7 +2052,7 @@ function boxPlan(input) {
   if (!S || !SL) {
     var lobe = (o.length || 0) / 2 / 1.72;
     if (!crossAt) problems.push(heart ? 'A heart ' + +(+o.length || 0).toFixed(1) + ' mm across needs at least ' + +(2.5 * lobe + 0.05).toFixed(1) + ' mm from point to top, and a point radius under ' + +(lobe - 0.05).toFixed(1) + ' mm'
-      : custom ? (o.outline && o.outline.pts ? 'The Corner Radius rounds the drawing away: make it smaller' : 'Open a drawing (an SVG or DXF file) for the custom shape') : 'Give the oval a Length and Width');
+      : custom ? (o.outline && o.outline.pts ? 'The Corner Radius rounds the drawing away: make it smaller' : 'Open a drawing (an SVG or DXF file) for the custom shape') : 'Give the oval a Width and Length');
     S = SL = { kind: 'circle', r: Math.max(1, (o.length || 2) / 2) };
   }
   var SH = { base: S, lid: SL };
@@ -2094,7 +2094,7 @@ function boxPlan(input) {
   var height = { base: baseH, lid: lidH }, under = { base: o.floor, lid: o.top };
   var lipHalf = lipOnLid ? 'lid' : 'base', rabbetHalf = lipOnLid ? 'base' : 'lid';
 
-  if (rect || oval || heart || custom) need(o.length > 0 && o.width > 0, 'Length and Width must be more than 0');
+  if (rect || oval || heart || custom) need(o.length > 0 && o.width > 0, 'Width and Length must be more than 0');
   // A drawing: one piece, not crossing itself; its inside corners as the
   // heart's notch.
   if (custom && S.kind === 'outline') {
@@ -3942,7 +3942,7 @@ if (typeof module !== 'undefined' && module.exports) {
     $('cb-corner').closest('.cb-field').hidden = v.shape === 'oval' || v.shape === 'circle';
     // A heart's sizes: across its lobes, from its point to the top, its point's radius.
     var heartLabels = v.shape === 'heart';
-    [['cb-length', 'Length (X)', 'Across the Lobes'], ['cb-width', 'Width (Y)', 'Point to Top'], ['cb-corner', 'Corner Radius', 'Point Radius']].forEach(function (l) {
+    [['cb-length', 'Width (X)', 'Across the Lobes'], ['cb-width', 'Length (Y)', 'Point to Top'], ['cb-corner', 'Corner Radius', 'Point Radius']].forEach(function (l) {
       var lab = $(l[0]).closest('.cb-field').querySelector('label');
       lab.textContent = (heartLabels ? l[2] : l[1]) + ' (' + unit() + ')';
     });

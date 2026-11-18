@@ -210,7 +210,7 @@ test('magnets and a notch that don\'t fit say why', () => {
   said({ lidHeight: 6, top: 6 }, /Lid Top must be between/);
   said({ shape: 'rect', cornerRadius: 2 }, /Corner Radius must be at least/);
   said({ shape: 'rect', magnets: { count: 3, diameter: 6, depth: 3 }, wall: 12 }, /even number of magnets/);
-  said({ shape: 'rect', width: 0 }, /Length and Width/);
+  said({ shape: 'rect', width: 0 }, /Width and Length/);
   said({ wall: 12, magnets: { count: 12, diameter: 6.35, depth: 3 }, notch: { width: 16, depth: 3 } }, /runs into a magnet hole/);
 });
 

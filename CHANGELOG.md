@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The outside size along X is now called **Width (X)** and along Y **Length (Y)**, as most people think of a width. Only the names changed: saved sizes stay as they were.
 - **Finger Notches:** 1 to 4 evenly round, from a Start Angle (0 at the front). Two to start, opposite each other, so a tight lid lifts straight up instead of tipping.
 - More labels on the previews, each a tap away from its setting: Outside Seam, Lead-In, Slope Height, Inside Rim and Cove Radius in the side view (when they're on), Magnets and Notch in the top view.
 - Easier to see in dark mode: buttons (Save, Delete, Open SVG or DXF, Edges Only…) and choices (Shape, Lip Stands Up On…) are filled with the darker background and outlined, as QuickCut's, instead of gray on gray.
