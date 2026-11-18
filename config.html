@@ -349,11 +349,13 @@
     </div>
     <div class="cb-card">
       <h3><span class="cb-grow">Finger Notch</span><label class="cb-switch"><input type="checkbox" id="cb-notch-on" aria-label="Finger notch"><span></span></label></h3>
-      <div class="cb-row cb-row-2" id="cb-notch-fields">
+      <div class="cb-row" id="cb-notch-fields">
         <div class="cb-field"><label for="cb-notch-w">Notch Width</label><input class="cb-input" id="cb-notch-w" data-unit="length"></div>
         <div class="cb-field"><label for="cb-notch-d">Notch Depth</label><input class="cb-input" id="cb-notch-d" data-unit="length"></div>
+        <div class="cb-field"><label for="cb-notch-n">Notches</label><input class="cb-input" id="cb-notch-n" title="1 to 4, evenly round. Two, opposite each other, lift a tight lid straight up with both hands; one tips it."></div>
+        <div class="cb-field"><label for="cb-notch-a">Start Angle (°)</label><input class="cb-input" id="cb-notch-a" title="Where the first notch is: 0 at the front, turning counterclockwise seen from above (90 the right side). With two, 0 puts them front and back, 90 at the sides."></div>
       </div>
-      <p class="cb-hint">A scoop in the base's rim at the front, to lift the lid by.</p>
+      <p class="cb-hint">Scoops in the base's rim to lift the lid by. A tight lid lifts straight up from two opposite each other; from one it tips.</p>
     </div>
     <div class="cb-card">
       <h3><span class="cb-grow">Magnets</span><label class="cb-switch"><input type="checkbox" id="cb-mag-on" aria-label="Magnets"><span></span></label></h3>
@@ -483,6 +485,7 @@
       <ul>
         <li>A <b>finishing pass</b> always goes round the walls once more after the roughing, for cleaner walls; how much it takes and which way it goes are set by the <b>Material</b>.</li>
         <li><b>Enlarge a picture</b>: click a blank spot on the top or side view (or ⤢ by its title) to see it over the whole window. There the mouse wheel zooms at the pointer, two fingers pinch, and zoomed in a drag moves it; or use <b>&minus;</b>, <b>+</b> and <b>Fit</b> at the top. Click a blank spot, &times;, or press Esc to go back. A tap on a label still goes to its setting.</li>
+        <li>A tight lid: two <b>Finger Notches</b> opposite each other (front and back, or a Start Angle of 90 for the sides) lift it straight up with both hands. From one it tips and binds.</li>
         <li>Keep the <b>Holding Tabs</b> on: they hold the halves while the outlines, corners and edges are cut.</li>
         <li>Tap a label on the pictures (Wall, Lip Height, Clearance, Gap&hellip;) to go to its field; tap a problem under the settings to go to the field it's about.</li>
         <li>Field values take either unit and simple math: <b>1/4"</b>, <b>6.35mm</b>, <b>1-1/2 in</b>, <b>1in+4mm</b>.</li>
@@ -2179,26 +2182,52 @@ function boxPlan(input) {
       need(closest >= o.magnets.diameter + 1, 'Too many magnets for the way round: their holes run together');
     }
   }
-  // A finger notch: a round scoop centered on the base's outline at the
-  // front (-Y; along Y, -X, a side the halves don't share), as deep as
-  // asked below where the halves meet, biting no further than the rim
-  // (outside any lip or widened opening).
-  var notchCut = null;
+  // Finger notches: round scoops centered on the base's outline, count
+  // of them evenly round (2: opposite, so a tight lid lifts straight up
+  // instead of tipping), the first at the front (-Y; along Y, -X, a side
+  // the halves don't share) turned angle degrees counterclockwise seen
+  // from above; as deep as asked below where the halves meet, biting no
+  // further than the rim (outside any lip or widened opening).
+  var notchCut = null, notchCuts = [];
   if (o.notch && o.notch.width > 0) {
     var rn = o.notch.width / 2, rim = lipOnLid ? -tRabbet : -tLip;
     need(rn > rb + 0.1, 'Finger notch must be wider than the bit');
     need(rn <= rim - 0.8, 'Finger notch too wide for the wall outside the ' + (lipOnLid ? 'opening' : 'lip'));
     need(o.notch.depth > 0 && meet.base + o.notch.depth <= baseH - o.floor, 'Finger notch depth must be more than 0 and above the floor');
-    var front = o.layout === 'y' ? { x: ext.minX, y: 0 } : { x: 0, y: ext.minY };
-    // A drawing's front: the nearest point of its outline to the middle
-    // of the front (it can be in a hollow).
-    if (custom && outlineAt0) front = loopPoint(outlineAt0, loopNearest(outlineAt0, front.x, front.y));
-    magnetAt.forEach(function(m) {
-      need(Math.hypot(m.dx - front.x, m.dy - front.y) >= rn + o.magnets.diameter / 2 + 1, 'The finger notch runs into a magnet hole: use fewer magnets or a narrower notch');
-    });
-    // From the stock's top: past the outline, the shoulder round a lip
-    // doesn't reach.
-    notchCut = { op: 'pocket', shape: { kind: 'circle', r: rn }, t: 0, dx: front.x, dy: front.y, z0: -faces.base, depth: meet.base + o.notch.depth, what: 'finger notch' };
+    var nCount = o.notch.count > 0 ? o.notch.count : 1, a0 = (o.notch.angle || 0) * Math.PI / 180, magHit = false, nHit = false;
+    need(nCount === Math.round(nCount) && nCount <= 4, 'Finger notches: the count must be 1 to 4');
+    nCount = Math.max(1, Math.min(4, Math.round(nCount)));
+    for (var ni = 0; ni < nCount; ni++) {
+      var na = a0 + ni * 2 * Math.PI / nCount, at;
+      // Straight to the front: the middle of the front (a drawing's
+      // nearest point to it, as below).
+      if (Math.abs(Math.sin(na)) < 1e-9 && Math.cos(na) > 0) {
+        at = o.layout === 'y' ? { x: ext.minX, y: 0 } : { x: 0, y: ext.minY };
+        if (custom && outlineAt0) at = loopPoint(outlineAt0, loopNearest(outlineAt0, at.x, at.y));
+      } else {
+        // Where the line out from the middle that way leaves the box's
+        // extent; then the nearest point of the outline to it (a
+        // drawing's can be in a hollow).
+        var fx = o.layout === 'y' ? -1 : 0, fy = o.layout === 'y' ? 0 : -1;
+        var ux = fx * Math.cos(na) - fy * Math.sin(na), uy = fx * Math.sin(na) + fy * Math.cos(na);
+        var reach = Math.min(Math.abs(ux) > 1e-9 ? (ux > 0 ? ext.maxX : -ext.minX) / Math.abs(ux) : Infinity, Math.abs(uy) > 1e-9 ? (uy > 0 ? ext.maxY : -ext.minY) / Math.abs(uy) : Infinity);
+        at = { x: ux * reach, y: uy * reach };
+        if (outlineAt0) at = loopPoint(outlineAt0, loopNearest(outlineAt0, at.x, at.y));
+      }
+      // (Each said once, however many notches it is.)
+      if (magnetAt.some(function(m) { return Math.hypot(m.dx - at.x, m.dy - at.y) < rn + o.magnets.diameter / 2 + 1; }) && !magHit) {
+        magHit = true;
+        problems.push('The finger notch runs into a magnet hole: use fewer magnets, a narrower notch, or turn the notches');
+      }
+      if (notchCuts.some(function(q) { return Math.hypot(q.dx - at.x, q.dy - at.y) < 2 * rn + 2; }) && !nHit) {
+        nHit = true;
+        problems.push('The finger notches run together: use fewer, or narrower');
+      }
+      // From the stock's top: past the outline, the shoulder round a lip
+      // doesn't reach.
+      notchCuts.push({ op: 'pocket', shape: { kind: 'circle', r: rn }, t: 0, dx: at.x, dy: at.y, z0: -faces.base, depth: meet.base + o.notch.depth, what: 'finger notch' + (nCount > 1 ? ' ' + (ni + 1) : '') });
+    }
+    notchCut = notchCuts[0];
   }
 
   // Chamfered or rounded edges: per half, its edges (u: which side the
@@ -2371,7 +2400,7 @@ function boxPlan(input) {
     magnetsOf(name).forEach(function(p, i) {
       (o.magnets.bit > 0 ? magnetCuts[name] : cuts).push({ op: 'pocket', shape: { kind: 'circle', r: o.magnets.diameter / 2 }, t: 0, dx: p.dx, dy: p.dy, z0: z0 - meet[name] + under0, depth: o.magnets.depth + under0, what: 'magnet hole ' + (i + 1) });
     });
-    if (name === 'base' && notchCut) cuts.push(notchCut);
+    if (name === 'base') notchCuts.forEach(function(c) { cuts.push(c); });
     return cuts;
   }
   var halves = [
@@ -2384,7 +2413,7 @@ function boxPlan(input) {
   var plan = {
     o: o, problems: problems, notes: notes, shape: S, mirror: mirror, halfX: halfX, halfY: halfY, ext: ext, margin: m,
     tInside: tInside, tRabbet: tRabbet, tLip: tLip, tOpen: tOpen, slope: slope ? slant : 0, slopeUp: slope ? slopeUp : 0, slopeD: slopeD, openSteps: openSteps, rabbetDepth: rabbetDepth, lipUp: lipUp, lidHeight: lidH, baseHeight: baseH, face: face, faces: faces,
-    halves: halves, magnetAt: magnetAt, magnets: magnetCuts, notch: notchCut, edges: edgeAt, corners: cornerAt, boards: B, originSay: originSay,
+    halves: halves, magnetAt: magnetAt, magnets: magnetCuts, notch: notchCut, notches: notchCuts, edges: edgeAt, corners: cornerAt, boards: B, originSay: originSay,
     // The stock needed: its size and front-left corner.
     stock: B.sep ? { w: stockW, h: stockH, x0: one.at.x + all.minX - m, y0: one.at.y + all.minY - m, thick: one.name === 'lid' ? B.lid : T }
       : { w: stockW, h: stockH, x0: shift.x + all.minX - m, y0: shift.y + all.minY - m, thick: T },
@@ -2610,7 +2639,7 @@ function autoSizes(input, material, imperial) {
   if (o.magnets) a.magnets = Object.assign({}, o.magnets, { count: rect ? 4 : clamp(Math.round(round / 80), 3, 6) });
   // A notch in the base below the lip (when it's on the base), above the floor.
   var notchRoom = T - a.floor - (o.lipOn === 'lid' ? 0 : a.lipHeight - a.clearance) - 0.5;
-  if (o.notch) a.notch = { width: half(clamp(small * 0.18, 10, 20)), depth: Math.min(half(clamp(a.lipHeight, 3, 6)), Math.max(grid(1), Math.floor(notchRoom / grid(notchRoom)) * grid(notchRoom))) };
+  if (o.notch) a.notch = Object.assign({}, o.notch, { width: half(clamp(small * 0.18, 10, 20)), depth: Math.min(half(clamp(a.lipHeight, 3, 6)), Math.max(grid(1), Math.floor(notchRoom / grid(notchRoom)) * grid(notchRoom))) });
   // Edges: a lead-in for the lid to find its way on, no outside seam.
   if (o.edges) a.edges = Object.assign({}, o.edges, { outside: 0, inside: half(o.edges.bit === 'round' ? Math.min(o.edges.radius || 1.5, 1.5) : 1.5), pocket: half(0.5) });
   var slope = !!(o.edges && o.edges.slope && o.edges.bit !== 'round'), slant = slope ? Math.tan((o.edges.angle || 90) * Math.PI / 360) : 0;
@@ -3070,7 +3099,7 @@ function boxProgram(plan, f, only) {
   });
   if (plan.set) comment('Each box as its own settings say: magnets, notch, edges, corners');
   else if (plan.magnetAt.length && !(o.magnets.bit > 0)) comment('Magnets: ' + plan.magnetAt.length + ' holes ' + mm3(o.magnets.diameter) + unit + ' wide, ' + mm3(o.magnets.depth) + unit + ' deep, both halves');
-  if (plan.notch && !plan.set) comment('Finger notch in the base, ' + mm3(o.notch.width) + unit + ' wide, ' + mm3(o.notch.depth) + unit + ' deep');
+  if (plan.notch && !plan.set) comment((plan.notches.length > 1 ? plan.notches.length + ' finger notches' : 'Finger notch') + ' in the base, ' + mm3(o.notch.width) + unit + ' wide, ' + mm3(o.notch.depth) + unit + ' deep');
   comment('Closed ' + n3(plan.closedHeight) + unit + ' high, ' + n3(plan.insideHeight) + unit + ' inside');
   comment('Origin: ' + (plan.originSay || (o.origin === 'center' ? 'the middle of the pair' : 'the stock\'s front-left corner')));
   comment('Z0: top of the ' + (B.sep ? 'board' : 'stock'));
@@ -3209,7 +3238,7 @@ if (typeof module !== 'undefined' && module.exports) {
     ['cb-nest-n', 'nestCount', 'count', 3], ['cb-nest-gap', 'nestGap', 'length', 1.5],
     ['cb-tab-n', 'tabCount', 'count', 4], ['cb-tab-w', 'tabWidth', 'length', 6], ['cb-tab-h', 'tabHeight', 'length', 1.5],
     ['cb-mag-n', 'magCount', 'count', 4], ['cb-mag-d', 'magDiameter', 'length', 5], ['cb-mag-depth', 'magDepth', 'length', 3.2],
-    ['cb-notch-w', 'notchWidth', 'length', 16], ['cb-notch-d', 'notchDepth', 'length', 4],
+    ['cb-notch-w', 'notchWidth', 'length', 16], ['cb-notch-d', 'notchDepth', 'length', 4], ['cb-notch-n', 'notchCount', 'count', 2], ['cb-notch-a', 'notchAngle', 'count', 0],
     ['cb-bit', 'bit', 'length', 3.175], ['cb-feed', 'feed', 'feed', 1500], ['cb-plunge', 'plunge', 'feed', 400],
     ['cb-doc', 'doc', 'length', 1.5], ['cb-stepover', 'stepoverPct', 'count', 40], ['cb-rpm', 'rpm', 'count', 18000],
     ['cb-delay', 'delay', 'count', 2],
@@ -3276,6 +3305,7 @@ if (typeof module !== 'undefined' && module.exports) {
     ['cb-doc', function (x) { return x >= 0.05; }, 'must be at least 0.05 mm (0.002 in)'], ['cb-stepover', function (x) { return x >= 1 && x <= 90; }, 'must be between 1 and 90'],
     ['cb-rpm', function (x) { return x >= 0; }, 'can\u2019t be negative'], ['cb-delay', function (x) { return x >= 0; }, 'can\u2019t be negative'],
     ['cb-efeed', function (x) { return x >= 25; }, 'must be at least 25 mm/min (1 in/min)'],
+    ['cb-notch-n', function (x) { return x >= 1 && x <= 4 && x === Math.round(x); }, 'must be 1, 2, 3 or 4'],
     ['cb-cfeed', function (x) { return x >= 25; }, 'must be at least 25 mm/min (1 in/min)'], ['cb-crpm', function (x) { return x >= 0; }, 'can\u2019t be negative'], ['cb-erpm', function (x) { return x >= 0; }, 'can\u2019t be negative']
   ];
   var SEGS = [['cb-ebit', 'edgeBit', 'v'], ['cb-shape', 'shape', 'circle'], ['cb-lip-on', 'lipOn', 'base'], ['cb-layout', 'layout', 'x'], ['cb-origin', 'origin', 'front-left'], ['cb-cut', 'cut', 'both']];
@@ -3351,7 +3381,7 @@ if (typeof module !== 'undefined' && module.exports) {
     return ({
       shape: v.shape, diameter: v.diameter, length: v.length, width: v.width, sides: v.sides, flats: v.flats, cornerRadius: v.cornerRadius, outline: v.outline, stock: v.stock, lidHeight: v.lidHeight, wall: v.wall, floor: v.floor, top: v.top,
       magnets: v.magOn ? { count: Math.round(v.magCount), diameter: v.magDiameter, depth: v.magDepth, bit: magnetsInBox(v) ? toolEntry(v.magTool).mm : null, drill: magnetsInBox(v) && toolEntry(v.magTool).type === 'drill' } : null,
-      notch: v.notchOn ? { width: v.notchWidth, depth: v.notchDepth } : null,
+      notch: v.notchOn ? { width: v.notchWidth, depth: v.notchDepth, count: v.notchCount, angle: v.notchAngle } : null,
       lipOn: v.lipOn, lipHeight: v.lipHeight, lipWidth: v.lipWidth, clearance: v.clearance,
       gap: v.gap, layout: v.layout, origin: v.origin, margin: v.margin, bit: v.bit,
       tabs: v.tabsOn ? { count: Math.round(v.tabCount), width: v.tabWidth, height: v.tabHeight } : null,
@@ -3421,7 +3451,7 @@ if (typeof module !== 'undefined' && module.exports) {
       (h.magnetAt || plan.magnetAt).forEach(function (m) {
         out += '<circle class="cb-cut" cx="' + (cx + m.dx * s).toFixed(2) + '" cy="' + (cy - m.dy * s).toFixed(2) + '" r="' + (o.magnets.diameter / 2 * s).toFixed(2) + '"/>';
       });
-      if (h.name === 'base' && plan.notch) out += '<circle class="cb-cut" cx="' + (cx + plan.notch.dx * s).toFixed(2) + '" cy="' + (cy - plan.notch.dy * s).toFixed(2) + '" r="' + (plan.notch.shape.r * s).toFixed(2) + '"/>';
+      if (h.name === 'base') (plan.notches || []).forEach(function (n) { out += '<circle class="cb-cut" cx="' + (cx + n.dx * s).toFixed(2) + '" cy="' + (cy - n.dy * s).toFixed(2) + '" r="' + (n.shape.r * s).toFixed(2) + '"/>'; });
       if (o.tabs) for (var k = 0; k < o.tabs.count; k++) {
         var at = tabLen * (k + 0.5) / o.tabs.count, p = loopPoint(tabLoop, at), q = loopPoint(tabLoop, Math.min(tabLen, at + 0.5));
         var a = Math.atan2(q.y - p.y, q.x - p.x) - Math.PI / 2, tw = o.tabs.width * s;

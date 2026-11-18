@@ -74,8 +74,8 @@ function allowed(set, half, p) {
   for (const m of half.magnetAt || plan.magnetAt) {
     if (Math.hypot(px - m.dx, py - m.dy) <= o.magnets.diameter / 2 - rb + eps && d <= meet + o.magnets.depth + eps) return true;
   }
-  if (half.name === 'base' && plan.notch) {
-    if (Math.hypot(px - plan.notch.dx, py - plan.notch.dy) <= plan.notch.shape.r - rb + eps && d <= meet + o.notch.depth + eps) return true;
+  if (half.name === 'base') for (const n of plan.notches || []) {
+    if (Math.hypot(px - n.dx, py - n.dy) <= n.shape.r - rb + eps && d <= meet + o.notch.depth + eps) return true;
   }
   return false;
 }
@@ -1131,4 +1131,27 @@ test('a sloped top: the lip straight below its Slope Height, the opening narrowe
   const r = fitOption({ wall: 8, lipWidth: 3, lipHeight: 8, gap: 12, edges: { bit: 'v', angle: 90, diameter: 16, outside: 0, inside: 0, pocket: 0, slope: true, slopeHeight: 7 } }, false);
   assert.deepEqual(r.problems, []);
   assert.ok(r.set.lipWidth > 3 && r.set['edges.slopeHeight'] < 7 && !('lipHeight' in r.set), JSON.stringify(r.set));
+});
+
+test('finger notches: a count of them evenly round from a start angle, cut without touching what stays', () => {
+  for (const shape of [{}, { shape: 'rect', length: 140, width: 90, cornerRadius: 12 }, { shape: 'oval', length: 150, width: 100 }]) for (const layout of ['x', 'y']) {
+    for (const [count, angle] of [[1, 0], [2, 0], [2, 90], [3, 30], [4, 45]]) {
+      const input = Object.assign({ wall: 12, layout, notch: { width: 14, depth: 4, count, angle } }, shape);
+      const { plan, gcode } = check(input);
+      assert.equal(plan.notches.length, count);
+      assert.equal((gcode.match(/Base: finger notch/g) || []).length, count);
+      const S = plan.shape;
+      for (const n of plan.notches) assert.ok(Math.abs(shapeDistance(S, 0, n.dx, n.dy)) < 0.05, 'notch off the outline');
+      // The first: the front turned angle degrees counterclockwise.
+      const front = layout === 'y' ? Math.PI : -Math.PI / 2, a = Math.atan2(plan.notches[0].dy, plan.notches[0].dx);
+      if (S.kind === 'circle') assert.ok(Math.abs(Math.atan2(Math.sin(a - front - angle * Math.PI / 180), Math.cos(a - front - angle * Math.PI / 180))) < 1e-6);
+      // Two: opposite each other.
+      if (count === 2) assert.ok(Math.hypot(plan.notches[0].dx + plan.notches[1].dx, plan.notches[0].dy + plan.notches[1].dy) < 0.05);
+    }
+  }
+  assert.ok(boxPlan({ wall: 12, notch: { width: 14, depth: 4, count: 5 } }).problems.some((p) => /count must be 1 to 4/.test(p)));
+  // Fitted round the magnets: turned so they miss them.
+  const mag = { wall: 12, magnets: { count: 4, diameter: 6, depth: 3 } };
+  assert.deepEqual(boxPlan({ ...mag, notch: { width: 12, depth: 3, count: 2, angle: 0 } }).problems, []);
+  assert.ok(boxPlan({ ...mag, notch: { width: 12, depth: 3, count: 2, angle: 45 } }).problems.some((p) => /runs into a magnet hole/.test(p)));
 });
