@@ -212,9 +212,9 @@
         </div>
       </div>
       <div class="cb-row">
-        <div class="cb-field"><label for="cb-lip-h">Lip Height</label><input class="cb-input" id="cb-lip-h" data-unit="length" title="How far the lip stands up into the other half."></div>
+        <div class="cb-field"><label for="cb-lip-h">Lip Height</label><input class="cb-input" id="cb-lip-h" data-unit="length" title="How deep the other half's opening is cut for the lip. The lip stands up this less the Clearance, so it stops short of the bottom and the halves close tight on the shoulder."></div>
         <div class="cb-field"><label for="cb-lip-w">Lip Thickness</label><input class="cb-input" id="cb-lip-w" data-unit="length" title="How thick the lip is: part of the wall, on its inside."></div>
-        <div class="cb-field"><label for="cb-clear">Clearance Each Side</label><input class="cb-input" id="cb-clear" data-unit="length" title="Gap each side between the lip and the other half: about 0.2 to 0.3 mm in wood, 0.1 mm in plastic."></div>
+        <div class="cb-field"><label for="cb-clear">Clearance Each Side</label><input class="cb-input" id="cb-clear" data-unit="length" title="Gap each side between the lip and the other half, and over its top: about 0.2 to 0.3 mm in wood, 0.1 mm in plastic."></div>
       </div>
       <p class="cb-hint">The lip stands up round the opening of one half and slides into a widened opening in the other; they meet on the shoulder outside it.</p>
     </div>
@@ -392,7 +392,7 @@
     </div>
     <div class="cb-card">
       <h3>How the lid fits</h3>
-      <p>One half has a <b>lip</b>: the inner part of its wall, left standing. The other half's opening is widened by the Lip Thickness plus the <b>Clearance</b>, as deep as the lip plus the Clearance, so the lip slides in and the halves meet on the shoulder outside it. Your box, closed and cut through its middle:</p>
+      <p>One half has a <b>lip</b>: the inner part of its wall, left standing. The other half's opening is widened by the Lip Thickness plus the <b>Clearance</b>, as deep as the <b>Lip Height</b>; the lip stands up the Clearance less, so it slides in, stops short of the bottom, and the halves close tight on the shoulder outside it. Your box, closed and cut through its middle:</p>
       <div class="cb-help-pics"><div class="cb-view"><div class="cb-view-title">Your box · side view</div><svg id="cb-help-side" viewBox="0 0 100 40"></svg></div></div>
     </div>
     <div class="cb-card">
@@ -1901,11 +1901,11 @@ if (typeof module !== 'undefined' && module.exports) {
  * faced down first. Each half's inside is pocketed from the top face,
  * leaving the Wall all round and the Floor (base) or Top (lid)
  * underneath; its outline is then cut free, with tabs. One half carries a
- * lip: its wall top is cut down by the Lip Height outside a ring Lip
- * Width thick, standing up round the opening. The other half's opening is
- * widened by the Lip Thickness plus the Clearance, Lip Height plus the
- * Clearance deep, so the lip slides in and the halves meet on the shoulder
- * outside it. The lid is turned over onto the base. Optional: magnet
+ * lip: its wall top is cut down by the Lip Height less the Clearance
+ * outside a ring Lip Width thick, standing up round the opening. The
+ * other half's opening is widened by the Lip Thickness plus the
+ * Clearance, Lip Height deep, so the lip slides in, the Clearance short
+ * of the bottom, and the halves meet on the shoulder outside it. The lid is turned over onto the base. Optional: magnet
  * holes facing each other where the halves meet, a finger notch in the
  * base's rim at the front, rounded floor corners (a ball or bowl bit) and
  * chamfered or rounded edges (a V-bit or roundover bit), both cut after
@@ -1987,7 +1987,10 @@ function boxPlan(input) {
   var lipOnLid = o.lipOn === 'lid';
   // The outline moved in to the inside, the widened opening, the lip's outside.
   var tInside = -w, tRabbet = -(w - o.lipWidth - o.clearance), tLip = -(w - o.lipWidth);
-  var rabbetDepth = o.lipHeight + o.clearance;
+  // The opening's as deep as the Lip Height; the lip stands the Clearance
+  // lower (its shoulder cut that much less), so it doesn't touch the
+  // bottom of the opening and the halves still meet on the shoulder.
+  var rabbetDepth = o.lipHeight, lipUp = o.lipHeight - o.clearance;
   var height = { base: baseH, lid: lidH }, under = { base: o.floor, lid: o.top };
   var lipHalf = lipOnLid ? 'lid' : 'base', rabbetHalf = lipOnLid ? 'base' : 'lid';
 
@@ -2020,6 +2023,7 @@ function boxPlan(input) {
   need(o.floor > 0 && o.floor < baseH, 'Base Floor must be between 0 and the stock thickness');
   need(o.top > 0 && o.top < lidH, 'Lid Top must be between 0 and the lid height');
   need(o.lipHeight > 0, 'Lip Height must be more than 0');
+  need(!(o.lipHeight > 0) || lipUp > 0.5, 'Lip Height must be at least 0.5 mm more than the Clearance');
   need(o.lipWidth > 0, 'Lip Thickness must be more than 0');
   need(o.clearance >= 0, 'Clearance can\'t be negative');
   need(deep - w > rb + (o.finish > 0 ? o.finish : 0), 'Wall too thick for the size: the inside must be wider than the bit');
@@ -2027,8 +2031,8 @@ function boxPlan(input) {
   // can come apart into the lobes, and is cut a piece at a time).
   if (S.kind === 'outline') need(shapeLoops(S, tInside).length <= 1 && shapeLoops(S, tInside - rb).length <= 1, 'Wall too thick for the shape: its inside comes apart in two');
   need(w - o.lipWidth - o.clearance >= 1, 'Wall must be at least 1 mm more than Lip Thickness + Clearance, for the wall outside the lip');
-  need(o.lipHeight < height[lipHalf] - under[lipHalf], 'Lip Height must be less than the inside depth of the half with the lip');
-  need(rabbetDepth < height[rabbetHalf] - under[rabbetHalf], 'Lip Height + Clearance must be less than the inside depth of the half without the lip');
+  need(lipUp < height[lipHalf] - under[lipHalf], 'Lip Height must be less than the inside depth of the half with the lip');
+  need(rabbetDepth < height[rabbetHalf] - under[rabbetHalf], 'Lip Height must be less than the inside depth of the half without the lip');
   need(o.margin >= 0, 'Edge Margin can\'t be negative');
   var fin = o.finish > 0 ? o.finish : 0;
   need(!(o.finish < 0 || o.finish > 1), 'Finish Allowance must be between 0 and 1 mm');
@@ -2047,7 +2051,7 @@ function boxPlan(input) {
   // Where the halves meet, from each half's top: the shoulder round a lip,
   // or the rim of the other.
   var meet = { base: 0, lid: 0 };
-  meet[lipHalf] = o.lipHeight;
+  meet[lipHalf] = lipUp;
 
   // Magnets: holes on the line midway across the wall the halves meet on
   // (outside the widened opening), the same in both halves.
@@ -2129,7 +2133,7 @@ function boxPlan(input) {
     };
     var tops = { base: -faces.base, lid: -faces.lid };
     add(rabbetHalf, 0, 1, tops[rabbetHalf], ed.outside, 'outside seam edge');
-    add(lipHalf, 0, 1, tops[lipHalf] - o.lipHeight, ed.outside, 'outside seam edge');
+    add(lipHalf, 0, 1, tops[lipHalf] - lipUp, ed.outside, 'outside seam edge');
     add(rabbetHalf, tRabbet, -1, tops[rabbetHalf], ed.inside, 'opening edge');
     add(lipHalf, tLip, 1, tops[lipHalf], ed.inside, 'lip\'s outer edge');
     add(lipHalf, tInside, -1, tops[lipHalf], ed.pocket, 'lip\'s inner edge');
@@ -2150,7 +2154,7 @@ function boxPlan(input) {
     // as high as the lip, must clear it (a V-bit's cone at the lip's top,
     // no wider than the bit; a roundover bit's head).
     if (ed.outside > 0) {
-      var upTo = o.lipHeight + ed.outside, inward = vbit ? Math.min(upTo * tan, ed.diameter / 2) : R;
+      var upTo = lipUp + ed.outside, inward = vbit ? Math.min(upTo * tan, ed.diameter / 2) : R;
       need(inward <= -tLip - 0.3, 'The outside seam\'s bit would cut into the lip: make the seam smaller, the Wall thicker, the Lip Height lower, or use a narrower V-bit');
       ['base', 'lid'].forEach(function(h) {
         var e = edgeAt[h].filter(function(x) { return x.what === 'outside seam edge'; })[0], high = e ? -e.z0 + e.depth : 0;
@@ -2160,8 +2164,8 @@ function boxPlan(input) {
     }
     // The bit's tip stays above what's below the edges inside: the
     // shoulder by the lip, the widened opening's floor.
-    need(!(ed.inside >= o.lipHeight - 0.2) && !(ed.inside > rabbetDepth - 0.2), 'Lead-In edges must be less deep than the Lip Height');
-    need(!(ed.outside >= Math.min(baseH, lidH) - o.lipHeight - (o.tabs ? o.tabs.height : 0) - 1), 'Outside seam edge too deep for the halves');
+    need(!(ed.inside >= lipUp - 0.2) && !(ed.inside > rabbetDepth - 0.2), 'Lead-In edges must be less deep than the Lip Height');
+    need(!(ed.outside >= Math.min(baseH, lidH) - lipUp - (o.tabs ? o.tabs.height : 0) - 1), 'Outside seam edge too deep for the halves');
     // An inside edge's bit fits across the inside.
     var reach = vbit ? tip + Math.max(eIn, ePk) : tip + R;
     if (ed.inside > 0 || ed.pocket > 0) need(deep + tInside > reach + 0.5, 'Edges: the inside is too small for the edge bit');
@@ -2235,9 +2239,10 @@ function boxPlan(input) {
       cuts.push({ op: 'pocket', t: tInside, dx: 0, dy: 0, z0: z0, depth: inDepth - rc, finish: fin, what: 'inside' });
       cuts.push({ op: 'pocket', t: tInside - rc, dx: 0, dy: 0, z0: z0 - (inDepth - rc), depth: rc, what: 'inside, its floor short of the corners' });
     } else cuts.push({ op: 'pocket', t: tInside, dx: 0, dy: 0, z0: z0, depth: inDepth, finish: fin, what: 'inside' });
-    // The shoulder: the wall top outside the lip, down by the Lip Height,
+    // The shoulder: the wall top outside the lip, down by the Lip Height
+    // less the Clearance,
     // out past the outline into the waste.
-    if (name === lipHalf) cuts.push({ op: 'ring', tIn: tLip, tOut: waste, finish: fin, floor: fin, dx: 0, dy: 0, z0: z0, depth: o.lipHeight, what: 'shoulder round the lip' });
+    if (name === lipHalf) cuts.push({ op: 'ring', tIn: tLip, tOut: waste, finish: fin, floor: fin, dx: 0, dy: 0, z0: z0, depth: lipUp, what: 'shoulder round the lip' });
     magnetsOf(name).forEach(function(p, i) {
       (o.magnets.bit > 0 ? magnetCuts[name] : cuts).push({ op: 'pocket', shape: { kind: 'circle', r: o.magnets.diameter / 2 }, t: 0, dx: p.dx, dy: p.dy, z0: z0 - meet[name], depth: o.magnets.depth, what: 'magnet hole ' + (i + 1) });
     });
@@ -2253,14 +2258,14 @@ function boxPlan(input) {
   var one = halves[0];
   var plan = {
     o: o, problems: problems, notes: notes, shape: S, mirror: mirror, halfX: halfX, halfY: halfY, ext: ext, margin: m,
-    tInside: tInside, tRabbet: tRabbet, tLip: tLip, rabbetDepth: rabbetDepth, lidHeight: lidH, baseHeight: baseH, face: face, faces: faces,
+    tInside: tInside, tRabbet: tRabbet, tLip: tLip, rabbetDepth: rabbetDepth, lipUp: lipUp, lidHeight: lidH, baseHeight: baseH, face: face, faces: faces,
     halves: halves, magnetAt: magnetAt, magnets: magnetCuts, notch: notchCut, edges: edgeAt, corners: cornerAt, boards: B, originSay: originSay,
     // The stock needed: its size and front-left corner.
     stock: B.sep ? { w: stockW, h: stockH, x0: one.at.x + ext.minX - m, y0: one.at.y + ext.minY - m, thick: one.name === 'lid' ? B.lid : T }
       : { w: stockW, h: stockH, x0: shift.x + ext.minX - m, y0: shift.y + ext.minY - m, thick: T },
     // Closed: both halves, less the lip's height where they overlap.
-    closedHeight: baseH + lidH - o.lipHeight,
-    insideHeight: (baseH - o.floor) + (lidH - o.top) - o.lipHeight
+    closedHeight: baseH + lidH - lipUp,
+    insideHeight: (baseH - o.floor) + (lidH - o.top) - lipUp
   };
   // Each half knows its box (a nested set's halves come from several).
   halves.forEach(function(h) { Object.defineProperty(h, 'plan', { value: plan }); });
@@ -2329,7 +2334,7 @@ function nestInputs(input, count, gap, tune) {
     var at = limitOf(pp.shape, prev.wall + gap + rc), next = at && shrunk(prev, prev.wall + gap + rc, at);
     if (!next) break;
     var room = pp.insideHeight - gap, r = pp.baseHeight / (pp.baseHeight + pp.lidHeight), fits = true;
-    var heights = function() { var X = room + next.lipHeight; next.baseHeight = cm(X * r); next.lidHeight = cm(X * (1 - r)); };
+    var heights = function() { var X = room + next.lipHeight - next.clearance; next.baseHeight = cm(X * r); next.lidHeight = cm(X * (1 - r)); };
     // Its own sizes can round its corners or point more: fitted again.
     var size = function() { return [next.diameter, next.length, next.width, next.flats].join(); };
     for (var k = 0; k < 2 && fits; k++) {
@@ -2477,7 +2482,7 @@ function autoSizes(input, material, imperial) {
   if (o.tabs) a.tabs = { count: clamp(Math.round(round / 90), 3, 8), width: half(Math.max(5, 1.5 * b)), height: half(clamp(T * 0.08, 1, 3)) };
   if (o.magnets) a.magnets = Object.assign({}, o.magnets, { count: rect ? 4 : clamp(Math.round(round / 80), 3, 6) });
   // A notch in the base below the lip (when it's on the base), above the floor.
-  var notchRoom = T - a.floor - (o.lipOn === 'lid' ? 0 : a.lipHeight) - 0.5;
+  var notchRoom = T - a.floor - (o.lipOn === 'lid' ? 0 : a.lipHeight - a.clearance) - 0.5;
   if (o.notch) a.notch = { width: half(clamp(small * 0.18, 10, 20)), depth: Math.min(half(clamp(a.lipHeight, 3, 6)), Math.max(grid(1), Math.floor(notchRoom / grid(notchRoom)) * grid(notchRoom))) };
   // Edges: a lead-in for the lid to find its way on, no outside seam.
   if (o.edges) a.edges = Object.assign({}, o.edges, { outside: 0, inside: half(o.edges.bit === 'round' ? Math.min(o.edges.radius || 1.5, 1.5) : 1.5), pocket: half(0.5) });
@@ -2847,7 +2852,7 @@ function boxProgram(plan, f, only) {
     comment('Box ' + (i + 1) + ': ' + boxSize(p, mm3, unit) + ', ' + n3(p.closedHeight) + unit + ' closed, ' + n3(p.insideHeight) + unit + ' inside');
   });
   comment('Wall ' + mm3(o.wall) + ', floor ' + mm3(o.floor) + ', top ' + mm3(o.top) + unit);
-  comment('Lip on the ' + o.lipOn + ': ' + mm3(o.lipHeight) + ' high, ' + mm3(o.lipWidth) + ' wide, ' + mm3(o.clearance) + unit + ' clearance');
+  comment('Lip on the ' + o.lipOn + ': ' + mm3(plan.lipUp) + ' high, ' + mm3(o.lipWidth) + ' wide, ' + mm3(o.clearance) + unit + ' clearance');
   if (!plan.set) ['base', 'lid'].forEach(function(h) {
     if (plan.faces && plan.faces[h] > 0 && plan.halves.some(function(x) { return x.name === h; })) comment(cap(h) + ' ' + n3(h === 'lid' ? plan.lidHeight : plan.baseHeight) + unit + ' high: its area faced down ' + n3(plan.faces[h]) + unit + ' first');
   });
@@ -3270,18 +3275,18 @@ if (typeof module !== 'undefined' && module.exports) {
     [1, -1].forEach(function (side) {
       var f = function (x) { return side * x; };
       // The base, 0 to T (its top at T); the lid's rim at T - lipHeight when the lip is on the base.
-      var shoulder = lipBase ? T - o.lipHeight : T, lidRim = shoulder;
+      var up = plan.lipUp, shoulder = lipBase ? T - up : T, lidRim = shoulder;
       if (lipBase) {
         out += poly([[f(Ri), o.floor, fl], [f(Ri), T, eLipIn], [f(Ri + o.lipWidth), T, eLipOut], [f(Ri + o.lipWidth), shoulder], [f(R), shoulder, eSeamL], [f(R), 0], [0, 0], [0, o.floor]], 'cb-wood');
         // The lid, upside down on the shoulder: its rabbet round the lip.
         var top = lidRim + LH, rab = Ri + o.lipWidth + c;
-        out += poly([[f(Ri), top - o.top, fl && cove(top - o.top - (lidRim + o.lipHeight + c))], [f(Ri), lidRim + o.lipHeight + c, eStep], [f(rab), lidRim + o.lipHeight + c], [f(rab), lidRim, eOpen], [f(R), lidRim, eSeamR], [f(R), top], [0, top], [0, top - o.top]], 'cb-wood-dark');
+        out += poly([[f(Ri), top - o.top, fl && cove(top - o.top - (lidRim + up + c))], [f(Ri), lidRim + up + c, eStep], [f(rab), lidRim + up + c], [f(rab), lidRim, eOpen], [f(R), lidRim, eSeamR], [f(R), top], [0, top], [0, top - o.top]], 'cb-wood-dark');
       } else {
         // Lip on the lid: the base's opening is widened; the lid's lip hangs down into it.
         var rabB = Ri + o.lipWidth + c, rimB = T;
-        out += poly([[f(Ri), o.floor, fl && cove(T - o.lipHeight - c - o.floor)], [f(Ri), T - o.lipHeight - c, eStep], [f(rabB), T - o.lipHeight - c], [f(rabB), T, eOpen], [f(R), T, eSeamR], [f(R), 0], [0, 0], [0, o.floor]], 'cb-wood');
-        var top2 = T + LH - o.lipHeight;
-        out += poly([[f(Ri), top2 - o.top, fl], [f(Ri), rimB - o.lipHeight, eLipIn], [f(Ri + o.lipWidth), rimB - o.lipHeight, eLipOut], [f(Ri + o.lipWidth), rimB], [f(R), rimB, eSeamL], [f(R), top2], [0, top2], [0, top2 - o.top]], 'cb-wood-dark');
+        out += poly([[f(Ri), o.floor, fl && cove(T - up - c - o.floor)], [f(Ri), T - up - c, eStep], [f(rabB), T - up - c], [f(rabB), T, eOpen], [f(R), T, eSeamR], [f(R), 0], [0, 0], [0, o.floor]], 'cb-wood');
+        var top2 = T + LH - up;
+        out += poly([[f(Ri), top2 - o.top, fl], [f(Ri), rimB - up, eLipIn], [f(Ri + o.lipWidth), rimB - up, eLipOut], [f(Ri + o.lipWidth), rimB], [f(R), rimB, eSeamL], [f(R), top2], [0, top2], [0, top2 - o.top]], 'cb-wood-dark');
       }
     });
     return out;
@@ -3294,7 +3299,7 @@ if (typeof module !== 'undefined' && module.exports) {
     out += '<text class="cb-dim" x="' + X(0) + '" y="' + (Y(0) + 4.5) + '">' + (plan.shape.kind === 'rect' ? fmt(o.length) + ' × ' + fmt(o.width) : plan.shape.kind === 'poly' ? plan.shape.n + ' sides, ' + fmt(o.flats) : o.shape === 'oval' ? 'oval ' + fmt(o.length) + ' × ' + fmt(o.width) : o.shape === 'heart' ? 'heart ' + fmt(o.length) + ' × ' + fmt(o.width) : o.shape === 'custom' ? 'drawing ' + fmt(o.length) + ' × ' + fmt(o.width) : 'Ø ' + fmt(o.diameter)) + ' ' + unit() + ' · lip on the ' + o.lipOn + '</text>';
     // The sizes, labelled down the left, each pointing at its part of the
     // left wall: a tap on one goes to its field.
-    var Ri = R + P0.tInside, lw = o.lipWidth, c = Math.max(o.clearance, 0.4), lipTop = P0.baseHeight, lipBot = lipTop - o.lipHeight;
+    var Ri = R + P0.tInside, lw = o.lipWidth, c = Math.max(o.clearance, 0.4), lipTop = P0.baseHeight, lipBot = lipTop - P0.lipUp;
     var tags = [
       ['cb-top-t', 'Lid Top', -R * 0.4, hTot - o.top / 2],
       ['cb-lip-h', 'Lip Height', -(Ri + lw / 2), lipTop - o.lipHeight * 0.2],

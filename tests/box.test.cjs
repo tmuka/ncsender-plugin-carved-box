@@ -62,12 +62,12 @@ function allowed(set, half, p) {
   if (facing && -p.z <= face + eps && at(facing.t - rb) <= eps) return true;
   if (at(rb) >= -eps) return d <= half.outline.depth + eps;
   const withLip = (o.lipOn === 'lid') === (half.name === 'lid');
-  const floor = half.height - (half.name === 'lid' ? o.top : o.floor), meet = withLip ? o.lipHeight : 0;
+  const floor = half.height - (half.name === 'lid' ? o.top : o.floor), meet = withLip ? plan.lipUp : 0;
   // Rounded floor corners: the box's bit stays the radius off the wall
   // for that last bit of the pocket (the corner bit's to cut).
   const rc = o.corners ? o.corners.radius : 0;
   if (at(plan.tInside - rb) <= eps && d <= floor + eps && (d <= floor - rc + eps || at(plan.tInside - rc - rb) <= eps)) return true;
-  if (withLip && at(plan.tLip + rb) >= -eps && d <= o.lipHeight + eps) return true;
+  if (withLip && at(plan.tLip + rb) >= -eps && d <= plan.lipUp + eps) return true;
   if (!withLip && at(plan.tRabbet - rb) <= eps && d <= plan.rabbetDepth + eps) return true;
   for (const m of half.magnetAt || plan.magnetAt) {
     if (Math.hypot(px - m.dx, py - m.dy) <= o.magnets.diameter / 2 - rb + eps && d <= meet + o.magnets.depth + eps) return true;
@@ -172,10 +172,11 @@ test('a lid lower than the stock, magnets and a finger notch', () => {
       magnets: { count: 4, diameter: 6.35, depth: 3.2 }, notch: { width: 12, depth: 4 } };
     for (const shape of [{}, { shape: 'rect', length: 130, width: 90, cornerRadius: 16 }]) {
     const { plan, pts } = check(Object.assign({}, input, shape, shape.shape ? { magnets: { count: 4, diameter: 6.35, depth: 3.2 } } : {}));
-    assert.equal(plan.closedHeight, 19 + 12 - 4);
+    // The lip stands the Lip Height less the Clearance.
+    assert.ok(Math.abs(plan.closedHeight - (19 + 12 - (4 - 0.2))) < 1e-9);
     // Each magnet hole goes its full depth in both halves.
     for (const half of plan.halves) {
-      const meet = (plan.o.lipOn === 'lid') === (half.name === 'lid') ? plan.o.lipHeight : 0;
+      const meet = (plan.o.lipOn === 'lid') === (half.name === 'lid') ? plan.lipUp : 0;
       const bottom = (half.name === 'lid' ? -plan.face : 0) - meet - 3.2;
       for (const m of plan.magnetAt) {
         assert.ok(pts.some((p) => Math.abs(p.z - bottom) < 1e-6 && Math.hypot(p.x - half.at.x - m.dx, p.y - half.at.y - m.dy) < plan.o.magnets.diameter / 2), half.name + ' magnet hole too shallow');
@@ -401,7 +402,7 @@ test('the finishing pass: roughing leaves the allowance, a lap cleans each wall,
       const at = (p, t) => shapeDistance(plan.shape, t, p.x - h.at.x, p.y - h.at.y);
       const walls = [[plan.tInside - rb, (p) => withLip || top - p.z > plan.rabbetDepth + eps, pocketG, true]];
       if (!withLip) walls.push([plan.tRabbet - rb, (p) => top - p.z <= plan.rabbetDepth + eps, pocketG, true]);
-      else walls.push([plan.tLip + rb, (p) => top - p.z <= plan.o.lipHeight + eps, lipG, false]);
+      else walls.push([plan.tLip + rb, (p) => top - p.z <= plan.lipUp + eps, lipG, false]);
       for (const [t, here, finishG, inward] of walls) {
         // Between the allowance and the wall: only the finishing laps (and their lead-ins).
         const between = near.filter((p) => here(p) && (inward ? at(p, t) > -fin + eps && at(p, t) < eps : at(p, t) < fin - eps && at(p, t) > -eps));
@@ -778,7 +779,7 @@ test('a Magnet Bit: the holes after a tool change, with the smaller bit', () => 
   let reach = 0, deepest = 0;
   for (const p of mag) {
     if (p.z > -1e-6) continue;
-    const h = half(p), meet = (input.lipOn || 'base') === h.name ? plan.o.lipHeight : 0, d = plan.faces[h.name] - p.z;
+    const h = half(p), meet = (input.lipOn || 'base') === h.name ? plan.lipUp : 0, d = plan.faces[h.name] - p.z;
     const r = Math.min(...plan.magnetAt.map((m) => Math.hypot(p.x - h.at.x - m.dx, p.y - h.at.y - m.dy)));
     assert.ok(r <= 2.5 - 3.175 / 2 + 0.005 && d <= meet + 3.2 + 0.005, 'magnet bit: ' + JSON.stringify(p));
     reach = Math.max(reach, r); deepest = Math.max(deepest, d - meet);
@@ -820,7 +821,7 @@ test('the finishing pass reaches every wall: round, rectangle, polygon, oval and
         return d <= 0.01 && d > m ? d : m;
       }, -Infinity);
       const withLip = lipOn === h.name, top = -plan.faces[h.name];
-      assert.ok(reach(plan.tInside - rb, top - plan.o.lipHeight - plan.o.clearance - 1) > -0.02, sh.shape + ' ' + h.name + ' inside');
+      assert.ok(reach(plan.tInside - rb, top - plan.rabbetDepth - 1) > -0.02, sh.shape + ' ' + h.name + ' inside');
       if (!withLip) assert.ok(reach(plan.tRabbet - rb, top - 0.05) > -0.02, sh.shape + ' ' + h.name + ' opening');
     }
   }
@@ -840,7 +841,7 @@ test('finishing: the step floors roughed short, skimmed after all the roughing, 
       const laps = h.cuts.filter((c) => c.finish).map((c) => at(new RegExp('^\\(' + H + ': ' + c.what + ': finishing lap')));
       assert.ok(rough >= 0 && skim > lastRough && laps.every((l) => l > skim), H + ' ' + JSON.stringify([rough, lastRough, skim, laps]));
       // The step's roughing stops the allowance over its floor; the skim reaches it.
-      const floorZ = -plan.faces[h.name] - (withLip ? plan.o.lipHeight : plan.rabbetDepth);
+      const floorZ = -plan.faces[h.name] - (withLip ? plan.lipUp : plan.rabbetDepth);
       const deepest = (from, to) => Math.min(...simulate(lines.slice(from, to).join('\n').replace(/^/, 'G0 Z5\n')).map((p) => p.z));
       assert.ok(Math.abs(deepest(rough + 1, rough + 1 + lines.slice(rough + 1).findIndex((l) => /^\(/.test(l))) - (floorZ + 0.3)) < 1e-3, H + ' rough floor');
       assert.ok(Math.abs(deepest(skim + 1, skim + 1 + lines.slice(skim + 1).findIndex((l) => /^\(/.test(l))) - floorZ) < 1e-3, H + ' skimmed floor');
@@ -943,4 +944,19 @@ test('drawings: a DXF file\'s outline, its arcs and joined pieces, in its units'
   assert.ok(Math.abs(shapeDistance(plan.shape, 0, 50.8, 0)) < 0.05 && Math.abs(shapeDistance(plan.shape, 0, 25.4, 25.4)) < 0.05);
   assert.match(drawingOutline(dxf([], ent('LINE', [[10, 0], [20, 0], [11, 3], [21, 0]])), 'e.dxf').problem, /no closed shape/);
   assert.match(drawingOutline('AutoCAD Binary DXF\r\n\x1a\x00', 'f.dxf').problem, /binary DXF/);
+});
+
+test('the opening is the Lip Height deep; the lip stands the Clearance lower, so the halves close on the shoulder', () => {
+  for (const lipOn of ['base', 'lid']) {
+    const { plan, pts } = check({ lipOn, lipHeight: 5, clearance: 0.3, wall: 10, gap: 14 });
+    const withLip = plan.halves.find((h) => h.name === lipOn), without = plan.halves.find((h) => h.name !== lipOn);
+    const opening = without.cuts.find((c) => /opening widened/.test(c.what)), shoulder = withLip.cuts.find((c) => /shoulder/.test(c.what));
+    assert.equal(opening.depth, 5);
+    assert.ok(Math.abs(shoulder.depth - 4.7) < 1e-9);
+    // Cut that deep, no deeper.
+    const deepest = (h, t) => Math.max(...pts.filter((p) => Math.abs(p.x - h.at.x) < 1e3 && shapeDistance(h.shape, t, p.x - h.at.x, p.y - h.at.y) > 0.1 && shapeDistance(h.shape, 0, p.x - h.at.x, p.y - h.at.y) < -0.1).map((p) => -p.z - plan.faces[h.name]));
+    assert.ok(Math.abs(deepest(withLip, plan.tLip) - 4.7) < 1e-6, lipOn + " " + deepest(withLip, plan.tLip));
+    assert.ok(Math.abs(plan.closedHeight - (plan.baseHeight + plan.lidHeight - 4.7)) < 1e-9);
+  }
+  assert.ok(boxPlan({ lipHeight: 0.6, clearance: 0.2 }).problems.some((p) => /at least 0.5 mm more than the Clearance/.test(p)));
 });

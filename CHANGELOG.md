@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Lip and opening:** the other half's opening is now cut just the Lip Height deep (it was Lip Height + Clearance), and the lip stands up the Clearance less, so the clearance no longer eats into the lid or base and the halves still close tight on the shoulder. A box closes the Clearance lower than before.
 - **Drawing**: a new shape from your own SVG or DXF file (in a DXF, closed polylines with arcs, circles, ellipses and splines, or lines and arcs meeting end to end). Its biggest closed shape is the box's outline, stretched to the Length and Width (starting at the file's size when it gives one), with Keep its proportions. The Corner Radius rounds its outside corners for the lip; the lid is cut as its mirror image so it lands on the base. Outlines that cross themselves, or that the rounding cuts apart, are refused. The drawing is saved with your settings, and Test Fit and nested sets work with it (each nested box is the outline moved in, so it fits past inside corners).
 - A box typed far too big no longer stalls the page while its outline is worked out.
 - Floor Corners: the side view no longer draws a cove bulging the wrong way in the half without the lip when its inside is too shallow for it; the note says how much wall there is above the step and what to change.
