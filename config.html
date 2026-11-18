@@ -2187,7 +2187,10 @@ function boxPlan(input) {
     need(deep + tInside - rc > rb + 0.1, 'Corners: the inside is too small for the box\'s bit to clear the floor inside the rounded corners');
     ['base', 'lid'].forEach(function(h) {
       var depth = height[h] - under[h] - (h === rabbetHalf ? rabbetDepth : 0);
-      need(rc <= depth - 0.5, 'Corners: the radius is too big for the ' + h + '\'s inside');
+      // In the half without the lip, the wall between its floor and the
+      // step the lip sits on.
+      need(rc <= depth - 0.5, 'Corners: the radius is too big for the ' + h + '\'s inside: ' + (h === rabbetHalf ? 'the wall between its ' + (h === 'lid' ? 'top' : 'floor') + ' and the step the lip sits on is ' : 'its wall is ') +
+        +Math.max(0, depth).toFixed(2) + ' mm high, and the cove needs its radius + 0.5 mm. Make the Cove Radius smaller, ' + (h === 'lid' ? 'the Lid Top thinner or the Lid Height taller' : 'the Base Floor thinner') + (h === rabbetHalf ? ', or the Lip Height lower' : ''));
       var floorZ = -faces[h] - (height[h] - under[h]);
       cornerAt[h].push({ op: 'corner', shape: cornered ? Object.assign({}, SH[h], { cr: Math.max(SH[h].cr, rb - tInside) }) : SH[h],
         t: tInside - cn.diameter / 2, z0: floorZ + rc, depth: rc, what: 'floor corners rounded' });
@@ -3259,6 +3262,9 @@ if (typeof module !== 'undefined' && module.exports) {
     var lipH = lipBase ? 'base' : 'lid', rabH = lipBase ? 'lid' : 'base';
     var eSeamL = edgeOf(lipH, 'outside seam edge'), eSeamR = edgeOf(rabH, 'outside seam edge'), eOpen = edgeOf(rabH, 'opening edge');
     var fl = o.corners && plan.corners.base.length ? { depth: o.corners.radius, width: o.corners.radius, R: o.corners.radius } : null;
+    // A cove no taller than the wall it's on (one too big is a problem the
+    // note says; drawn whole, it would fold the section over).
+    var cove = function (wall) { var r = Math.max(0, Math.min(fl.R, wall)); return r > 1e-6 ? { depth: r, width: r, R: r } : null; };
     var eLipOut = edgeOf(lipH, 'lip\'s outer edge'), eLipIn = edgeOf(lipH, 'lip\'s inner edge'), eStep = edgeOf(rabH, 'step\'s inner edge');
     var out = '';
     [1, -1].forEach(function (side) {
@@ -3269,11 +3275,11 @@ if (typeof module !== 'undefined' && module.exports) {
         out += poly([[f(Ri), o.floor, fl], [f(Ri), T, eLipIn], [f(Ri + o.lipWidth), T, eLipOut], [f(Ri + o.lipWidth), shoulder], [f(R), shoulder, eSeamL], [f(R), 0], [0, 0], [0, o.floor]], 'cb-wood');
         // The lid, upside down on the shoulder: its rabbet round the lip.
         var top = lidRim + LH, rab = Ri + o.lipWidth + c;
-        out += poly([[f(Ri), top - o.top, fl], [f(Ri), lidRim + o.lipHeight + c, eStep], [f(rab), lidRim + o.lipHeight + c], [f(rab), lidRim, eOpen], [f(R), lidRim, eSeamR], [f(R), top], [0, top], [0, top - o.top]], 'cb-wood-dark');
+        out += poly([[f(Ri), top - o.top, fl && cove(top - o.top - (lidRim + o.lipHeight + c))], [f(Ri), lidRim + o.lipHeight + c, eStep], [f(rab), lidRim + o.lipHeight + c], [f(rab), lidRim, eOpen], [f(R), lidRim, eSeamR], [f(R), top], [0, top], [0, top - o.top]], 'cb-wood-dark');
       } else {
         // Lip on the lid: the base's opening is widened; the lid's lip hangs down into it.
         var rabB = Ri + o.lipWidth + c, rimB = T;
-        out += poly([[f(Ri), o.floor, fl], [f(Ri), T - o.lipHeight - c, eStep], [f(rabB), T - o.lipHeight - c], [f(rabB), T, eOpen], [f(R), T, eSeamR], [f(R), 0], [0, 0], [0, o.floor]], 'cb-wood');
+        out += poly([[f(Ri), o.floor, fl && cove(T - o.lipHeight - c - o.floor)], [f(Ri), T - o.lipHeight - c, eStep], [f(rabB), T - o.lipHeight - c], [f(rabB), T, eOpen], [f(R), T, eSeamR], [f(R), 0], [0, 0], [0, o.floor]], 'cb-wood');
         var top2 = T + LH - o.lipHeight;
         out += poly([[f(Ri), top2 - o.top, fl], [f(Ri), rimB - o.lipHeight, eLipIn], [f(Ri + o.lipWidth), rimB - o.lipHeight, eLipOut], [f(Ri + o.lipWidth), rimB], [f(R), rimB, eSeamL], [f(R), top2], [0, top2], [0, top2 - o.top]], 'cb-wood-dark');
       }
@@ -3976,7 +3982,7 @@ if (typeof module !== 'undefined' && module.exports) {
     [/Lip Thickness/, 'cb-lip-w'], [/Lip Height/, 'cb-lip-h'], [/Clearance/, 'cb-clear'], [/Corner Radius|ends are too tight|Point/, 'cb-corner'],
     [/Base Floor|floor/, 'cb-floor'], [/Lid Top/, 'cb-top-t'], [/Lid Height/, 'cb-lid-h'], [/Lid Board/, 'cb-lid-stock'], [/Gap Between|Gap/, 'cb-gap'], [/Edge Margin/, 'cb-margin'],
     [/[Tt]abs/, 'cb-tab-n'], [/^The Magnet Bit|than the Magnet Bit/, 'cb-mtool-row'], [/[Mm]agnet/, 'cb-mag-d'], [/[Nn]otch/, 'cb-notch-w'], [/Lead-In/, 'cb-ein'], [/Inside Rim/, 'cb-epk'], [/seam/, 'cb-eout'],
-    [/Corners:/, 'cb-cdiam'], [/Stock Thickness|stock thickness/, 'cb-stock'], [/Wall/, 'cb-wall'], [/Bit Diameter|bit/, 'cb-bit']];
+    [/^Corners: the radius/, 'cb-crad'], [/Corners:/, 'cb-cdiam'], [/Stock Thickness|stock thickness/, 'cb-stock'], [/Wall/, 'cb-wall'], [/Bit Diameter|bit/, 'cb-bit']];
   // The name it starts with first ("Wall must be at least ... Lip Thickness"), else any it uses.
   function problemField(p) {
     var m = PROBLEM_FIELDS.filter(function (x) { return p.search(x[0]) === 0; })[0] || PROBLEM_FIELDS.filter(function (x) { return x[0].test(p); })[0];
