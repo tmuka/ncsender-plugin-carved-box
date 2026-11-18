@@ -1110,6 +1110,9 @@ test('a sloped top: the lip straight below its Slope Height, the opening narrowe
     const { plan } = check(input);
     const slant = Math.tan(angle * Math.PI / 360), straight = plan.lipUp - 2;
     assert.equal(plan.slopeUp, 2);
+    // The steps after the first only round the wall, not the whole inside again.
+    const rings = plan.halves.flatMap((h) => h.cuts).filter((c) => /narrowed to the lip's slope/.test(c.what));
+    assert.ok(rings.length && rings.every((c) => c.op === 'ring' && c.tOut - c.tIn >= plan.o.bit - 1e-9));
     // The V-bit only chamfers the lip's top; the opening's narrowing is the box bit's.
     const lipHalf = lipOn, rabHalf = lipOn === 'lid' ? 'base' : 'lid';
     assert.deepEqual(plan.edges[lipHalf].map((e) => e.what).filter((w) => /lip's|opening/.test(w)), ["lip's sloped top"]);
@@ -1154,4 +1157,23 @@ test('finger notches: a count of them evenly round from a start angle, cut witho
   const mag = { wall: 12, magnets: { count: 4, diameter: 6, depth: 3 } };
   assert.deepEqual(boxPlan({ ...mag, notch: { width: 12, depth: 3, count: 2, angle: 0 } }).problems, []);
   assert.ok(boxPlan({ ...mag, notch: { width: 12, depth: 3, count: 2, angle: 45 } }).problems.some((p) => /runs into a magnet hole/.test(p)));
+  // Auto Sizes: a magnet count that misses two notches, not a thicker wall.
+  for (const diameter of [60, 76.2]) {
+    const a = autoSizes({ diameter, stock: 25.4, bit: 3.175, magnets: { count: 3, diameter: 6.35, depth: 3 }, notch: { width: 16, depth: 4, count: 2, angle: 0 } }, 'walnut', false);
+    assert.deepEqual(a.problems, []);
+    assert.ok(a.wall < 16 && a.magnets.count % 2 === 0, JSON.stringify(a));
+  }
+  // Switched on with Auto Sizes off: the magnets turned, not the notch narrowed.
+  const two = { ...mag, magnets: { ...mag.magnets, count: 3 }, notch: { width: 14, depth: 3, count: 2, angle: 0 } };
+  assert.deepEqual(fitOption(two, false).set, { 'magnets.count': 2 });
+  // What was wrong before it was switched on is left as it was.
+  const before = boxPlan({ ...two, notch: null }).problems.concat(['The finger notch runs into a magnet hole: use fewer magnets, a narrower notch, or turn the notches']);
+  assert.deepEqual(fitOption(two, false, before).set, {});
+  // Turned toward the lid: no further into the Gap than 1 mm short of it.
+  const wide = { diameter: 100, wall: 18, lipWidth: 4, gap: 12, notch: { width: 26, depth: 3, count: 1 } };
+  assert.ok(boxPlan({ ...wide, notch: { ...wide.notch, angle: 90 } }).problems.some((p) => /across the Gap/.test(p)));
+  assert.deepEqual(boxPlan({ ...wide, notch: { ...wide.notch, angle: 270 } }).problems, []);
+  assert.ok(boxPlan({ ...wide, layout: 'y', notch: { ...wide.notch, angle: 270 } }).problems.some((p) => /across the Gap/.test(p)));
+  // Too deep: said, its width left as it is.
+  assert.ok(!('notch.width' in fitOption({ diameter: 100, wall: 10, lipWidth: 3, stock: 12, floor: 4, notch: { width: 12, depth: 9 } }, false).set));
 });
