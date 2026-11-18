@@ -960,3 +960,45 @@ test('the opening is the Lip Height deep; the lip stands the Clearance lower, so
   }
   assert.ok(boxPlan({ lipHeight: 0.6, clearance: 0.2 }).problems.some((p) => /at least 0.5 mm more than the Clearance/.test(p)));
 });
+
+test('review fixes: drawings from underneath, rounded drawings centered, holes on the rough shoulder, notch on a hollow front, lines joined fast', () => {
+  const { drawingOutline, svgOutline } = require('../lib/box-drawing.cjs');
+  const dxf = (ents) => ['0', 'SECTION', '2', 'ENTITIES', ...ents, '0', 'ENDSEC', '0', 'EOF'].join('\n');
+  const ent = (type, g) => ['0', type, ...g.flatMap(([c, v]) => [String(c), String(v)])];
+  // A 100 x 60 rounded rectangle, its arcs written from underneath (X the other way).
+  const down = [[210, 0], [220, 0], [230, -1]], L = (x0, y0, x1, y1) => ent('LINE', [[10, x0], [20, y0], [11, x1], [21, y1]]);
+  const arc = (cx, cy, a0, a1) => ent('ARC', [[10, -cx], [20, cy], [40, 10], [50, 180 - a1], [51, 180 - a0], ...down]);
+  const rr = drawingOutline(dxf([...L(10, 0, 90, 0), ...arc(90, 10, 270, 360), ...L(100, 10, 100, 50), ...arc(90, 50, 0, 90), ...L(90, 60, 10, 60), ...arc(10, 50, 90, 180), ...L(0, 50, 0, 10), ...arc(10, 10, 180, 270)]), 'r.dxf');
+  assert.deepEqual([+rr.size.w.toFixed(3), +rr.size.h.toFixed(3)], [100, 60]);
+  // A closed polyline from underneath: mirrored back (its notch on the right, as drawn).
+  const pl = drawingOutline(dxf(ent('LWPOLYLINE', [[90, 5], [70, 1], [10, 0], [20, 0], [10, -100], [20, 0], [10, -100], [20, 60], [10, -60], [20, 30], [10, 0], [20, 60], ...down])), 'p.dxf');
+  const notchAt = pl.pts.findIndex((v, i) => i % 2 === 1 && Math.abs(v) < 1e-6);
+  assert.ok(pl.pts[notchAt - 1] > 0, 'mirrored');
+  // A right triangle rounded: still Length x Width about the middle, the lid on the stock.
+  const tri = { shape: 'custom', outline: { pts: [0, 0, 100, 0, 0, 100] }, length: 150, width: 150, cornerRadius: 15, wall: 10, lipWidth: 3, gap: 12 };
+  const tp = boxPlan(tri);
+  assert.deepEqual(tp.problems, []);
+  assert.ok(Math.abs(tp.ext.maxX - 75) < 0.05 && Math.abs(tp.ext.minX + 75) < 0.05 && Math.abs(tp.ext.minY + 75) < 0.05);
+  for (const h of tp.halves) {
+    const lp = shapeLoop(h.shape, plan0(tp) + tp.o.bit / 2);
+    for (let k = 0; k < 200; k++) { const q = loopPoint(lp, loopLength(lp) * k / 200); assert.ok(q.x + h.at.x >= tp.stock.x0 - 1e-6 && q.x + h.at.x <= tp.stock.x0 + tp.stock.w + 1e-6, h.name + ' off the stock'); }
+  }
+  check(tri);
+  // Magnet holes in the half with the lip start on the shoulder as roughed.
+  const mp = boxPlan({ finish: 0.5, magnets: { count: 3, diameter: 6.35, depth: 3 }, wall: 12, lipWidth: 3, gap: 14 });
+  const base = mp.halves[0], hole = base.cuts.find((c) => /magnet/.test(c.what)), sh = base.cuts.find((c) => /shoulder/.test(c.what));
+  assert.ok(Math.abs(hole.z0 - (sh.z0 - (sh.depth - 0.5))) < 1e-9 && Math.abs(hole.z0 - hole.depth - (-mp.lipUp - 3)) < 1e-9);
+  check(mp);
+  // A U open to the front: the notch on its outline, in the hollow.
+  const u = svgOutline('<svg width="160mm" height="120mm" viewBox="0 0 160 120"><path d="M0 0 H160 V120 H88 V50 H72 V120 H0 Z"/></svg>');
+  const up = boxPlan({ shape: 'custom', outline: u, length: 160, width: 120, notch: { width: 12, depth: 3 }, cornerRadius: 6 });
+  assert.ok(Math.abs(shapeDistance(up.shape, 0, up.notch.dx, up.notch.dy)) < 0.05, 'notch off the outline');
+  // An SVG of loose lines, and 10,000 shuffled DXF lines, joined.
+  assert.equal(svgOutline('<svg width="10mm" height="10mm" viewBox="0 0 10 10"><line x1="0" y1="0" x2="10" y2="0"/><line x1="10" y1="10" x2="10" y2="0"/><path d="M10 10 L0 10"/><line x1="0" y1="10" x2="0" y2="0"/></svg>').size.w, 10);
+  const lines = [];
+  for (let k = 0; k < 10000; k++) { const a = 2 * Math.PI * k / 10000, b = 2 * Math.PI * (k + 1) / 10000; lines.push(L(50 * Math.cos(a), 50 * Math.sin(a), 50 * Math.cos(b), 50 * Math.sin(b))); }
+  for (let k = lines.length - 1; k > 0; k--) { const j = Math.floor(((k * 7919) % 10007) / 10007 * (k + 1)); [lines[k], lines[j]] = [lines[j], lines[k]]; }
+  const t = Date.now(), big = drawingOutline(dxf(lines.flat()), 'c.dxf');
+  assert.ok(Math.abs(big.size.w - 100) < 0.01 && Date.now() - t < 1500, 'joined in ' + (Date.now() - t) + ' ms');
+});
+function plan0() { return 0; }

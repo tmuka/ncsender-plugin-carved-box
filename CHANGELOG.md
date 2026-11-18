@@ -1,10 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.3.2: Your own shapes, cleaner steps, a tighter lip
 
 - **Lip and opening:** the other half's opening is now cut just the Lip Height deep (it was Lip Height + Clearance), and the lip stands up the Clearance less, so the clearance no longer eats into the lid or base and the halves still close tight on the shoulder. A box closes the Clearance lower than before.
 - **Drawing**: a new shape from your own SVG or DXF file (in a DXF, closed polylines with arcs, circles, ellipses and splines, or lines and arcs meeting end to end). Its biggest closed shape is the box's outline, stretched to the Length and Width (starting at the file's size when it gives one), with Keep its proportions. The Corner Radius rounds its outside corners for the lip; the lid is cut as its mirror image so it lands on the base. Outlines that cross themselves, or that the rounding cuts apart, are refused. The drawing is saved with your settings, and Test Fit and nested sets work with it (each nested box is the outline moved in, so it fits past inside corners).
 - A box typed far too big no longer stalls the page while its outline is worked out.
+- With the Finishing Pass, magnet holes in the half with the lip start on the shoulder as it was roughed, not 0.25 mm or so into wood that's skimmed later.
+- Drawings: a drawing's Corner Radius no longer makes it smaller than its Length and Width, and its lid stays on the stock however lopsided it is; the finger notch sits on the outline even where the front is hollow; DXF arcs and polylines written from underneath (as some CAD programs do) are read the right way round; SVGs made of loose lines are joined; thousands of DXF lines are joined quickly.
 - Floor Corners: the side view no longer draws a cove bulging the wrong way in the half without the lip when its inside is too shallow for it; the note says how much wall there is above the step and what to change.
 - Finishing Pass: the steps' floors (the widened opening's, the shoulder round the lip) are roughed a little short too, then skimmed in one light pass; and all of a half's finishing comes after all its roughing (the floors, then the walls' laps), so later roughing no longer tears up a finished edge and a lap cuts off fibers the floor skim lifts over an edge. Less fuzz where the step meets the inside.
 
