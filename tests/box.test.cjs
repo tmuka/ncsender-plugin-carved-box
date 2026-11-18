@@ -48,7 +48,7 @@ function simulate(gcode) {
 // the notch.) Distances: to the box's outline moved t, < 0 inside.
 function allowed(set, half, p) {
   // A nested set's half: its own box's plan.
-  const plan = half.plan || set, o = plan.o, rb = o.bit / 2, S = plan.shape;
+  const plan = half.plan || set, o = plan.o, rb = o.bit / 2, S = half.shape || plan.shape;
   // eps: the program's coordinates are to 0.001 mm, arc centers too; an
   // outline's offsets (a heart's, an oval's) are straight lines kept to
   // 0.02 mm of the curve.
@@ -69,7 +69,7 @@ function allowed(set, half, p) {
   if (at(plan.tInside - rb) <= eps && d <= floor + eps && (d <= floor - rc + eps || at(plan.tInside - rc - rb) <= eps)) return true;
   if (withLip && at(plan.tLip + rb) >= -eps && d <= o.lipHeight + eps) return true;
   if (!withLip && at(plan.tRabbet - rb) <= eps && d <= plan.rabbetDepth + eps) return true;
-  for (const m of plan.magnetAt) {
+  for (const m of half.magnetAt || plan.magnetAt) {
     if (Math.hypot(px - m.dx, py - m.dy) <= o.magnets.diameter / 2 - rb + eps && d <= meet + o.magnets.depth + eps) return true;
   }
   if (half.name === 'base' && plan.notch) {
@@ -92,7 +92,7 @@ function check(input, extra) {
     assert.ok(!(p.rapid && p.z < -1e-6), 'a rapid below the stock top');
     if (p.rapid && p.z < SAFE) assert.ok(!p.sideways, 'a move sideways under safe height: ' + JSON.stringify(p));
     // The half it's nearest (inside, or closest outside its outline).
-    const near = (h) => shapeDistance(h.plan.shape, 0, p.x - h.at.x, p.y - h.at.y);
+    const near = (h) => shapeDistance(h.shape || h.plan.shape, 0, p.x - h.at.x, p.y - h.at.y);
     const half = plan.halves.reduce((a, b) => near(a) <= near(b) ? a : b);
     assert.ok(allowed(plan, half, p), half.name + ' cut where wood stays: ' + JSON.stringify(p));
   }
@@ -548,6 +548,7 @@ test('an outline whose pocket comes apart: each piece cleared on its own, betwee
   const plan = boxPlan({ shape: 'oval', length: 130, width: 60 });
   assert.deepEqual(plan.problems, []);
   plan.shape = dumbbell;
+  plan.halves.forEach((h) => { h.shape = dumbbell; });
   assert.equal(shapeLoops(dumbbell, plan.tInside).length, 1);
   assert.ok(shapeLoops(dumbbell, -20).length === 2, 'splits in two');
   const { gcode } = boxProgram(plan, FEEDS);
@@ -845,4 +846,82 @@ test('finishing: the step floors roughed short, skimmed after all the roughing, 
       assert.ok(Math.abs(deepest(skim + 1, skim + 1 + lines.slice(skim + 1).findIndex((l) => /^\(/.test(l))) - floorZ) < 1e-3, H + ' skimmed floor');
     }
   }
+});
+
+test('drawings: an SVG file\'s outline read in mm, the biggest closed shape kept', () => {
+  const { svgOutline } = require('../lib/box-drawing.cjs');
+  const r = svgOutline('<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" width="210mm" height="297mm" viewBox="0 0 210 297"><g transform="translate(10,20)"><rect width="100" height="60" rx="5"/></g><circle cx="5" cy="5" r="2"/><defs><rect width="999" height="999"/></defs></svg>');
+  assert.deepEqual([r.size.w, r.size.h, r.sized, r.others], [100, 60, true, 1]);
+  const inches = svgOutline('<svg width="4in" height="3in" viewBox="0 0 400 300"><polygon points="0,0 400,0 400,300 200,150 0,300"/><path d="M0 0 L10 10"/></svg>');
+  assert.deepEqual([+inches.size.w.toFixed(3), +inches.size.h.toFixed(3), inches.open, inches.pts.length], [101.6, 76.2, 1, 10]);
+  // Up the page is to the back: the notch at the top of the page is at +Y.
+  assert.ok(inches.pts.some((v, i) => i % 2 === 1 && Math.abs(v) < 1e-6));
+  const px = svgOutline('<svg><path d="M100,180 C 20,120 0,80 30,40 A40 40 0 0 1 100 60 a40,40 0 01 70-20 C200 80 180 120 100 180z"/></svg>');
+  assert.equal(px.sized, false);
+  assert.match(svgOutline('<svg><line x1="0" y1="0" x2="1" y2="1"/></svg>').problem, /no closed shape/);
+  assert.match(svgOutline('<svg><path d="M0 0 L x"/></svg>').problem, /Couldn't read/);
+  assert.match(svgOutline('not a drawing').problem, /No shapes/);
+});
+
+// A lopsided outline with an inside corner, as a drawing (+Y down the page).
+const LOPSIDED = '<svg width="120mm" height="90mm" viewBox="0 0 120 90"><path d="M0 90 H120 V40 H70 L40 0 L0 20 Z"/></svg>';
+test('drawings: cut without touching what stays, the lid mirrored to land on the base', () => {
+  const { svgOutline } = require('../lib/box-drawing.cjs');
+  const outline = { name: 'lopsided.svg', pts: svgOutline(LOPSIDED).pts };
+  for (const [layout, lipOn] of [['x', 'base'], ['y', 'lid']]) {
+    const input = { shape: 'custom', outline, length: 120, width: 90, layout, lipOn, stock: 25, finish: 0.3,
+      magnets: { count: 5, diameter: 6.35, depth: 3.2 }, notch: { width: 14, depth: 4 } };
+    const sizes = autoSizes(input, 'hardwood', false);
+    assert.deepEqual(sizes.problems, []);
+    const { plan, pts } = check(Object.assign({}, input, sizes));
+    const [base, lid] = plan.halves, rb = plan.o.bit / 2;
+    assert.ok(base.shape.inside && base.shape.cr >= plan.o.wall - plan.o.lipWidth - plan.o.clearance + rb - 1e-9);
+    // Turned over across the line between the halves, the lid's outline and
+    // magnet holes are the base's.
+    const flip = layout === 'y' ? (p) => ({ x: p.x, y: -p.y }) : (p) => ({ x: -p.x, y: p.y });
+    const out = shapeLoop(base.shape, 0), len = loopLength(out);
+    for (let k = 0; k < 120; k++) { const q = flip(loopPoint(out, len * k / 120)); assert.ok(Math.abs(shapeDistance(lid.shape, 0, q.x, q.y)) < 0.03, 'the lid isn\'t the base turned over'); }
+    assert.ok(Math.abs(shapeDistance(base.shape, 0, ...Object.values(flip(loopPoint(out, len / 3))))) > 1, 'the drawing is lopsided');
+    for (const m of lid.magnetAt) { const q = flip({ x: m.dx, y: m.dy }); assert.ok(base.magnetAt.some((b) => Math.hypot(b.dx - q.x, b.dy - q.y) < 1e-6), 'magnets don\'t meet'); }
+    // The notch on the outline at the front.
+    assert.ok(Math.abs(shapeDistance(base.shape, 0, plan.notch.dx, plan.notch.dy)) < 0.05);
+    // Every floor cleared, each half's own.
+    for (const half of plan.halves) {
+      const floor = (half.name === 'lid' ? plan.face : 0) + half.height - (half.name === 'lid' ? plan.o.top : plan.o.floor);
+      const deep = pts.filter((p) => Math.abs(p.z + floor) < 1e-6);
+      for (let qx = plan.ext.minX; qx <= plan.ext.maxX; qx += 1.5) for (let qy = plan.ext.minY; qy <= plan.ext.maxY; qy += 1.5) {
+        if (shapeDistance(half.shape, plan.tInside - plan.o.finish, qx, qy) > -0.3) continue;
+        let near = Infinity;
+        for (const p of deep) { const d = Math.hypot(p.x - half.at.x - qx, p.y - half.at.y - qy); if (d < near) near = d; if (near <= rb) break; }
+        assert.ok(near <= rb + 0.35, half.name + ' floor left at ' + qx.toFixed(1) + ',' + qy.toFixed(1) + ' (' + near.toFixed(2) + ')');
+      }
+    }
+    assert.match(boxProgram(plan, FEEDS).gcode, /a drawing 120 x 90mm, corners/);
+  }
+});
+
+test('drawings: what can\'t be cut is said; Test Fit and nested sets keep its proportions', () => {
+  const { svgOutline } = require('../lib/box-drawing.cjs');
+  const said = (o, re) => { const p = boxPlan(Object.assign({ shape: 'custom', length: 120, width: 90 }, o)).problems; assert.ok(p.some((x) => re.test(x)), p.join('; ')); };
+  said({}, /Open a drawing/);
+  said({ outline: { pts: [0, 0, 100, 0, 0, 100, 100, 100] }, cornerRadius: 12 }, /crosses itself/);
+  // Two blobs on a 6 mm neck: rounding 8 mm parts them.
+  const neck = svgOutline('<svg width="100mm" height="40mm" viewBox="0 0 100 40"><path d="M0 0 H45 V17 H55 V0 H100 V40 H55 V23 H45 V40 H0 Z"/></svg>');
+  said({ outline: neck, length: 100, width: 40, cornerRadius: 8 }, /cuts the drawing apart/);
+  said({ outline: { pts: svgOutline(LOPSIDED).pts }, wall: 6, lipWidth: 5, cornerRadius: 8 }, /inside corners/);
+  const outline = { pts: svgOutline(LOPSIDED).pts };
+  const input = Object.assign({ shape: 'custom', outline, length: 160, width: 120, stock: 30, bit: 6.35 });
+  const tuned = Object.assign({}, input, autoSizes(input, 'hardwood', false));
+  delete tuned.problems;
+  const fit = testFitInput(tuned);
+  assert.ok(Math.abs(fit.length / fit.width - 4 / 3) < 1e-9 && fit.length < 160);
+  check(fit);
+  const list = nestInputs(tuned, 2, 1.5, (i) => autoSizes(i, 'hardwood', false));
+  assert.equal(list.length, 2);
+  const set = setPlan(list, 2), [outer, inner] = set.set;
+  const lp = shapeLoop(inner.shape, 0), len = loopLength(lp);
+  // Set in it where its outline came from (shift from the outer's middle).
+  const { x: sx, y: sy } = inner.o.shift;
+  for (let k = 0; k < 200; k++) { const q = loopPoint(lp, len * k / 200); assert.ok(shapeDistance(outer.shape, -(outer.o.wall + 1.5), q.x + sx, q.y + sy) <= 0.03, 'box 2 sticks out'); }
+  check(set);
 });

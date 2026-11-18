@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+
+- **Drawing**: a new shape from your own SVG file. Its biggest closed shape is the box's outline, stretched to the Length and Width (starting at the file's size when it gives one), with Keep its proportions. The Corner Radius rounds its outside corners for the lip; the lid is cut as its mirror image so it lands on the base. Outlines that cross themselves, or that the rounding cuts apart, are refused. The drawing is saved with your settings, and Test Fit and nested sets work with it (each nested box is the outline moved in, so it fits past inside corners).
+- A box typed far too big no longer stalls the page while its outline is worked out.
 - Finishing Pass: the steps' floors (the widened opening's, the shoulder round the lip) are roughed a little short too, then skimmed in one light pass; and all of a half's finishing comes after all its roughing (the floors, then the walls' laps), so later roughing no longer tears up a finished edge and a lap cuts off fibers the floor skim lifts over an edge. Less fuzz where the step meets the inside.
 
 ## 0.3.1: Oval and heart lids fit
