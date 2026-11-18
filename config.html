@@ -179,7 +179,7 @@
           <button type="button" role="radio" data-v="circle"><svg class="cb-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/></svg>Round</button><button type="button" role="radio" data-v="rect"><svg class="cb-icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3.5" width="12" height="9" rx="2.5"/></svg>Rectangle</button><button type="button" role="radio" data-v="poly"><svg class="cb-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8 13.4 4.9v6.2L8 14.2 2.6 11.1V4.9z"/></svg>Polygon</button><button type="button" role="radio" data-v="oval"><svg class="cb-icon" viewBox="0 0 16 16" aria-hidden="true"><ellipse cx="8" cy="8" rx="6.5" ry="4.5"/></svg>Oval</button><button type="button" role="radio" data-v="heart"><svg class="cb-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13.6C4 10.6 1.8 8.4 1.8 5.9A3.1 3.1 0 0 1 8 4.6a3.1 3.1 0 0 1 6.2 1.3c0 2.5-2.2 4.7-6.2 7.7z"/></svg>Heart</button><button type="button" role="radio" data-v="custom"><svg class="cb-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 12.5 3 6.2 7.2 2.6l2.4 3.6 3.9.6-.8 4.2-3.2 2.4z"/></svg>Drawing</button>
         </div>
       </div>
-      <div class="cb-field" id="cb-drawing-field"><label for="cb-drawing-btn">Drawing</label>
+      <div class="cb-field" id="cb-drawing-field" role="group" aria-labelledby="cb-drawing-label"><label id="cb-drawing-label">Drawing</label>
         <div class="cb-drawing-row"><button type="button" class="cb-btn cb-btn-quiet cb-btn-small" id="cb-drawing-btn" title="An SVG or DXF file: its biggest closed shape is the box's outline, as seen from above (the top of the drawing to the back).">Open SVG or DXF&hellip;</button><input type="file" id="cb-drawing-file" accept=".svg,.dxf,image/svg+xml" hidden><span class="cb-hint" id="cb-drawing-name"></span></div>
         <div class="cb-grain-row"><label class="cb-switch" title="Typing the Length sets the Width to match, and the other way round, so the drawing isn't stretched."><input type="checkbox" id="cb-keep" aria-label="Keep its proportions"><span></span></label><span class="cb-hint">Keep its proportions</span></div>
       </div>
@@ -3619,7 +3619,13 @@ if (typeof module !== 'undefined' && module.exports) {
     $('cb-ev-fields').hidden = v.edgeBit === 'round'; $('cb-eround-fields').hidden = v.edgeBit !== 'round';
     $('cb-generate').disabled = !!(errKeys.length || probs.length || tooBig);
     $('cb-testfit').disabled = !!(errKeys.length || plan.problems.length || tooBig);
-    if (!errKeys.length) { try { topView(plan); sideView(plan); } catch (e) {} }
+    if (!errKeys.length) {
+      try { topView(plan); sideView(plan); } catch (e) {
+        // Not a stale picture: blank, and why in the console.
+        $('cb-top').innerHTML = ''; $('cb-side').innerHTML = '';
+        console.log('Carved Box preview failed:', JSON.stringify(String(e && e.message || e)));
+      }
+    }
     GROUPS.forEach(function (g) { $(g[1]).closest('.cb-card').classList.toggle('cb-off', !$(g[1]).checked); });
     GROUPS.forEach(function (g) {
       ROOT.querySelectorAll('#' + g[0] + ' .cb-input, #' + g[0] + ' .cb-select, #' + g[0] + ' .cb-seg button').forEach(function (el) { el.disabled = !$(g[1]).checked; });
@@ -3710,23 +3716,40 @@ if (typeof module !== 'undefined' && module.exports) {
     var d = state.outline;
     if (!d) return;
     var L = read('cb-length', 'length'), W = read('cb-width', 'length');
-    if (!force && L >= 10 && W >= 10) return;
+    if (!force && L >= 10 && W >= 10) {
+      // A size from another shape: in the drawing's proportions, by its Length.
+      if (state.keep && Math.abs(W / L - d.h / d.w) > 0.005 * d.h / d.w) show('cb-width', L * d.h / d.w, 'length');
+      return;
+    }
     var k = d.sized && Math.max(d.w, d.h) >= 10 && Math.max(d.w, d.h) <= 1500 ? 1 : (state.imperial ? 101.6 : 100) / Math.max(d.w, d.h);
     show('cb-length', d.w * k, 'length'); show('cb-width', d.h * k, 'length');
+  }
+  // A file that can't be used: said, and the last drawing kept.
+  function drawingBad(msg) {
+    drawingSaid = msg + (state.outline ? ' The last drawing (' + state.outline.name + ') is kept.' : '');
+    $('cb-drawing-name').textContent = drawingSaid; $('cb-drawing-name').classList.add('cb-bad');
+  }
+  // Keep its proportions: the other size follows the one just set.
+  function followProportion(id) {
+    var drawn = ROOT.querySelector('#cb-shape button.on'), d = state.outline;
+    if (!(state.keep && d && drawn && drawn.dataset.v === 'custom' && (id === 'cb-length' || id === 'cb-width'))) return;
+    var typed = read(id, 'length');
+    if (typed > 0) show(id === 'cb-length' ? 'cb-width' : 'cb-length', id === 'cb-length' ? typed * d.h / d.w : typed * d.w / d.h, 'length');
   }
   function openDrawing(file) {
     if (!file) return;
     var reader = new FileReader();
     reader.onload = function () {
-      var r = drawingOutline(reader.result, file.name);
-      if (r.problem) { drawingSaid = file.name + ': ' + r.problem + '.'; $('cb-drawing-name').textContent = drawingSaid; $('cb-drawing-name').classList.add('cb-bad'); return; }
+      var r;
+      try { r = drawingOutline(reader.result, file.name); } catch (err) { r = { problem: 'Couldn\u2019t read it (' + err.message + ')' }; }
+      if (r.problem) { drawingBad(file.name + ': ' + r.problem + '.'); return; }
       drawingSaid = '';
       $('cb-drawing-name').classList.remove('cb-bad');
       state.outline = { name: file.name, pts: r.pts, w: r.size.w, h: r.size.h, sized: r.sized, others: r.others };
       drawingSize(true);
       update(true);
     };
-    reader.onerror = function () { drawingSaid = 'Couldn\u2019t read ' + file.name + '.'; $('cb-drawing-name').textContent = drawingSaid; };
+    reader.onerror = function () { drawingBad('Couldn\u2019t read ' + file.name + '.'); };
     reader.readAsText(file);
   }
 
@@ -3795,6 +3818,8 @@ if (typeof module !== 'undefined' && module.exports) {
     if (!name) return;
     update(false);
     var at = state.saved.map(function (p) { return p.name.toLowerCase(); }).indexOf(name.toLowerCase()), entry = { name: name, v: settingsNow() };
+    // A drawing only with a drawing's settings (loading others keeps the one open).
+    if (entry.v.shape !== 'custom') delete entry.v.outline;
     if (at >= 0) state.saved[at] = entry; else { state.saved.push(entry); at = state.saved.length - 1; }
     persist();
     startSaid = 'Saved as \u201c' + name + '\u201d.';
@@ -3891,13 +3916,18 @@ if (typeof module !== 'undefined' && module.exports) {
     // step them.
     wirePickers();
     NcUnitInput.wireUnitFields(ROOT, { imperial: function () { return state.imperial; }, onStep: function (el) {
+      followProportion(el.id);
       if (state.autoSizes && AUTO.some(function (x) { return x[0] === el.id; })) { state.autoSizes = false; update(true); }
     } });
     SEGS.forEach(function (s) {
       ROOT.querySelectorAll('#' + s[0] + ' button').forEach(function (b) {
         b.addEventListener('click', function () {
           ROOT.querySelectorAll('#' + s[0] + ' button').forEach(function (x) { var on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-checked', String(on)); });
-          if (s[0] === 'cb-shape') sizeFor(b.dataset.v);
+          if (s[0] === 'cb-shape') {
+            // A drawing's corners start as round as the lip needs, not the last shape's.
+            if (b.dataset.v === 'custom' && (!lastPlan || lastPlan.v.shape !== 'custom')) state.cornerOwn = 0;
+            sizeFor(b.dataset.v);
+          }
           update(true);
         });
       });
@@ -3919,11 +3949,7 @@ if (typeof module !== 'undefined' && module.exports) {
         if (e.isTrusted && f[0] === 'cb-corner') { var cr = read('cb-corner', 'length'); if (cr != null && !isNaN(cr)) state.cornerOwn = cr; }
         if (e.isTrusted && f[0] === 'cb-lid-h') state.lidOwn = !!String($('cb-lid-h').value).trim();
         // A drawing kept in proportion: the other way follows.
-        var drawn = ROOT.querySelector('#cb-shape button.on');
-        if (e.isTrusted && state.keep && state.outline && drawn && drawn.dataset.v === 'custom' && (f[0] === 'cb-length' || f[0] === 'cb-width')) {
-          var typed = read(f[0], 'length'), d = state.outline;
-          if (typed > 0) show(f[0] === 'cb-length' ? 'cb-width' : 'cb-length', f[0] === 'cb-length' ? typed * d.h / d.w : typed * d.w / d.h, 'length');
-        }
+        if (e.isTrusted) followProportion(f[0]);
         if ((f[0] === 'cb-stock' || f[0] === 'cb-lid-stock') && !state.lidOwn && String($('cb-lid-h').value).trim()) {
           var lb = lidBoard(collect().v); if (lb > 0) show('cb-lid-h', lb, 'length');
         }
