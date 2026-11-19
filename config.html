@@ -325,6 +325,10 @@
             </div>
           </div>
         </div>
+        <div class="cb-row cb-row-2">
+          <div class="cb-field"><label for="cb-efeed">Edge Feed</label><input class="cb-input" id="cb-efeed" data-unit="feed"></div>
+          <div class="cb-field"><label for="cb-erpm">Edge RPM</label><input class="cb-input" id="cb-erpm"></div>
+        </div>
         <div class="cb-row" id="cb-ev-fields">
           <div class="cb-field"><label for="cb-eangle">V Angle (°)</label><input class="cb-input" id="cb-eangle" title="Across the whole V: 90 for 45° a side."></div>
           <div class="cb-field"><label for="cb-evtip">Tip Diameter</label><input class="cb-input" id="cb-evtip" data-unit="length" title="Across the V-bit's flat tip (no V-bit comes to a true point): the bit goes half of it off the edge, so the chamfer starts right at the edge."></div>
@@ -337,13 +341,9 @@
         </div>
         <div class="cb-row">
           <div class="cb-field"><label for="cb-eout">Outside Seam</label><input class="cb-input" id="cb-eout" data-unit="length" placeholder="none" title="How far down each half's rim is cut at its outer edge. Closed, the two make a groove where the halves meet."></div>
+          <div class="cb-field"><label for="cb-epk">Inside Rim</label><input class="cb-input" id="cb-epk" data-unit="length" placeholder="none" title="How far down each pocket's top edge is cut: the lip's inner edge, and the edge of the step the lip sits on in the other half."></div>
           <div class="cb-field"><label for="cb-ein">Lead-In</label><input class="cb-input" id="cb-ein" data-unit="length" placeholder="none" title="How far down the lip's outer edge and the opening's edge are cut: eases the lid on."></div>
           <div class="cb-field"><label for="cb-eslope">Slope Height</label><input class="cb-input" id="cb-eslope" data-unit="length" placeholder="whole lip" title="How far down from its top the lip is sloped. Empty: all of it, so the lid drops on and lifts off. Less: the lip stays straight below it, so the lid grips at the Clearance, and the opening narrows to match in small steps of the box's bit."></div>
-          <div class="cb-field"><label for="cb-epk">Inside Rim</label><input class="cb-input" id="cb-epk" data-unit="length" placeholder="none" title="How far down each pocket's top edge is cut: the lip's inner edge, and the edge of the step the lip sits on in the other half."></div>
-        </div>
-        <div class="cb-row cb-row-2">
-          <div class="cb-field"><label for="cb-efeed">Edge Feed</label><input class="cb-input" id="cb-efeed" data-unit="feed"></div>
-          <div class="cb-field"><label for="cb-erpm">Edge RPM</label><input class="cb-input" id="cb-erpm"></div>
         </div>
       </div>
       <p class="cb-hint" id="cb-edge-note"></p>
@@ -2361,7 +2361,14 @@ function boxPlan(input) {
       add(lipHalf, tLip, 1, tops[lipHalf], lipUp, 'lip\'s sloped side');
     } else if (part) add(lipHalf, tLip, 1, tops[lipHalf], slopeUp, 'lip\'s sloped top');
     add(lipHalf, tInside, -1, tops[lipHalf], ed.pocket, 'lip\'s inner edge');
-    add(rabbetHalf, tInside, -1, tops[rabbetHalf] - rabbetDepth, ed.pocket, 'step\'s inner edge');
+    // The step the lip sits on, in the other half: its inner edge is down
+    // at the step, the widened opening's wall above it (a sloped one
+    // leans away as the V-bit's cone does). Where the bit would reach that
+    // wall, or the step's too narrow, it's left: a note says so.
+    var stepW = tOpen - tInside, upStep = rabbetDepth + ed.pocket;
+    var stepFits = ePk <= stepW - 0.3 && (vbit ? (slope && !part ? ePk : Math.min(upStep * tan, ed.diameter / 2) - slopeD * tan) : R) <= stepW - 0.3;
+    if (stepFits) add(rabbetHalf, tInside, -1, tops[rabbetHalf] - rabbetDepth, ed.pocket, 'step\'s inner edge');
+    else if (ed.pocket > 0) notes.push('Inside Rim: the step\'s inner edge in the ' + rabbetHalf + ' is left as it is, as the edge bit would cut the opening\'s wall above it. A narrower V-bit, a wider Lip Thickness or a lower Lip Height lets it be cut.');
     // What each edge leaves: the rim between the outline and the widened
     // opening, the shoulder outside the lip, the lip itself.
     need(eOut + eRim <= -tRabbet - 0.5, 'Edges too big for the rim round the widened opening: make them smaller, or the wall thicker');
@@ -2369,15 +2376,7 @@ function boxPlan(input) {
     if (slope) need(eIn + ePk <= o.lipWidth - 1, 'Sloped lip: at the V-bit\'s ' + +(+ed.angle).toFixed(1) + '\u00b0, the lip slants in ' + (eIn + ePk).toFixed(2) + ' mm' + (ePk > 0 ? ' (with the Inside Rim)' : '') +
       ', and the lip is ' + (+o.lipWidth).toFixed(2) + ' mm thick: it needs 1 mm more than the slant. Make the Lip Thickness ' + (eIn + ePk + 1).toFixed(2) + ' mm or more, the Lip Height lower, or use a V-bit with a narrower angle');
     else need(eIn + ePk <= o.lipWidth - 0.3, 'Lead-In and Inside Rim too big for the lip: they take ' + (eIn + ePk).toFixed(2) + ' mm of it');
-    // The step the lip sits on, in the other half: its inner edge is down
-    // at the step, the widened opening's wall above it.
-    if (ed.pocket > 0) {
-      // A sloped opening's wall leans away as the V-bit's cone does.
-      var step = tOpen - tInside, upStep = rabbetDepth + ed.pocket;
-      need(ePk <= step - 0.3, 'Inside Rim too big for the step the lip sits on');
-      need((vbit ? (slope && !part ? ePk : Math.min(upStep * tan, ed.diameter / 2) - slopeD * tan) : R) <= step - 0.3, 'The Inside Rim\'s bit would cut into the widened opening\'s wall: make it smaller, the Lip Thickness wider, or use a narrower V-bit');
-      need(!(ed.pocket >= Math.min(baseH - under.base, lidH - o.top) - rabbetDepth - 1), 'Inside Rim too deep for the inside');
-    }
+    if (ed.pocket > 0) need(!(ed.pocket >= Math.min(baseH - under.base, lidH - o.top) - rabbetDepth - 1), 'Inside Rim too deep for the inside');
     // The seam on the half with the lip is down at the shoulder: the bit,
     // as high as the lip, must clear it (a V-bit's cone at the lip's top,
     // no wider than the bit; a roundover bit's head).
@@ -2777,8 +2776,9 @@ function autoSizes(input, material, imperial) {
   // A notch in the base below the lip (when it's on the base), above the floor.
   var notchRoom = T - a.floor - (o.lipOn === 'lid' ? 0 : a.lipHeight - a.clearance) - 0.5;
   if (o.notch) a.notch = Object.assign({}, o.notch, { width: half(clamp(small * 0.18, 10, 20)), depth: Math.min(half(clamp(a.lipHeight, 3, 6)), Math.max(grid(1), Math.floor(notchRoom / grid(notchRoom)) * grid(notchRoom))) });
-  // Edges: a lead-in for the lid to find its way on, no outside seam.
-  if (o.edges) a.edges = Object.assign({}, o.edges, { outside: 0, inside: half(o.edges.bit === 'round' ? Math.min(o.edges.radius || 1.5, 1.5) : 1.5), pocket: half(0.5) });
+  // Edges: a lead-in for the lid to find its way on, the rims' edges
+  // just taken off (fuzz-free).
+  if (o.edges) a.edges = Object.assign({}, o.edges, { outside: half(0.508), inside: half(o.edges.bit === 'round' ? Math.min(o.edges.radius || 1.5, 1.5) : 1.5), pocket: half(0.508) });
   var slope = !!(o.edges && o.edges.slope && o.edges.bit !== 'round'), slant = slope ? Math.tan((o.edges.angle || 90) * Math.PI / 360) : 0;
   // Edges get room from a lower lip and a wall up to a sixth of the size
   // or 2 mm more than it was (in wood, the wall first and the lip not
@@ -3419,7 +3419,7 @@ if (typeof module !== 'undefined' && module.exports) {
     ['cb-doc', 'doc', 'length', 1.5], ['cb-stepover', 'stepoverPct', 'count', 40], ['cb-rpm', 'rpm', 'count', 18000],
     ['cb-delay', 'delay', 'count', 2],
     ['cb-eangle', 'edgeAngle', 'count', 90], ['cb-ediam', 'edgeDiameter', 'length', 12.7], ['cb-erad', 'edgeRadius', 'length', 3.175], ['cb-etip', 'edgeTip', 'length', 3.175],
-    ['cb-eout', 'edgeOut', 'length', 0, true], ['cb-ein', 'edgeIn', 'length', 1.5, true], ['cb-epk', 'edgePocket', 'length', 0, true], ['cb-eslope', 'slopeHeight', 'length', null, true],
+    ['cb-eout', 'edgeOut', 'length', 0.508, true], ['cb-ein', 'edgeIn', 'length', 1.5, true], ['cb-epk', 'edgePocket', 'length', 0.508, true], ['cb-eslope', 'slopeHeight', 'length', null, true],
     ['cb-efeed', 'edgeFeed', 'feed', 1500], ['cb-erpm', 'edgeRpm', 'count', 18000],
     ['cb-evtip', 'edgeVTip', 'length', 0.3],
     ['cb-cdiam', 'cornerDiameter', 'length', 6.35], ['cb-crad', 'cornerBitRadius', 'length', 3.175],

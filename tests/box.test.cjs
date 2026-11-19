@@ -328,7 +328,11 @@ test('edges that don\'t fit say why', () => {
   said({ edges: { ...V, outside: 3, inside: 0 } }, /rim round the widened opening/);
   said({ wall: 10, edges: { ...V, outside: 0, inside: 1.5, pocket: 1.5 } }, /Lead-In and Inside Rim too big for the lip/);
   // The step's inner edge is down at the step: its bit must clear the opening's wall above.
-  said({ wall: 10, edges: { ...V, outside: 0, inside: 0, pocket: 0.5 } }, /cut into the widened opening's wall/);
+  // (or it's left, with a note, and the lip's inner edge still cut).
+  const left = boxPlan({ wall: 10, edges: { ...V, outside: 0, inside: 0, pocket: 0.5 } });
+  assert.deepEqual(left.problems, []);
+  assert.ok(left.notes.some((n) => /step's inner edge/.test(n)));
+  assert.ok(!left.edges.lid.some((e) => /step/.test(e.what)) && left.edges.base.some((e) => /lip's inner edge/.test(e.what)));
   said({ edges: { bit: 'round', radius: 2, tip: 3, outside: 3, inside: 0 } }, /deeper than the bit's radius/);
   said({ edges: { ...V, angle: 10, outside: 1, inside: 0 } }, /angle must be between/);
   said({ wall: 10, lipHeight: 2, edges: { bit: 'v', angle: 60, diameter: 12.7, outside: 0, inside: 1.9 } }, /Lead-In edges must be less deep/);
@@ -360,7 +364,8 @@ test('Auto Sizes: a box that fits together for any size, stock, bit and material
       // On an inch machine, the wall on a 1/32" grid.
       if (imperial) assert.ok(Math.abs(a.wall * 32 / 25.4 - Math.round(a.wall * 32 / 25.4)) < 1e-9, 'wall ' + a.wall);
       if (size >= 80) assert.deepEqual(a.problems, [], JSON.stringify(input));
-      if (opts.edges && size >= 80) assert.ok(a.edges.outside === 0 && a.edges.inside > 0, 'lead-in left out, or a seam: ' + JSON.stringify(input));
+      // A lead-in, and the outside seam just taken off.
+      if (opts.edges && size >= 80) assert.ok(a.edges.outside >= 0 && a.edges.outside <= 0.51 && a.edges.inside > 0, 'lead-in left out, or a big seam: ' + JSON.stringify(input));
       // The lip half the wall (to the grid), and in wood at least 1/4" high where the box is deep enough.
       // With magnets, thinner when their holes need the room, down to 1/4".
       assert.ok(a.lipWidth <= a.wall / 2 + 1e-9 && (a.lipWidth > a.wall / 2 - 0.8 || (opts.magnets && a.lipWidth >= 6.35 - 1e-9)), 'lip width ' + a.lipWidth + ' of wall ' + a.wall);
