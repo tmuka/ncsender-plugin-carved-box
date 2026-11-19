@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- A Base Height typed as the stock's thickness follows the stock when it changes, as an empty one does.
+- On an inch machine, problems and notes give their sizes in inches.
+- A preset also resets the Slope Height and the Glued-On Bottom's sizes.
+
 ## 0.3.5: Safer chamfers higher up the V-bit, a looser fit in wood
 
 - Fixed: on a half with a lower Lid or Base Height, the Lead-In's V-bit could reach past the cleared area, into the waste or the other half's wall.

@@ -3853,6 +3853,8 @@ if (typeof module !== 'undefined' && module.exports) {
   }
   function unit() { return state.imperial ? 'in' : 'mm'; }
   function fmt(mm) { return String(round(mm / K(), state.imperial ? 3 : 1)); }
+  // The plan's messages say mm: on an inch machine, in inches.
+  function inUnits(text) { return state.imperial ? String(text).replace(/(\d+(?:\.\d+)?) mm\b/g, function (m0, n) { return fmt(+n) + ' in'; }) : text; }
 
   // ---------- Starting feeds ----------
   function fillFeeds() {
@@ -4117,12 +4119,12 @@ if (typeof module !== 'undefined' && module.exports) {
       note.textContent = $(f[0]).closest('.cb-field').querySelector('label').firstChild.textContent + ' ' + c.errs[errKeys[0]] + '.';
       note.classList.add('cb-bad', 'cb-go'); note.dataset.field = f[0]; note.title = 'Go to the field';
     } else if (probs.length || tooBig) {
-      note.textContent = (tooBig || probs[0]) + '.';
+      note.textContent = inUnits(tooBig || probs[0]) + '.';
       note.classList.add('cb-bad');
       var pf = !tooBig && problemField(probs[0]);
       if (pf && !$(pf).closest('[hidden]') && !$(pf).closest('.cb-off')) { note.classList.add('cb-go'); note.dataset.field = pf; note.title = 'Go to the field'; }
     } else {
-      var warns = plan.notes.slice();
+      var warns = plan.notes.map(inUnits);
       if (state.fitSay) warns.unshift(state.fitSay);
       if (!(v.rpm > 0)) warns.push('Spindle RPM 0: the program won\u2019t start the spindle.');
       if (v.edgesOn && !(v.edgeRpm > 0)) warns.push('Edge RPM 0: the edges are cut with the spindle off.');
@@ -4308,6 +4310,7 @@ if (typeof module !== 'undefined' && module.exports) {
   function settingsNow() {
     var v = Object.assign({}, lastPlan ? lastPlan.v : collect().v, { feedsAuto: state.feedsAuto, autoSizes: state.autoSizes, cornerOwn: state.cornerOwn });
     v.lidHeight = state.lidOwn ? v.lidHeight : null;
+    v.baseHeight = state.baseOwn ? v.baseHeight : null;
     // Every length kept in mm (feeds in mm/min), shown in the machine's units.
     v.units = 'mm';
     return v;
@@ -4317,7 +4320,7 @@ if (typeof module !== 'undefined' && module.exports) {
   // A preset sets the box and its options (Auto Sizes fills in the rest
   // for your stock, bit and material); saved settings bring back all.
   var PRESET_BASE = { autoSizes: true, lipOn: 'base', cut: 'both', grain: false, nestOn: false, tabsOn: true, magOn: false, notchOn: false, edgesOn: false, slope: false, cornersOn: false, botOn: false, baseHeight: null, lidHeight: null,
-    notchCount: 1, notchAngle: 0 };
+    notchCount: 1, notchAngle: 0, slopeHeight: null, bottomBoard: null, bottomStep: null, bottomOversize: null };
   // Each shows off an option or two.
   var PRESETS = [
     { name: 'Ring box, round 2", finger notch', v: { shape: 'circle', diameter: 50.8, notchOn: true } },
@@ -4465,6 +4468,7 @@ if (typeof module !== 'undefined' && module.exports) {
     state.cornerOwn = typeof saved.cornerOwn === 'number' ? saved.cornerOwn : typeof saved.cornerRadius === 'number' ? saved.cornerRadius : null;
     // A Lid Height that's the stock's thickness follows it; one typed lower stays.
     sizeFor(saved.shape || 'circle');
+    state.baseOwn = typeof saved.baseHeight === 'number' && !(Math.abs(saved.baseHeight - saved.stock) < 1e-3);
     state.lidOwn = typeof saved.lidHeight === 'number' && !(Math.abs(saved.lidHeight - ((saved.cut === 'base' || saved.cut === 'lid') && !saved.nestOn && saved.lidStock > 0 ? saved.lidStock : saved.stock)) < 1e-3);
   }
   function wire() {
@@ -4506,8 +4510,11 @@ if (typeof module !== 'undefined' && module.exports) {
         if (e.isTrusted && AUTO.some(function (x) { return x[0] === f[0]; })) state.autoSizes = false;
         if (e.isTrusted && f[0] === 'cb-corner') { var cr = read('cb-corner', 'length'); if (cr != null && !isNaN(cr)) state.cornerOwn = cr; }
         if (e.isTrusted && f[0] === 'cb-lid-h') state.lidOwn = !!String($('cb-lid-h').value).trim();
+        // A Base Height typed as the stock's thickness follows it, as an empty one does.
+        if (e.isTrusted && f[0] === 'cb-base-h') { var bh = read('cb-base-h', 'length'); state.baseOwn = bh != null && !isNaN(bh) && Math.abs(bh - read('cb-stock', 'length')) > 1e-3; }
         // A drawing kept in proportion: the other way follows.
         if (e.isTrusted) followProportion(f[0]);
+        if (f[0] === 'cb-stock' && !state.baseOwn && String($('cb-base-h').value).trim()) { var st = read('cb-stock', 'length'); if (st > 0) show('cb-base-h', st, 'length'); }
         if ((f[0] === 'cb-stock' || f[0] === 'cb-lid-stock') && !state.lidOwn && String($('cb-lid-h').value).trim()) {
           var lb = lidBoard(collect().v); if (lb > 0) show('cb-lid-h', lb, 'length');
         }
