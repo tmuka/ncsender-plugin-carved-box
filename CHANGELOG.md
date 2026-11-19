@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Glued-On Bottom**, quicker for big boxes: the base is a ring, its inside cut out through (the middle held by tabs) instead of pocketed, glued onto a bottom whose edge is stepped down round a plug that fits inside the ring and lines it up for the glue. The bottom comes from the stock, or from its own thinner board with the new **Cut: Bottom Only**. About a third less time on a 250 × 180 × 38 mm box.
+
 ## 0.3.3: A sloped lip, two finger notches, bigger previews
 
 - The outside size along X is now called **Width (X)** and along Y **Length (Y)**, as most people think of a width. Only the names changed: saved sizes stay as they were.

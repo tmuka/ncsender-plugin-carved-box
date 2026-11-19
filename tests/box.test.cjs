@@ -59,8 +59,12 @@ function allowed(set, half, p) {
   if (-p.z <= eps) return true;
   // A lid lower than the stock: its area faced down first.
   const facing = half.cuts.find((c) => /faced down/.test(c.what));
-  if (facing && -p.z <= face + eps && at(facing.t - rb) <= eps) return true;
+  if (facing && -p.z <= face + eps && (facing.op === 'ring' ? at(facing.tIn + rb) >= -eps : at(facing.t - rb) <= eps)) return true;
   if (at(rb) >= -eps) return d <= half.outline.depth + eps;
+  // A glued-on bottom: the step round its plug; a ring's middle, cut out
+  // through from the stock's top.
+  if (half.name === 'bottom') return -p.z <= plan.bottom.step + eps && shapeDistance(plan.bottom.shape, plan.bottom.t + rb, px, py) >= -eps;
+  if (plan.bottom && half.name === 'base' && shapeDistance(plan.bottom.shape, plan.tInside - rb, px, py) <= eps) return -p.z <= o.stock + o.through + eps;
   const withLip = (o.lipOn === 'lid') === (half.name === 'lid');
   const floor = half.height - (half.name === 'lid' ? o.top : o.floor), meet = withLip ? plan.lipUp : 0;
   // Rounded floor corners: the box's bit stays the radius off the wall
@@ -1176,4 +1180,47 @@ test('finger notches: a count of them evenly round from a start angle, cut witho
   assert.ok(boxPlan({ ...wide, layout: 'y', notch: { ...wide.notch, angle: 270 } }).problems.some((p) => /across the Gap/.test(p)));
   // Too deep: said, its width left as it is.
   assert.ok(!('notch.width' in fitOption({ diameter: 100, wall: 10, lipWidth: 3, stock: 12, floor: 4, notch: { width: 12, depth: 9 } }, false).set));
+});
+
+test('a glued-on bottom: the base a ring cut through, the bottom stepped round a plug that fits inside it', () => {
+  const shapes = [{}, { shape: 'rect', length: 160, width: 110, cornerRadius: 12 }, { shape: 'rect', length: 140, width: 90, cornerRadius: 30 },
+    { shape: 'poly', sides: 6, flats: 110, cornerRadius: 12 }, { shape: 'oval', length: 150, width: 100 }, { shape: 'heart', length: 140, width: 130, cornerRadius: 12 }];
+  for (const shape of shapes) for (const lipOn of ['base', 'lid']) for (const layout of ['x', 'y']) {
+    const input = Object.assign({ lipOn, layout, wall: 14, lipWidth: 4, bottom: { board: null, step: 2 }, magnets: { count: 4, diameter: 6.35, depth: 3 }, notch: { width: 12, depth: 4, count: 2 } }, shape);
+    const { plan, pts } = check(input);
+    assert.deepEqual(plan.halves.map((h) => h.name), ['base', 'lid', 'bottom']);
+    const base = plan.halves[0], bottom = plan.halves[2], rb = plan.o.bit / 2;
+    // No pocket left in the ring: its inside is a cut through, with tabs.
+    assert.ok(!base.cuts.some((c) => c.op === 'pocket' && c.t <= plan.tInside + 1e-9 && !c.shape));
+    const through = base.cuts.find((c) => c.op === 'profile');
+    assert.ok(through && through.side === 'in' && through.tabs);
+    assert.ok(pts.some((p) => Math.abs(p.z + plan.o.stock + plan.o.through) < 1e-6 && shapeDistance(plan.bottom.shape, plan.tInside - rb, p.x - base.at.x, p.y - base.at.y) > -0.05 && shapeDistance(plan.bottom.shape, plan.tInside - rb, p.x - base.at.x, p.y - base.at.y) < 0.05), 'the ring\'s inside goes through');
+    // The plug: every point of it inside the ring's inside by the Clearance
+    // (the ring's corners as round as its bit leaves them).
+    const plug = shapeLoop(plan.bottom.shape, plan.bottom.t), hole = plan.bottom.shape, len = loopLength(plug);
+    for (let k = 0; k < 200; k++) { const q = loopPoint(plug, len * k / 200); assert.ok(shapeDistance(hole, plan.tInside, q.x, q.y) <= -plan.o.clearance + 0.03, 'plug past the ring at ' + JSON.stringify(q)); }
+    // The step is cut all round, out to the outline, at its depth.
+    const stepPts = pts.filter((p) => Math.abs(p.z + 2) < 1e-6);
+    for (let k = 0; k < 60; k++) {
+      const q = loopPoint(shapeLoop(plan.shape, -0.3), loopLength(shapeLoop(plan.shape, -0.3)) * k / 60);
+      assert.ok(stepPts.some((p) => Math.hypot(p.x - bottom.at.x - q.x, p.y - bottom.at.y - q.y) <= rb + 0.05), 'the step left standing near the outline');
+    }
+    assert.ok(Math.abs(plan.closedHeight - (19 + 19 - plan.lipUp + 19 - 2)) < 1e-9);
+  }
+  // Its own board: cut with Bottom Only; the rest without it.
+  const own = { shape: 'rect', length: 200, width: 140, cornerRadius: 16, bit: 6.35, wall: 12, gap: 20, bottom: { board: 6.35, step: 2 } };
+  assert.deepEqual(check(own).plan.halves.map((h) => h.name), ['base', 'lid']);
+  const only = check({ ...own, cut: 'bottom' });
+  assert.deepEqual(only.plan.halves.map((h) => h.name), ['bottom']);
+  assert.equal(only.plan.stock.thick, 6.35);
+  // Much quicker than pocketing the base.
+  const minutes = (i) => boxProgram(boxPlan(i), FEEDS).minutes;
+  assert.ok(minutes(own) < 0.8 * minutes({ ...own, bottom: null }), minutes(own) + ' vs ' + minutes({ ...own, bottom: null }));
+  // What doesn't fit says why.
+  const said = (i, re) => assert.ok(boxPlan(i).problems.some((p) => re.test(p)), JSON.stringify(boxPlan(i).problems));
+  said({ bottom: { board: 3, step: 2 } }, /Locating Step/);
+  said({ cut: 'bottom' }, /Bottom Only needs/);
+  said({ bottom: { board: 6, step: 2 }, tabs: { count: 4, width: 6, height: 4.5 } }, /Tabs/);
+  // A faced base: round the ring only.
+  check({ baseHeight: 15, bottom: { step: 2 } });
 });
