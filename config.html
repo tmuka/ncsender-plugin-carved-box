@@ -4245,14 +4245,19 @@ if (typeof module !== 'undefined' && module.exports) {
   // ---------- Start: presets, and your own saved settings ----------
   // A preset sets the box and its options (Auto Sizes fills in the rest
   // for your stock, bit and material); saved settings bring back all.
-  var PRESET_BASE = { autoSizes: true, lipOn: 'base', cut: 'both', grain: false, nestOn: false, tabsOn: true, magOn: false, notchOn: false, edgesOn: false, slope: false, cornersOn: false, lidHeight: null };
+  var PRESET_BASE = { autoSizes: true, lipOn: 'base', cut: 'both', grain: false, nestOn: false, tabsOn: true, magOn: false, notchOn: false, edgesOn: false, slope: false, cornersOn: false, botOn: false, lidHeight: null,
+    notchCount: 1, notchAngle: 0 };
+  // Each shows off an option or two.
   var PRESETS = [
-    { name: 'Ring box, round 2"', v: { shape: 'circle', diameter: 50.8, notchOn: true } },
-    { name: 'Trinket box, round 3"', v: { shape: 'circle', diameter: 76.2 } },
-    { name: 'Keepsake box, 6" \u00d7 4", magnets', v: { shape: 'rect', length: 152.4, width: 101.6, cornerRadius: 12.7, magOn: true, magCount: 4, magDiameter: 5, notchOn: true } },
-    { name: 'Hexagon box, 4"', v: { shape: 'poly', sides: 6, flats: 101.6, cornerRadius: 6.35 } },
-    { name: 'Oval box, 6" \u00d7 4"', v: { shape: 'oval', length: 152.4, width: 101.6 } },
-    { name: 'Heart box, 5"', v: { shape: 'heart', length: 127, width: 120, cornerRadius: 12.7 } },
+    { name: 'Ring box, round 2", finger notch', v: { shape: 'circle', diameter: 50.8, notchOn: true } },
+    { name: 'Trinket box, round 3", lip on the lid', v: { shape: 'circle', diameter: 76.2, lipOn: 'lid' } },
+    { name: 'Keepsake box, 6" \u00d7 4", magnets', v: { shape: 'rect', length: 152.4, width: 101.6, cornerRadius: 12.7, magOn: true, magCount: 4, magDiameter: 8, magDepth: 3.2, notchOn: true } },
+    { name: 'Hexagon box, 4", chamfered edges', v: { shape: 'poly', sides: 6, flats: 101.6, cornerRadius: 6.35, edgesOn: true, edgeBit: 'v', edgeOut: 1.5, edgeIn: 1, edgePocket: 0 } },
+    { name: 'Oval box, 6" \u00d7 4", notches both sides', v: { shape: 'oval', length: 152.4, width: 101.6, notchOn: true, notchCount: 2 } },
+    { name: 'Heart box, 5", rounded edges', v: { shape: 'heart', length: 127, width: 120, cornerRadius: 12.7, edgesOn: true, edgeBit: 'round', edgeOut: 1.5, edgeIn: 0, edgePocket: 0 } },
+    { name: 'Tea box, 8" \u00d7 5", sloped lip', v: { shape: 'rect', length: 203.2, width: 127, cornerRadius: 15.875, edgesOn: true, edgeBit: 'v', edgeOut: 1, edgeIn: 0, edgePocket: 0, slope: true, slopeHeight: null } },
+    { name: 'Jewelry box, 7" \u00d7 5", rounded floor corners', v: { shape: 'rect', length: 177.8, width: 127, cornerRadius: 12.7, cornersOn: true, notchOn: true } },
+    { name: 'Big box, 10" \u00d7 7", glued-on bottom', v: { shape: 'rect', length: 254, width: 177.8, cornerRadius: 19.05, botOn: true, bottomBoard: 6.35, bottomStep: 2, magOn: true, magCount: 4, magDiameter: 10, magDepth: 3.2 } },
     { name: 'Nested set of 3, round 5"', v: { shape: 'circle', diameter: 127, nestOn: true, nestCount: 3, nestGap: 1.5, nestCut: 0 } }
   ];
   function renderStart(pick) {
