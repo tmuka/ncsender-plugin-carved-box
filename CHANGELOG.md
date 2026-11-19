@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.5: Safer chamfers higher up the V-bit, a looser fit in wood
+
+- Fixed: on a half with a lower Lid or Base Height, the Lead-In's V-bit could reach past the cleared area, into the waste or the other half's wall.
+- Fixed: the Outside Seam on the half with the lip could plunge the V-bit's tip into solid waste beside the outline.
+- Fixed: chamfers inside an oval with tight ends, or inside a glued-on bottom's ring, could cut into wood the box bit left; there they're cut as before, and a ring's inside edge the bit can't reach without touching its loose middle is left, with a note.
+- The **Clearance** starts at 0.015" (0.4 mm) in wood, as worked best in pine tests; plastics and aluminum stay tighter.
+- With the Outside Seam on by default (0.02"), the stock needed can be a little bigger when the lip half's seam is down at the shoulder.
+- Presets keep the edge sizes Auto Sizes picks.
+
 ## 0.3.4: A glued-on bottom for big boxes, Base Height, cleaner chamfers
 
 - **Glued-On Bottom**, quicker for big boxes: the base is a ring, its inside cut out through (the middle held by tabs) instead of pocketed, glued onto a bottom whose edge is stepped down round a plug that fits inside the ring and lines it up for the glue. The bottom comes from the stock, or from its own thinner board with the new **Cut: Bottom Only**. **Oversize** leaves the bottom a little bigger, to trim flush after the glue-up. About a third less time on a 250 × 180 × 38 mm box.
