@@ -60,7 +60,7 @@ function allowed(set, half, p) {
   // A lid lower than the stock: its area faced down first.
   const facing = half.cuts.find((c) => /faced down/.test(c.what));
   if (facing && -p.z <= face + eps && (facing.op === 'ring' ? at(facing.tIn + rb) >= -eps : at(facing.t - rb) <= eps)) return true;
-  if (at(rb) >= -eps) return d <= half.outline.depth + eps;
+  if (at(rb + (half.name === 'bottom' ? plan.bottom.oversize : 0)) >= -eps) return d <= half.outline.depth + eps;
   // A glued-on bottom: the step round its plug; a ring's middle, cut out
   // through from the stock's top.
   if (half.name === 'bottom') return -p.z <= plan.bottom.step + eps && (shapeDistance(plan.bottom.shape, plan.bottom.t + rb, px, py) >= -eps || clearOfPlug(plan, px, py, rb - 0.03));
@@ -1263,6 +1263,19 @@ test('a glued-on bottom: the base a ring cut through, the bottom stepped round a
   // A drawing, with an inside corner.
   const { svgOutline } = require('../lib/box-drawing.cjs');
   check({ shape: 'custom', outline: { name: 'lopsided.svg', pts: svgOutline(LOPSIDED).pts }, length: 120, width: 90, stock: 25, wall: 12, lipWidth: 4, bottom: { step: 2 } });
+  // Oversize: the bottom's outline further out, its step out to it, the
+  // stock longer by twice it; on its own board too.
+  for (const layout of ['x', 'y']) for (const shape of [{}, { shape: 'heart', length: 140, width: 130, cornerRadius: 12 }]) {
+    const plain = boxPlan({ ...shape, layout, bottom: { step: 2 } }), over = check({ ...shape, layout, bottom: { step: 2, oversize: 2 } });
+    const bot = over.plan.halves[2], rbO = over.plan.o.bit / 2;
+    assert.equal(bot.outline.t, 2);
+    assert.ok(Math.abs((layout === 'x' ? over.plan.stock.w - plain.stock.w : over.plan.stock.h - plain.stock.h) - 4) < 1e-6);
+    const at2 = over.pts.filter((p) => Math.abs(p.z + 2) < 1e-6).map((p) => shapeDistance(over.plan.shape, 0, p.x - bot.at.x, p.y - bot.at.y));
+    assert.ok(Math.max(...at2) >= 2 + rbO - 0.05, 'the step out to the oversize outline');
+  }
+  const overOnly = check({ ...own, cut: 'bottom', bottom: { board: 6.35, step: 2, oversize: 3 } }).plan;
+  assert.ok(Math.abs(overOnly.stock.w - only.plan.stock.w - 6) < 1e-6);
+  said({ bottom: { step: 2, oversize: 12 } }, /Oversize/);
   // A faced base: round the ring only. With the lip on the lid and a bit
   // wider than the opening's step, the facing goes in as far as the
   // step does, so the step isn't plunged into the unfaced middle.
