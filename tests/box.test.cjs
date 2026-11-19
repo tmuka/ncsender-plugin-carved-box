@@ -178,10 +178,29 @@ test('numbers that make no box say why', () => {
   said({ wall: 45 }, /inside must be wider than the bit/);
   said({ wall: 3, lipWidth: 2.5 }, /Wall must be at least 1 mm more/);
   said({ floor: 19 }, /Base Floor must be between/);
-  said({ lipHeight: 16 }, /Lip Height must be less/);
+  said({ lipHeight: 16, top: 18 }, /Lip Height must be less/);
   said({ gap: 3 }, /Gap Between must be at least/);
   said({ tabs: { count: 30, width: 10, height: 2 } }, /Too many or too wide tabs/);
   assert.equal(BOX_DEFAULTS.lipOn, 'base');
+});
+
+test('Base and Lid Height are the outside to the seam; a lip too high for the other half is lowered', () => {
+  for (const lipOn of ['base', 'lid']) {
+    const plan = boxPlan({ lipOn, stock: 19, baseHeight: 12, lidHeight: 10, lipHeight: 5, clearance: 0.3 });
+    assert.deepEqual(plan.problems, []);
+    assert.ok(Math.abs(plan.closedHeight - 22) < 1e-9 && plan.baseOut === 12 && plan.lidOut === 10);
+    assert.ok(Math.abs((lipOn === 'lid' ? plan.lidHeight - 10 : plan.baseHeight - 12) - 4.7) < 1e-9);
+    // As high as the board allows: the half with the lip less the lip.
+    const full = boxPlan({ lipOn, stock: 19, lipHeight: 5, clearance: 0.3 });
+    assert.ok(Math.abs(full[lipOn + 'Out'] - 14.3) < 1e-9 && full[(lipOn === 'lid' ? 'base' : 'lid') + 'Out'] === 19);
+    assert.ok(boxPlan({ lipOn, stock: 19, [lipOn + 'Height']: 15, lipHeight: 5, clearance: 0.3 }).problems.some((p) => /Height can't be more than 14\.3 mm with this stock/.test(p)));
+    // The opening 1 mm clear of the other half's top or floor.
+    const low = boxPlan({ lipOn, stock: 19, [(lipOn === 'lid' ? 'base' : 'lid') + 'Height']: 8, floor: 4, top: 4, lipHeight: 5 });
+    assert.deepEqual(low.problems, []);
+    assert.equal(low.rabbetDepth, 3);
+    assert.ok(low.notes.some((n) => /Lip Height lowered to 3 mm/.test(n)), low.notes.join(' '));
+    check({ lipOn, stock: 19, [(lipOn === 'lid' ? 'base' : 'lid') + 'Height']: 8, floor: 4, top: 4, lipHeight: 5 });
+  }
 });
 
 test('a lid lower than the stock, magnets and a finger notch', () => {
@@ -190,8 +209,10 @@ test('a lid lower than the stock, magnets and a finger notch', () => {
       magnets: { count: 4, diameter: 6.35, depth: 3.2 }, notch: { width: 12, depth: 4 } };
     for (const shape of [{}, { shape: 'rect', length: 130, width: 90, cornerRadius: 16 }]) {
     const { plan, pts } = check(Object.assign({}, input, shape, shape.shape ? { magnets: { count: 4, diameter: 6.35, depth: 3.2 } } : {}));
-    // The lip stands the Lip Height less the Clearance.
-    assert.ok(Math.abs(plan.closedHeight - (19 + 12 - (4 - 0.2))) < 1e-9);
+    // Base and Lid Height to the seam: the lip stands the Lip Height less
+    // the Clearance above it, from the same board.
+    const up = 4 - 0.2, baseOut = lipOn === 'lid' ? 19 : 19 - up;
+    assert.ok(Math.abs(plan.closedHeight - (baseOut + 12)) < 1e-9 && Math.abs(plan.lidHeight - (lipOn === 'lid' ? 12 + up : 12)) < 1e-9);
     // Each magnet hole goes its full depth in both halves.
     for (const half of plan.halves) {
       const meet = (plan.o.lipOn === 'lid') === (half.name === 'lid') ? plan.lipUp : 0;
@@ -664,7 +685,7 @@ test('one half on its own board: the base or the lid, the lid from a thinner boa
     }
   // The lid's height still from its own board: lower than it, faced down.
   check({ cut: 'lid', lidStock: 15, lidHeight: 12 });
-  assert.ok(boxPlan({ cut: 'lid', lidStock: 10, lidHeight: 12 }).problems.some((p) => /more than the lid's board/.test(p)));
+  assert.ok(boxPlan({ cut: 'lid', lidStock: 10, lidHeight: 12 }).problems.some((p) => /Lid Height can't be more than 10 mm with this lid board/.test(p)));
   // A base lower than the stock, as a nested box's: faced down first.
   const { gcode } = check({ baseHeight: 15, lidHeight: 14 });
   assert.match(gcode, /Base: faced down to the base height/);
@@ -1047,7 +1068,7 @@ test('a sloped lip: the V-bit slopes the lip and the opening alike, cutting noth
   const EF = { toolNumber: 5, feed: 1000, plunge: 300, rpm: 16000, delay: 2, doc: 1.5 };
   for (const lipOn of ['base', 'lid']) for (const shape of [{}, { shape: 'rect', length: 130, width: 90, cornerRadius: 16 }, { shape: 'heart', length: 120, width: 110, cornerRadius: 14 }]) {
     for (const edges of [{ bit: 'v', angle: 90, diameter: 12.7, vtip: 0.3, outside: 0, inside: 1.5, pocket: 0, slope: true }, { bit: 'v', angle: 60, diameter: 12.7, outside: 1, inside: 0, pocket: 0.5, slope: true }]) {
-      const input = Object.assign({ lipOn, wall: 14, lipWidth: 8, lipHeight: 5, lidHeight: 16, finish: 0.3, edges }, shape);
+      const input = Object.assign({ lipOn, wall: 14, lipWidth: 8, lipHeight: 5, lidHeight: lipOn === 'lid' ? 16 - 4.8 : 16, finish: 0.3, edges }, shape);
       const { plan } = check(input);
       const slant = Math.tan(edges.angle * Math.PI / 360), tip = (edges.vtip || 0) / 2;
       assert.ok(Math.abs(plan.slope - slant) < 1e-12 && Math.abs(plan.tOpen - (plan.tRabbet - plan.rabbetDepth * slant)) < 1e-12);
@@ -1141,7 +1162,7 @@ test('a sloped top: the lip straight below its Slope Height, the opening narrowe
   const EF = { toolNumber: 5, feed: 1000, plunge: 300, rpm: 16000, delay: 2, doc: 1.5 };
   for (const lipOn of ['base', 'lid']) for (const shape of [{}, { shape: 'rect', length: 130, width: 90, cornerRadius: 16 }]) for (const angle of [60, 90]) {
     const edges = { bit: 'v', angle, diameter: 12.7, vtip: 0.2, outside: 0.5, inside: 1, pocket: 0, slope: true, slopeHeight: 2 };
-    const input = Object.assign({ lipOn, wall: 12, lipWidth: 5, lipHeight: 6, clearance: 0.25, lidHeight: 16, finish: 0.3, edges }, shape);
+    const input = Object.assign({ lipOn, wall: 12, lipWidth: 5, lipHeight: 6, clearance: 0.25, lidHeight: lipOn === 'lid' ? 16 - 5.75 : 16, finish: 0.3, edges }, shape);
     const { plan } = check(input);
     const slant = Math.tan(angle * Math.PI / 360), straight = plan.lipUp - 2;
     assert.equal(plan.slopeUp, 2);
@@ -1298,13 +1319,16 @@ test('a glued-on bottom: the base a ring cut through, the bottom stepped round a
   // A faced base: round the ring only. With the lip on the lid and a bit
   // wider than the opening's step, the facing goes in as far as the
   // step does, so the step isn't plunged into the unfaced middle.
-  check({ baseHeight: 15, bottom: { step: 2 } });
-  const faced = check({ shape: 'rect', length: 300, width: 200, cornerRadius: 12, bit: 6.35, wall: 12, lipWidth: 4, lipOn: 'lid', gap: 20, baseHeight: 15, bottom: { step: 3 } }).plan;
+  // (Base Height from the bottom's underside: a ring h high.)
+  const ring = (h, step, up) => h + 19 - step - (up || 0);
+  check({ baseHeight: ring(15, 2, 3.8), bottom: { step: 2 } });
+  const faced = check({ shape: 'rect', length: 300, width: 200, cornerRadius: 12, bit: 6.35, wall: 12, lipWidth: 4, lipOn: 'lid', gap: 20, baseHeight: ring(15, 3), bottom: { step: 3 } }).plan;
+  assert.equal(faced.baseHeight, 15);
   const fc = faced.halves[0].cuts, face = fc.find((c) => /faced down/.test(c.what));
   assert.ok(fc.filter((c) => c.op === 'ring' && /opening/.test(c.what)).every((c) => face.tIn <= c.tIn + 1e-9));
-  check({ diameter: 200, bit: 3.175, wall: 10, lipWidth: 2, lipOn: 'lid', baseHeight: 14, bottom: { step: 2 } });
+  check({ diameter: 200, bit: 3.175, wall: 10, lipWidth: 2, lipOn: 'lid', baseHeight: ring(14, 2), bottom: { step: 2 } });
   // A part slope's steps all go in as far: no slivers under the earlier ones.
-  const sloped = boxPlan({ diameter: 200, bit: 3.175, wall: 12, lipWidth: 5, lipHeight: 6, lipOn: 'lid', baseHeight: 15, bottom: { step: 2 },
+  const sloped = boxPlan({ diameter: 200, bit: 3.175, wall: 12, lipWidth: 5, lipHeight: 6, lipOn: 'lid', baseHeight: ring(15, 2), bottom: { step: 2 },
     edges: { bit: 'v', angle: 90, diameter: 12.7, outside: 0, inside: 0, pocket: 0, slope: true, slopeHeight: 3 } });
   assert.equal(new Set(sloped.halves[0].cuts.filter((c) => c.op === 'ring').map((c) => c.tIn)).size, 1);
   check(sloped);
