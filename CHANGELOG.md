@@ -1,12 +1,13 @@
 # Changelog
 
-## Unreleased
+## 0.3.4: A glued-on bottom for big boxes, Base Height, cleaner chamfers
 
 - **Glued-On Bottom**, quicker for big boxes: the base is a ring, its inside cut out through (the middle held by tabs) instead of pocketed, glued onto a bottom whose edge is stepped down round a plug that fits inside the ring and lines it up for the glue. The bottom comes from the stock, or from its own thinner board with the new **Cut: Bottom Only**. **Oversize** leaves the bottom a little bigger, to trim flush after the glue-up. About a third less time on a 250 × 180 × 38 mm box.
 - **Chamfers cut higher up the V-bit's cone** where there's room beside the edge: the same chamfer, cut by a faster part of the bit, with less fuzz in pine (not on hearts and drawings).
 - **Edges** start with the Outside Seam and Inside Rim at 0.02" (0.5 mm), just taking the fuzz off the rims; Edge Feed and RPM moved up under the bit. Where the step's inner edge can't be cut without the bit reaching the opening's wall, it's left with a note, and the lip's inner edge is still cut.
 - **Base Height**, as Lid Height: a lower base is faced down first, its outline still cut through the stock.
 - **Presets** for each main option: lip on the lid, chamfered and rounded edges, two notches, a sloped lip, rounded floor corners and a glued-on bottom.
+- Fixed: the bit could cut straight across a drawing's ring between its loops (the joins now go to each loop's nearest point).
 
 ## 0.3.3: A sloped lip, two finger notches, bigger previews
 
