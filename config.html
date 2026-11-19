@@ -225,11 +225,12 @@
       </div>
       <div class="cb-sub-h">Board and walls</div>
       <div class="cb-row">
-        <div class="cb-field"><label for="cb-stock">Stock Thickness</label><input class="cb-input" id="cb-stock" data-unit="length" title="Measure your board: the base is its full thickness."></div>
-        <div class="cb-field"><label for="cb-wall">Wall Thickness</label><input class="cb-input" id="cb-wall" data-unit="length" title="How thick the side walls are, the lip included."></div>
+        <div class="cb-field"><label for="cb-stock">Stock Thickness</label><input class="cb-input" id="cb-stock" data-unit="length" title="Measure your board: each half is its full thickness, unless its height is set lower."></div>
+        <div class="cb-field"><label for="cb-base-h">Base Height</label><input class="cb-input" id="cb-base-h" data-unit="length" placeholder="= stock" title="How tall the base is. Empty or the stock's thickness: no wood wasted. Lower: the base's area is faced down first; its outline still goes through the stock."></div>
         <div class="cb-field"><label for="cb-lid-h">Lid Height</label><input class="cb-input" id="cb-lid-h" data-unit="length" placeholder="= stock" title="How tall the lid is. Empty or the stock's thickness: no wood wasted. Lower: the lid's area is faced down first."></div>
       </div>
       <div class="cb-row">
+        <div class="cb-field"><label for="cb-wall">Wall Thickness</label><input class="cb-input" id="cb-wall" data-unit="length" title="How thick the side walls are, the lip included."></div>
         <div class="cb-field"><label for="cb-floor">Base Floor</label><input class="cb-input" id="cb-floor" data-unit="length" title="How thick the base's bottom is."></div>
         <div class="cb-field"><label for="cb-top-t">Lid Top</label><input class="cb-input" id="cb-top-t" data-unit="length" title="How thick the lid's top is."></div>
       </div>
@@ -415,7 +416,7 @@
       <h3>Getting started</h3>
       <ol>
         <li>For a quick start, pick a <b>preset</b> in the <b>Start</b> card: it loads right away and sets the box's shape, size and options. <b>Save</b> your own settings there under a name, to load again later.</li>
-        <li>Measure your board and type its <b>Stock Thickness</b> (or tap <b>Stock</b> beside it, with Spoilboard Toolbox). The base is the full thickness; so is the lid, unless you lower its Lid Height.</li>
+        <li>Measure your board and type its <b>Stock Thickness</b> (or tap <b>Stock</b> beside it, with Spoilboard Toolbox). Each half is the full thickness, unless you lower its Base Height or Lid Height: its area is faced down first, and its outline still goes through the stock.</li>
         <li>Pick the <b>Shape</b> and type its outside size.</li>
         <li>In <b>Tool &amp; Feeds</b>, pick the bit from the Tool Library and the <b>Material</b>. The feeds fill in for them.</li>
         <li>Turn on <b>Auto Sizes</b>: the wall, lip, clearance, tabs and the rest fill in (in color) to fit each other. Type in one to set it yourself.</li>
@@ -2146,7 +2147,7 @@ function boxPlan(input) {
   } else need(o.diameter > 0, 'Diameter must be more than 0');
   need(T > 0, 'Stock Thickness must be more than 0');
   need(lidH <= B.lid + 1e-9, B.sep ? 'Lid Height can\'t be more than the lid\'s board' : 'Lid Height can\'t be more than the stock thickness');
-  need(baseH <= T + 1e-9, 'The base\'s height can\'t be more than the stock thickness');
+  need(baseH <= T + 1e-9, 'Base Height can\'t be more than the stock thickness');
   if (B.sep) need(B.lid > 0, 'Lid Board must be more than 0');
   need(o.bit >= 0.8, 'Bit Diameter must be at least 0.8 mm: check it\'s in the right units');
   need(w > 0, 'Wall must be more than 0');
@@ -3406,7 +3407,7 @@ if (typeof module !== 'undefined' && module.exports) {
   var FIELDS = [
     ['cb-diameter', 'diameter', 'length', 80], ['cb-length', 'length', 'length', 120], ['cb-width', 'width', 'length', 80],
     ['cb-corner', 'cornerRadius', 'length', 10], ['cb-sides', 'sides', 'count', 6], ['cb-flats', 'flats', 'length', 80], ['cb-stock', 'stock', 'length', 19], ['cb-wall', 'wall', 'length', 6],
-    ['cb-floor', 'floor', 'length', 4], ['cb-top-t', 'top', 'length', 4], ['cb-lid-h', 'lidHeight', 'length', null, true],
+    ['cb-floor', 'floor', 'length', 4], ['cb-top-t', 'top', 'length', 4], ['cb-base-h', 'baseHeight', 'length', null, true], ['cb-lid-h', 'lidHeight', 'length', null, true],
     ['cb-lip-h', 'lipHeight', 'length', 4], ['cb-lip-w', 'lipWidth', 'length', 3], ['cb-clear', 'clearance', 'length', 0.2],
     ['cb-gap', 'gap', 'length', 12], ['cb-margin', 'margin', 'length', 5], ['cb-lid-stock', 'lidStock', 'length', null, true],
     ['cb-nest-n', 'nestCount', 'count', 3], ['cb-nest-gap', 'nestGap', 'length', 1.5],
@@ -3563,7 +3564,7 @@ if (typeof module !== 'undefined' && module.exports) {
   }
   function inputOf(v) {
     return ({
-      shape: v.shape, diameter: v.diameter, length: v.length, width: v.width, sides: v.sides, flats: v.flats, cornerRadius: v.cornerRadius, outline: v.outline, stock: v.stock, lidHeight: v.lidHeight, wall: v.wall, floor: v.floor, top: v.top,
+      shape: v.shape, diameter: v.diameter, length: v.length, width: v.width, sides: v.sides, flats: v.flats, cornerRadius: v.cornerRadius, outline: v.outline, stock: v.stock, baseHeight: v.baseHeight, lidHeight: v.lidHeight, wall: v.wall, floor: v.floor, top: v.top,
       magnets: v.magOn ? { count: Math.round(v.magCount), diameter: v.magDiameter, depth: v.magDepth, bit: magnetsInBox(v) ? toolEntry(v.magTool).mm : null, drill: magnetsInBox(v) && toolEntry(v.magTool).type === 'drill' } : null,
       notch: v.notchOn ? { width: v.notchWidth, depth: v.notchDepth, count: v.notchCount, angle: v.notchAngle } : null,
       lipOn: v.lipOn, lipHeight: v.lipHeight, lipWidth: v.lipWidth, clearance: v.clearance,
@@ -4071,6 +4072,8 @@ if (typeof module !== 'undefined' && module.exports) {
     $('cb-sep-fields').hidden = !sep;
     // A glued-on bottom: no floor of the base's own, and its own Cut choice.
     $('cb-floor').closest('.cb-field').hidden = v.botOn && !v.nestOn;
+    // A nested set's first box is the stock's height.
+    $('cb-base-h').closest('.cb-field').hidden = v.nestOn;
     $('cb-cut-bottom').hidden = !v.botOn;
     if (!v.botOn && $('cb-cut-bottom').classList.contains('on')) setSeg('cb-cut', 'both');
     ROOT.querySelectorAll('#cb-cut button').forEach(function (b) { b.disabled = v.nestOn; });
@@ -4294,7 +4297,7 @@ if (typeof module !== 'undefined' && module.exports) {
   // ---------- Start: presets, and your own saved settings ----------
   // A preset sets the box and its options (Auto Sizes fills in the rest
   // for your stock, bit and material); saved settings bring back all.
-  var PRESET_BASE = { autoSizes: true, lipOn: 'base', cut: 'both', grain: false, nestOn: false, tabsOn: true, magOn: false, notchOn: false, edgesOn: false, slope: false, cornersOn: false, botOn: false, lidHeight: null,
+  var PRESET_BASE = { autoSizes: true, lipOn: 'base', cut: 'both', grain: false, nestOn: false, tabsOn: true, magOn: false, notchOn: false, edgesOn: false, slope: false, cornersOn: false, botOn: false, baseHeight: null, lidHeight: null,
     notchCount: 1, notchAngle: 0 };
   // Each shows off an option or two.
   var PRESETS = [
@@ -4691,7 +4694,7 @@ if (typeof module !== 'undefined' && module.exports) {
     [/^Finger notch depth/, 'cb-notch-d'], [/^Only \d+ boxes fit|^No box fits/, 'cb-nest-n'],
     [/^Magnets: the count|even number of magnets|^Too many magnets/, 'cb-mag-n'], [/^Magnet hole depth|^Magnet holes too deep/, 'cb-mag-depth'],
     [/Lip Thickness/, 'cb-lip-w'], [/Lip Height/, 'cb-lip-h'], [/Clearance/, 'cb-clear'], [/Corner Radius|ends are too tight|Point/, 'cb-corner'],
-    [/^Bottom Board/, 'cb-bot-t'], [/^Locating Step/, 'cb-bot-step'], [/^Oversize/, 'cb-bot-over'], [/Glued-On Bottom/, 'cb-bot-on'], [/Base Floor|floor/, 'cb-floor'], [/Lid Top/, 'cb-top-t'], [/Lid Height/, 'cb-lid-h'], [/Lid Board/, 'cb-lid-stock'], [/Gap Between|Gap/, 'cb-gap'], [/Edge Margin/, 'cb-margin'],
+    [/^Bottom Board/, 'cb-bot-t'], [/^Locating Step/, 'cb-bot-step'], [/^Oversize/, 'cb-bot-over'], [/Glued-On Bottom/, 'cb-bot-on'], [/^Base Height/, 'cb-base-h'], [/Base Floor|floor/, 'cb-floor'], [/Lid Top/, 'cb-top-t'], [/Lid Height/, 'cb-lid-h'], [/Lid Board/, 'cb-lid-stock'], [/Gap Between|Gap/, 'cb-gap'], [/Edge Margin/, 'cb-margin'],
     [/[Tt]abs/, 'cb-tab-n'], [/^The Magnet Bit|than the Magnet Bit/, 'cb-mtool-row'], [/[Mm]agnet/, 'cb-mag-d'], [/[Nn]otch/, 'cb-notch-w'], [/Lead-In/, 'cb-ein'], [/Inside Rim/, 'cb-epk'], [/seam/, 'cb-eout'],
     [/^Corners: the radius/, 'cb-crad'], [/Corners:/, 'cb-cdiam'], [/Stock Thickness|stock thickness/, 'cb-stock'], [/Wall/, 'cb-wall'], [/Bit Diameter|bit/, 'cb-bit']];
   // The name it starts with first ("Wall must be at least ... Lip Thickness"), else any it uses.
