@@ -63,7 +63,7 @@ function allowed(set, half, p) {
   if (at(rb) >= -eps) return d <= half.outline.depth + eps;
   // A glued-on bottom: the step round its plug; a ring's middle, cut out
   // through from the stock's top.
-  if (half.name === 'bottom') return -p.z <= plan.bottom.step + eps && shapeDistance(plan.bottom.shape, plan.bottom.t + rb, px, py) >= -eps;
+  if (half.name === 'bottom') return -p.z <= plan.bottom.step + eps && (shapeDistance(plan.bottom.shape, plan.bottom.t + rb, px, py) >= -eps || clearOfPlug(plan, px, py, rb - 0.03));
   if (plan.bottom && half.name === 'base' && shapeDistance(plan.bottom.shape, plan.tInside - rb, px, py) <= eps) return -p.z <= o.stock + o.through + eps;
   const withLip = (o.lipOn === 'lid') === (half.name === 'lid');
   const floor = half.height - (half.name === 'lid' ? o.top : o.floor), meet = withLip ? plan.lipUp : 0;
@@ -84,6 +84,18 @@ function allowed(set, half, p) {
   return false;
 }
 
+// An outline's distances are only near at its corners: the plug's own
+// edge, walked, outside it and the bit's radius off.
+const plugEdges = new WeakMap();
+function clearOfPlug(plan, x, y, r) {
+  if (!plugEdges.has(plan)) {
+    const loop = shapeLoop(plan.bottom.shape, plan.bottom.t), len = loopLength(loop), pts = [];
+    for (let k = 0; k < 4000; k++) pts.push(loopPoint(loop, len * k / 4000));
+    plugEdges.set(plan, pts);
+  }
+  return shapeDistance(plan.bottom.shape, plan.bottom.t, x, y) > 0 && plugEdges.get(plan).every((q) => Math.hypot(q.x - x, q.y - y) >= r);
+}
+
 function check(input, extra) {
   const plan = input.halves ? input : boxPlan(input);
   assert.deepEqual(plan.problems, [], JSON.stringify(input.halves ? input.o : input));
@@ -100,7 +112,7 @@ function check(input, extra) {
     // The half it's nearest (inside, or closest outside its outline).
     const near = (h) => shapeDistance(h.shape || h.plan.shape, 0, p.x - h.at.x, p.y - h.at.y);
     const half = plan.halves.reduce((a, b) => near(a) <= near(b) ? a : b);
-    assert.ok(allowed(plan, half, p), half.name + ' cut where wood stays: ' + JSON.stringify(p));
+    assert.ok(allowed(plan, half, p), half.name + ' cut where wood stays: ' + JSON.stringify(p) + ' ' + plan.o.shape + ' ' + plan.o.diameter + ' ' + JSON.stringify(half.at));
   }
   return { plan, pts, gcode };
 }
@@ -566,7 +578,7 @@ test('an outline whose pocket comes apart: each piece cleared on its own, betwee
   for (const p of pts) {
     assert.ok(!(p.rapid && p.z < -1e-6), 'a rapid below the stock top');
     const half = plan.halves.reduce((m, n) => Math.hypot(p.x - m.at.x, p.y - m.at.y) <= Math.hypot(p.x - n.at.x, p.y - n.at.y) ? m : n);
-    assert.ok(allowed(plan, half, p), half.name + ' cut where wood stays: ' + JSON.stringify(p));
+    assert.ok(allowed(plan, half, p), half.name + ' cut where wood stays: ' + JSON.stringify(p) + ' ' + plan.o.shape + ' ' + plan.o.diameter + ' ' + JSON.stringify(half.at));
   }
   const rb = plan.o.bit / 2;
   for (const half of plan.halves) {
@@ -1186,8 +1198,8 @@ test('a glued-on bottom: the base a ring cut through, the bottom stepped round a
   const shapes = [{}, { shape: 'rect', length: 160, width: 110, cornerRadius: 12 }, { shape: 'rect', length: 140, width: 90, cornerRadius: 30 },
     { shape: 'poly', sides: 6, flats: 110, cornerRadius: 12 }, { shape: 'oval', length: 150, width: 100 }, { shape: 'heart', length: 140, width: 130, cornerRadius: 12 }];
   for (const shape of shapes) for (const lipOn of ['base', 'lid']) for (const layout of ['x', 'y']) {
-    const input = Object.assign({ lipOn, layout, wall: 14, lipWidth: 4, bottom: { board: null, step: 2 }, magnets: { count: 4, diameter: 6.35, depth: 3 }, notch: { width: 12, depth: 4, count: 2 } }, shape);
-    const { plan, pts } = check(input);
+    const input = Object.assign({ lipOn, layout, wall: 14, lipWidth: 4, finish: lipOn === 'lid' ? 0.3 : 0, bottom: { board: null, step: 2 }, magnets: { count: 4, diameter: 6.35, depth: 3 }, notch: { width: 12, depth: 4, count: 2 } }, shape);
+    const { plan, pts, gcode } = check(input);
     assert.deepEqual(plan.halves.map((h) => h.name), ['base', 'lid', 'bottom']);
     const base = plan.halves[0], bottom = plan.halves[2], rb = plan.o.bit / 2;
     // No pocket left in the ring: its inside is a cut through, with tabs.
@@ -1195,10 +1207,27 @@ test('a glued-on bottom: the base a ring cut through, the bottom stepped round a
     const through = base.cuts.find((c) => c.op === 'profile');
     assert.ok(through && through.side === 'in' && through.tabs);
     assert.ok(pts.some((p) => Math.abs(p.z + plan.o.stock + plan.o.through) < 1e-6 && shapeDistance(plan.bottom.shape, plan.tInside - rb, p.x - base.at.x, p.y - base.at.y) > -0.05 && shapeDistance(plan.bottom.shape, plan.tInside - rb, p.x - base.at.x, p.y - base.at.y) < 0.05), 'the ring\'s inside goes through');
-    // The plug: every point of it inside the ring's inside by the Clearance
-    // (the ring's corners as round as its bit leaves them).
-    const plug = shapeLoop(plan.bottom.shape, plan.bottom.t), hole = plan.bottom.shape, len = loopLength(plug);
-    for (let k = 0; k < 200; k++) { const q = loopPoint(plug, len * k / 200); assert.ok(shapeDistance(hole, plan.tInside, q.x, q.y) <= -plan.o.clearance + 0.03, 'plug past the ring at ' + JSON.stringify(q)); }
+    // The plug: every point of it inside the hole the bit cuts (its path
+    // round, the bit's radius out), the Clearance in from it.
+    const plug = shapeLoop(plan.bottom.shape, plan.bottom.t), len = loopLength(plug);
+    const cutPath = shapeLoop(through.shape, through.t - rb), cutLen = loopLength(cutPath), along = [];
+    for (let k = 0; k < 2000; k++) along.push(loopPoint(cutPath, cutLen * k / 2000));
+    for (const sg of cutPath) along.push(sg.type === 'line' ? { x: sg.x0, y: sg.y0 } : { x: sg.cx + sg.r * Math.cos(sg.a0), y: sg.cy + sg.r * Math.sin(sg.a0) });
+    for (let k = 0; k < 200; k++) {
+      const q = loopPoint(plug, len * k / 200);
+      assert.ok(shapeDistance(through.shape, through.t, q.x, q.y) < 0, 'plug outside the ring\'s inside at ' + JSON.stringify(q));
+      // All round it, the Clearance out: cut away (inside the bit's path,
+      // or in the bit's reach of it).
+      const c = plan.o.clearance - 0.03;
+      for (let j = 0; j < 12; j++) {
+        const x = q.x + c * Math.cos(j * Math.PI / 6), y = q.y + c * Math.sin(j * Math.PI / 6);
+        assert.ok(shapeDistance(through.shape, through.t - rb, x, y) < 0 || along.some((a) => Math.hypot(a.x - x, a.y - y) <= rb + 1e-6),
+          'plug less than the Clearance from the ring at ' + JSON.stringify(q) + ' ' + JSON.stringify(shape));
+      }
+    }
+    // The ring's middle is cut free last, after its floors and laps.
+    const lines = gcode.split('\n'), freed = lines.findIndex((l) => /Base: inside cut through/.test(l));
+    assert.ok(freed > 0 && !lines.slice(freed).some((l) => /Base: .*(skimmed|finishing lap)/.test(l)), 'a skim or lap after the ring\'s middle is free');
     // The step is cut all round, out to the outline, at its depth.
     const stepPts = pts.filter((p) => Math.abs(p.z + 2) < 1e-6);
     for (let k = 0; k < 60; k++) {
@@ -1215,12 +1244,36 @@ test('a glued-on bottom: the base a ring cut through, the bottom stepped round a
   assert.equal(only.plan.stock.thick, 6.35);
   // Much quicker than pocketing the base.
   const minutes = (i) => boxProgram(boxPlan(i), FEEDS).minutes;
-  assert.ok(minutes(own) < 0.8 * minutes({ ...own, bottom: null }), minutes(own) + ' vs ' + minutes({ ...own, bottom: null }));
+  const withBottom = minutes(own) + minutes({ ...own, cut: 'bottom' });
+  assert.ok(withBottom < 0.8 * minutes({ ...own, bottom: null }), withBottom + ' vs ' + minutes({ ...own, bottom: null }));
+  // Bottom Only isn't on the Lid Board (left from Lid Only).
+  const leftover = boxPlan({ ...own, cut: 'bottom', lidStock: 3 });
+  assert.deepEqual(leftover.problems, []);
+  assert.ok(Math.abs(leftover.closedHeight - boxPlan(own).closedHeight) < 1e-9);
   // What doesn't fit says why.
   const said = (i, re) => assert.ok(boxPlan(i).problems.some((p) => re.test(p)), JSON.stringify(boxPlan(i).problems));
   said({ bottom: { board: 3, step: 2 } }, /Locating Step/);
   said({ cut: 'bottom' }, /Bottom Only needs/);
   said({ bottom: { board: 6, step: 2 }, tabs: { count: 4, width: 6, height: 4.5 } }, /Tabs/);
-  // A faced base: round the ring only.
+  said({ bottom: { board: 60, step: 45 } }, /Locating Step must be at least 1 mm less/);
+  said({ diameter: 60, wall: 20, lipWidth: 4, tabs: { count: 6, width: 6, height: 1.5 }, bottom: { step: 2 } }, /tabs for the ring's inside/);
+  // No tabs: a note, and the middle still cut through.
+  const loose = check({ tabs: null, bottom: { step: 2 } }).plan;
+  assert.ok(loose.notes.some((n) => /comes loose/.test(n)));
+  // A drawing, with an inside corner.
+  const { svgOutline } = require('../lib/box-drawing.cjs');
+  check({ shape: 'custom', outline: { name: 'lopsided.svg', pts: svgOutline(LOPSIDED).pts }, length: 120, width: 90, stock: 25, wall: 12, lipWidth: 4, bottom: { step: 2 } });
+  // A faced base: round the ring only. With the lip on the lid and a bit
+  // wider than the opening's step, the facing goes in as far as the
+  // step does, so the step isn't plunged into the unfaced middle.
   check({ baseHeight: 15, bottom: { step: 2 } });
+  const faced = check({ shape: 'rect', length: 300, width: 200, cornerRadius: 12, bit: 6.35, wall: 12, lipWidth: 4, lipOn: 'lid', gap: 20, baseHeight: 15, bottom: { step: 3 } }).plan;
+  const fc = faced.halves[0].cuts, face = fc.find((c) => /faced down/.test(c.what));
+  assert.ok(fc.filter((c) => c.op === 'ring' && /opening/.test(c.what)).every((c) => face.tIn <= c.tIn + 1e-9));
+  check({ diameter: 200, bit: 3.175, wall: 10, lipWidth: 2, lipOn: 'lid', baseHeight: 14, bottom: { step: 2 } });
+  // A part slope's steps all go in as far: no slivers under the earlier ones.
+  const sloped = boxPlan({ diameter: 200, bit: 3.175, wall: 12, lipWidth: 5, lipHeight: 6, lipOn: 'lid', baseHeight: 15, bottom: { step: 2 },
+    edges: { bit: 'v', angle: 90, diameter: 12.7, outside: 0, inside: 0, pocket: 0, slope: true, slopeHeight: 3 } });
+  assert.equal(new Set(sloped.halves[0].cuts.filter((c) => c.op === 'ring').map((c) => c.tIn)).size, 1);
+  check(sloped);
 });

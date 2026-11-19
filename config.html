@@ -479,8 +479,8 @@
       <h3>A glued-on bottom, for big boxes</h3>
       <p>Most of a big box's time goes into pocketing out its inside. Turn on <b>Glued-On Bottom</b> and the base becomes a <b>ring</b>: its inside is cut out through, round the wall, instead of pocketed, and the ring is glued onto a <b>bottom</b>. The lid is cut as before.</p>
       <ul>
-        <li>The ring's inside is cut through like its outline, with tabs holding the middle. The middle comes out whole: keep it for something smaller.</li>
-        <li>The bottom is cut round its outline, its edge cut down by the <b>Locating Step</b>, leaving a <b>plug</b> the Clearance smaller than the ring's inside. The ring drops onto the step, over the plug, and lines up by itself while the glue sets. (On a heart or a drawing, the plug is half the bit smaller still, to clear every corner the bit rounds in the ring.)</li>
+        <li>The ring's inside is cut through like its outline, with tabs holding the middle, after the ring's other cuts. The middle comes out whole: keep it for something smaller. Its wall gets a finishing lap like the others, lifting over the tabs.</li>
+        <li>The bottom is cut round its outline, its edge cut down by the <b>Locating Step</b>, leaving a <b>plug</b> the Clearance smaller than the ring's inside. The ring drops onto the step, over the plug, and lines up by itself while the glue sets. (On a heart, a drawing or a narrow oval, the plug is half the bit smaller still, to clear every curve the bit rounds in the ring.)</li>
         <li><b>Bottom Board</b> empty: the bottom is cut from the stock, beside the ring and the lid. A thinner board, such as 1/4" plywood: cut the ring and lid as usual, then the bottom with <b>Cut: Bottom Only</b> on that board.</li>
         <li>The inside of the box starts at the plug's top; the closed height counts the bottom less its step. There's no Base Floor, and no Floor Corners in the ring (the lid's still get them).</li>
         <li>Glue the ring on the step, clamp it flat, and wipe off what squeezes out inside.</li>
@@ -2151,6 +2151,7 @@ function boxPlan(input) {
   else {
     need(botH > 0, 'Bottom Board must be more than 0');
     need(botStep > 0 && botStep <= botH - 2, 'Locating Step must be more than 0, and leave at least 2 mm of the Bottom Board under it');
+    need(botStep <= baseH - 1, 'Locating Step must be at least 1 mm less than the ring\'s height');
   }
   if (o.cut === 'bottom') need(!!bot, 'Bottom Only needs the Glued-On Bottom');
   need(o.top > 0 && o.top < lidH, 'Lid Top must be between 0 and the lid height');
@@ -2169,14 +2170,21 @@ function boxPlan(input) {
   var fin = o.finish > 0 ? o.finish : 0;
   need(!(o.finish < 0 || o.finish > 1), 'Finish Allowance must be between 0 and 1 mm');
   if (!B.sep) need(o.gap >= 2 * o.bit + 1, 'Gap Between must be at least 2 bit diameters + 1 mm, so the outlines don\'t meet');
+  // The ring's inside, a rectangle's or polygon's corners as round as the
+  // bit leaves them (the plug's the same, the Clearance smaller).
+  var SA = cornered && S.kind !== 'outline' && S.cr < rb - tInside ? Object.assign({}, S, { cr: Math.max(S.cr, rb - tInside) }) : S;
   var outlineLoop = shapeLoop(S, rb), round = outlineLoop ? loopLength(outlineLoop) : 0;
   if (o.tabs) {
-    need(o.tabs.height > 0 && o.tabs.width > 0 && o.tabs.count >= 1 && o.tabs.height < Math.min(baseH - under.base, lidH - o.top, bot ? botH - botStep : Infinity), 'Tabs: give a count, a width and a height less than the halves');
+    need(o.tabs.height > 0 && o.tabs.width > 0 && o.tabs.count >= 1 && o.tabs.height < Math.min(baseH - under.base, lidH - o.top, bot ? botH - botStep : Infinity),
+      'Tabs: give a count, a width and a height less than the halves' + (bot ? ' and the Bottom Board less the Locating Step' : ''));
     // Each tab, with the bit's width either side, well inside its own
     // share of the way round (it sits in the middle of it).
     var each = o.tabs.width + o.bit;
     need(o.tabs.count * each < 0.6 * round, 'Too many or too wide tabs for the outline');
-  }
+    // The ring's inside is held by tabs too, round a shorter loop.
+    var inLoop = bot ? shapeLoop(SA, tInside - rb) : null;
+    if (inLoop) need(o.tabs.count * each < 0.6 * loopLength(inLoop), 'Too many or too wide tabs for the ring\'s inside');
+  } else if (bot) notes.push('With no Holding Tabs, the ring\'s middle comes loose when its inside is cut through: hold it down.');
   if ((!bot && o.floor < 2) || o.top < 2) notes.push('A floor or top under 2 mm can flex or crack.');
   if (o.clearance < 0.1) notes.push('Under 0.1 mm of clearance, the lid may bind once the wood moves.');
 
@@ -2418,25 +2426,26 @@ function boxPlan(input) {
     if (name === 'base' || !mirror) return magnetAt;
     return magnetAt.map(function(p) { return mirror === 'y' ? { dx: p.dx, dy: -p.dy } : { dx: -p.dx, dy: p.dy }; });
   }
-  // The ring's inside, a rectangle's or polygon's corners as round as the
-  // bit leaves them (the plug's the same, the Clearance smaller).
-  var SA = cornered && S.kind !== 'outline' && S.cr < rb - tInside ? Object.assign({}, S, { cr: Math.max(S.cr, rb - tInside) }) : S;
   function inside(name) {
     var z0 = -faces[name], cuts = [], ring = bot && name === 'base';
+    // A ring's facing and opening steps all in to the same loop, the
+    // innermost any step reaches (its middle is never pocketed down).
+    var ringIn = !ring ? tInside : name !== rabbetHalf ? tInside
+      : openSteps.reduce(function(m, st) { return Math.min(m, st.t - 2 * rb); }, tInside);
     var waste = Math.max(2 * rb, reachOut[name] + 1);
     // A ring's middle is cut out: only round it (its wall and out).
-    if (faces[name] > 1e-9) cuts.push(ring ? { op: 'ring', tIn: tInside, tOut: waste, dx: 0, dy: 0, z0: 0, depth: faces[name], what: 'faced down to the ' + name + ' height' }
+    if (faces[name] > 1e-9) cuts.push(ring ? { op: 'ring', tIn: ringIn, tOut: waste, dx: 0, dy: 0, z0: 0, depth: faces[name], what: 'faced down to the ' + name + ' height' }
       : { op: 'pocket', t: waste, dx: 0, dy: 0, z0: 0, depth: faces[name], what: 'faced down to the ' + name + ' height' });
     if (name === rabbetHalf) openSteps.forEach(function(st, i) {
       // A part slope's steps: no finishing lap (the lip's slope doesn't touch them), the floor skimmed under the last.
       var last = i === openSteps.length - 1;
-      if (i === 0 && ring) cuts.push({ op: 'ring', tIn: Math.min(tInside, st.t - 2 * rb), tOut: st.t, finishOut: fin, dx: 0, dy: 0, z0: z0 - st.d0, depth: st.d1 - st.d0, floor: last ? fin : 0,
+      if (i === 0 && ring) cuts.push({ op: 'ring', tIn: ringIn, tOut: st.t, finishOut: fin, dx: 0, dy: 0, z0: z0 - st.d0, depth: st.d1 - st.d0, floor: last ? fin : 0,
         what: 'opening widened for the lip' + (slope && !part ? ' (its floor\'s width; the V-bit slopes its wall)' : '') });
       else if (i === 0) cuts.push({ op: 'pocket', t: st.t, dx: 0, dy: 0, z0: z0 - st.d0, depth: st.d1 - st.d0, finish: fin, floor: last ? fin : 0, floorFrom: tInside,
         what: 'opening widened for the lip' + (slope && !part ? ' (its floor\'s width; the V-bit slopes its wall)' : '') });
       // The next only round the wall: the inside's own pocket clears the
       // middle (a bit wide at least, past the inside's wall into it).
-      else cuts.push({ op: 'ring', tIn: Math.min(tInside, st.t - 2 * rb), tOut: st.t, dx: 0, dy: 0, z0: z0 - st.d0, depth: st.d1 - st.d0, floor: last ? fin : 0,
+      else cuts.push({ op: 'ring', tIn: ring ? ringIn : Math.min(tInside, st.t - 2 * rb), tOut: st.t, dx: 0, dy: 0, z0: z0 - st.d0, depth: st.d1 - st.d0, floor: last ? fin : 0,
         what: 'opening narrowed to the lip\'s slope, step ' + i });
     });
     // (A ring's inside is cut through last.)
@@ -2458,7 +2467,8 @@ function boxPlan(input) {
     if (name === 'base') notchCuts.forEach(function(c) { cuts.push(c); });
     // Last, the ring's inside cut through from the stock's top, the middle
     // held by tabs.
-    if (ring) cuts.push({ op: 'profile', side: 'in', shape: SA, t: tInside, dx: 0, dy: 0, z0: 0, depth: T + o.through, tabs: o.tabs, what: 'inside cut through, the middle held by tabs' });
+    if (ring) cuts.push({ op: 'profile', side: 'in', shape: SA, t: tInside, dx: 0, dy: 0, z0: 0, depth: T + o.through, tabs: o.tabs, finish: fin, last: true,
+      what: 'inside cut through' + (o.tabs ? ', the middle held by tabs' : '') });
     return cuts;
   }
   // The bottom: a step round its edge, down to where the ring sits,
@@ -2520,7 +2530,7 @@ function shapeOf(o, mirror) {
 // A glued-on bottom's board: its own (cut with Bottom Only when it isn't
 // as thick as the stock), or the stock.
 function boardsOf(o) {
-  var sep = o.cut === 'base' || o.cut === 'lid' || o.cut === 'bottom', T = o.stock, lid = sep && o.lidStock > 0 ? o.lidStock : T;
+  var sep = o.cut === 'base' || o.cut === 'lid' || o.cut === 'bottom', T = o.stock, lid = (o.cut === 'base' || o.cut === 'lid') && o.lidStock > 0 ? o.lidStock : T;
   var bot = o.bottom ? (o.bottom.board > 0 ? o.bottom.board : T) : 0;
   return { sep: sep, base: T, lid: lid, baseH: o.baseHeight > 0 ? o.baseHeight : T, lidH: o.lidHeight > 0 ? o.lidHeight : lid,
     bottom: bot, bottomOwn: !!o.bottom && Math.abs(bot - T) > 1e-6 };
@@ -2977,9 +2987,9 @@ function boxProgram(plan, f, only) {
   }
   function start(loop) { return loopPoint(loop, 0); }
   // The Z of each pass of a cut from z0 down `depth`.
-  function levels(z0, depth) {
+  function levels(z0, depth, deep) {
     var out = [], d = 0;
-    while (d < depth - 1e-9) { d = Math.min(depth, d + doc); out.push(z0 - d); }
+    while (d < depth - 1e-9) { d = Math.min(depth, d + (deep || doc)); out.push(z0 - d); }
     return out;
   }
   // The bit's loops from offset a (inside) out to b, at most a stepover apart.
@@ -2989,16 +2999,18 @@ function boxProgram(plan, f, only) {
     return out;
   }
   // Every loop of a cut, one after another from the inside out at each
-  // level, joined along +X (where every loop starts); the first is ramped
-  // down to the level.
+  // level, each joined at its nearest point to where the last ended (along
+  // +X, where a circle's or rectangle's start; a drawing's don't line up),
+  // then back in the same way; the first is ramped down to the level.
   function cutLoops(cx, cy, loops, z0, depth, pitch) {
-    var s0 = start(loops[0]);
+    var first = loops[0], s0 = start(first);
     rapid(cx + s0.x, cy + s0.y);
     levels(z0, depth).forEach(function(zl) {
       if (z > z0) down(z0);
-      ramp(loops[0], cx, cy, zl, pitch);
-      loops.slice(1).forEach(function(lp) { var p = start(lp); line(cx + p.x, cy + p.y); path(lp, cx, cy); });
-      line(cx + s0.x, cy + s0.y);
+      ramp(first, cx, cy, zl, pitch);
+      loops.slice(1).forEach(function(lp) { var l2 = startNear(lp, x - cx, y - cy), p = start(l2); line(cx + p.x, cy + p.y); path(l2, cx, cy); });
+      for (var k = loops.length - 2; k >= 0; k--) { var q = loopPoint(loops[k], loopNearest(loops[k], x - cx, y - cy)); line(cx + q.x, cy + q.y); }
+      first = startNear(loops[0], x - cx, y - cy);
     });
     lift();
   }
@@ -3144,9 +3156,20 @@ function boxProgram(plan, f, only) {
   // The outline: the bit a radius outside it (side 'in': inside it, a
   // ring's inside), through the stock; on the levels below the tabs' tops
   // it goes straight down where it starts (clear of every tab) and lifts
-  // over each.
+  // over each. A ring's inside: clockwise (conventional), its Finish
+  // Allowance left and then cut in a lap a few cuts deep at a time, its
+  // direction as the other laps'.
   function profile(cx, cy, cut) {
-    var loop = shapeLoop(cut.shape || HS, cut.side === 'in' ? cut.t - rb : cut.t + rb), len = loopLength(loop), tabs = cut.tabs, spans = [];
+    var fin = cut.side === 'in' && cut.finish > 0 ? cut.finish : 0;
+    if (!fin) return profilePass(cx, cy, cut, cut.t, doc, cut.side === 'in');
+    profilePass(cx, cy, cut, cut.t - fin, doc, true);
+    profilePass(cx, cy, cut, cut.t, 3 * doc, o.finishDir !== 'climb');
+  }
+  function profilePass(cx, cy, cut, t, deep, back) {
+    var loop = shapeLoop(cut.shape || HS, cut.side === 'in' ? t - rb : t + rb), len = loopLength(loop), tabs = cut.tabs, spans = [];
+    // Backwards: the same pieces, from the far end (the tabs sit the same).
+    var part = back ? function(a, b) { return reverseLoop(loopPart(loop, len - b, len - a)); } : function(a, b) { return loopPart(loop, a, b); };
+    var whole = back ? reverseLoop(loop) : loop;
     // Tabs: Height from the half's bottom, each in the middle of its own
     // share of the way round (none where the cut starts).
     var tabTop = tabs ? cut.z0 - (cut.depth - o.through - tabs.height) : null;
@@ -3156,22 +3179,22 @@ function boxProgram(plan, f, only) {
     }
     var s0 = start(loop);
     rapid(cx + s0.x, cy + s0.y);
-    levels(cut.z0, cut.depth).forEach(function(zl) {
+    levels(cut.z0, cut.depth, deep).forEach(function(zl) {
       if (tabTop == null || zl >= tabTop - 1e-9) {
         if (z > cut.z0) down(cut.z0);
-        ramp(loop, cx, cy, zl, Math.max(0.2, len * 0.05));
+        ramp(whole, cx, cy, zl, Math.max(0.2, len * 0.05));
         return;
       }
       down(zl);
       var at = 0;
       spans.forEach(function(sp) {
-        path(loopPart(loop, at, sp[0]), cx, cy);
+        path(part(at, sp[0]), cx, cy);
         L.push('G1 Z' + n3(tabTop) + ' F' + Math.round(f.plunge)); minutes += (tabTop - z) / f.plunge; z = tabTop;
-        path(loopPart(loop, sp[0], sp[1]), cx, cy);
+        path(part(sp[0], sp[1]), cx, cy);
         L.push('G1 Z' + n3(zl) + ' F' + Math.round(f.plunge)); minutes += (tabTop - zl) / f.plunge; z = zl;
         at = sp[1];
       });
-      path(loopPart(loop, at, len), cx, cy);
+      path(part(at, len), cx, cy);
     });
     lift();
   }
@@ -3186,8 +3209,9 @@ function boxProgram(plan, f, only) {
     : o.shape === 'custom' ? 'a drawing ' + mm3(o.length) + ' x ' + mm3(o.width) + unit + ', corners ' + mm3(o.cornerRadius) + unit
     : mm3(o.diameter) + unit + ' across'));
   var B = plan.boards || { sep: false };
-  if (B.sep) comment('Only the ' + o.cut + ', on its own board' + (o.grain ? ', grain matched' : '') + ': cut the ' + (o.cut === 'bottom' ? 'base and lid with theirs' : (o.cut === 'base' ? 'lid' : 'base') + ' with its own program'));
-  else if (plan.bottom && plan.bottom.own) comment('The bottom is not in this program: cut it from its board with Bottom Only');
+  if (B.sep) comment('Only the ' + o.cut + ', on its own board' + (o.grain && o.cut !== 'bottom' ? ', grain matched' : '') + ': cut the ' + (o.cut === 'bottom' ? 'base and lid with theirs' : (o.cut === 'base' ? 'lid' : 'base') + ' with its own program'));
+  if (B.sep && o.cut !== 'bottom' && plan.bottom) comment('The bottom is not in this program: cut it with Bottom Only');
+  else if (!B.sep && plan.bottom && plan.bottom.own) comment('The bottom is not in this program: cut it from its board with Bottom Only');
   comment((B.sep ? cap(o.cut) + '\'s board ' : 'Stock ') + mm3(plan.stock.thick || o.stock) + unit + ' thick, at least ' + n3(plan.stock.w) + ' x ' + n3(plan.stock.h) + unit);
   if (plan.set) plan.set.forEach(function(p, i) {
     comment('Box ' + (i + 1) + ': ' + boxSize(p, mm3, unit) + ', ' + n3(p.closedHeight) + unit + ' closed, ' + n3(p.insideHeight) + unit + ' inside');
@@ -3257,13 +3281,16 @@ function boxProgram(plan, f, only) {
     plan.halves.forEach(function(h) {
       HS = h.shape || h.plan.shape;
       later = { floors: [], laps: [] };
-      h.cuts.forEach(function(cut) {
+      var run = function(cut) {
         comment(cap(h.label) + ': ' + cut.what);
         (cut.op === 'pocket' ? pocket : cut.op === 'profile' ? profile : ring)(h.at.x + (cut.dx || 0), h.at.y + (cut.dy || 0), cut);
-      });
+      };
+      h.cuts.forEach(function(cut) { if (!cut.last) run(cut); });
       var done = later;
       later = null;
       done.floors.concat(done.laps).forEach(function(t) { comment(cap(h.label) + ': ' + t.what); t.run(); });
+      // Then what frees a piece (a ring's middle), on finished floors.
+      h.cuts.forEach(function(cut) { if (cut.last) run(cut); });
     });
     plan.halves.forEach(function(h) {
       HS = h.shape || h.plan.shape;
@@ -3590,7 +3617,7 @@ if (typeof module !== 'undefined' && module.exports) {
       out += '<text class="cb-label" data-field="' + (o.shape === 'circle' ? 'cb-diameter' : o.shape === 'poly' ? 'cb-flats' : 'cb-length') + '" style="font-size:' + fs.toFixed(2) + 'px" x="' + cx + '" y="' + (cy + fs * 0.35) + '">' + (/^box/.test(h.label) ? h.label.replace(/^box (\d+) (\w)\w*/, function (m0, n, c) { return n + c.toUpperCase(); }) : h.name === 'base' ? (plan.bottom ? 'Ring' : 'Base') : 'Lid') + '</text>';
     });
     // The gap between a pair, and the margin: a tap goes to the field.
-    if (!plan.set && plan.halves.length === 2) {
+    if (!plan.set && plan.halves.length >= 2) {
       var a = plan.halves[0].at, b = plan.halves[1].at;
       out += '<text class="cb-tag" data-field="cb-gap" text-anchor="middle" x="' + X((a.x + b.x) / 2).toFixed(2) + '" y="' + (Y((a.y + b.y) / 2) + 0.9).toFixed(2) + '">Gap</text>';
     }
@@ -3996,6 +4023,7 @@ if (typeof module !== 'undefined' && module.exports) {
     // A glued-on bottom: no floor of the base's own, and its own Cut choice.
     $('cb-floor').closest('.cb-field').hidden = v.botOn && !v.nestOn;
     $('cb-cut-bottom').hidden = !v.botOn;
+    if (!v.botOn && $('cb-cut-bottom').classList.contains('on')) setSeg('cb-cut', 'both');
     ROOT.querySelectorAll('#cb-cut button').forEach(function (b) { b.disabled = v.nestOn; });
     nestSay(plan, v);
     note.classList.remove('cb-bad', 'cb-warn', 'cb-go');
@@ -4100,11 +4128,13 @@ if (typeof module !== 'undefined' && module.exports) {
     var size = fmt(plan.stock.w) + ' × ' + fmt(plan.stock.h) + ' ' + unit() + ', ' + fmt(plan.stock.thick) + ' ' + unit() + ' thick';
     if (plan.boxOf) return 'Box ' + plan.boxOf.k + '\u2019s board: at least ' + size + '.' + (plan.faces.base > 0 || plan.faces.lid > 0 ? ' One half is faced down to its height first.' : '');
     if (plan.set) return 'Stock needed for the set: at least ' + size + '. The smaller boxes\u2019 halves are faced down to their heights first.';
-    if (v.cut === 'bottom') return 'Bottom\u2019s board: at least ' + size + '. The ring and the lid with Both, Side by Side.';
+    if (v.cut === 'bottom') return 'Bottom\u2019s board: at least ' + size + '. ' + (plan.bottom.own ? 'The ring and the lid with Both, Side by Side.'
+      : 'Both, Side by Side cuts it too, with the ring and the lid: use one or the other.');
     if ((v.cut === 'both' || v.nestOn) && plan.bottom && plan.bottom.own) return 'Stock needed: at least ' + size + '. Then the bottom with Bottom Only, from a board ' + fmt(plan.bottom.height) + ' ' + unit() + ' thick.';
     if (v.cut === 'both' || v.nestOn) return 'Stock needed: at least ' + size + '.';
     var other = v.cut === 'base' ? 'lid' : 'base', otherT = v.cut === 'base' ? lidBoard(v) : v.stock;
     var s = cap(v.cut) + '\u2019s board: at least ' + size + '. Then the ' + other + ' with ' + cap(other) + ' Only, on a board ' + fmt(otherT) + ' ' + unit() + ' thick.';
+    if (plan.bottom) s += ' And the bottom with Bottom Only.';
     if (v.grain) s += ' Grain Match: resaw a board into two leaves, and lay both with the sawn faces up, the lid\u2019s leaf turned over ' + (v.layout === 'y' ? 'front to back' : 'side to side') +
       ' like a book. Zero X Y on the base\u2019s leaf at its front-left corner and on the lid\u2019s at ' + (v.origin === 'center' ? 'its middle' : v.layout === 'y' ? 'its back-left corner' : 'its front-right corner') +
       ' (the corner that was over the base\u2019s), so the lid is cut over the base and the grain runs on across the seam.';
@@ -4359,7 +4389,7 @@ if (typeof module !== 'undefined' && module.exports) {
     state.cornerOwn = typeof saved.cornerOwn === 'number' ? saved.cornerOwn : typeof saved.cornerRadius === 'number' ? saved.cornerRadius : null;
     // A Lid Height that's the stock's thickness follows it; one typed lower stays.
     sizeFor(saved.shape || 'circle');
-    state.lidOwn = typeof saved.lidHeight === 'number' && !(Math.abs(saved.lidHeight - (saved.cut && saved.cut !== 'both' && !saved.nestOn && saved.lidStock > 0 ? saved.lidStock : saved.stock)) < 1e-3);
+    state.lidOwn = typeof saved.lidHeight === 'number' && !(Math.abs(saved.lidHeight - ((saved.cut === 'base' || saved.cut === 'lid') && !saved.nestOn && saved.lidStock > 0 ? saved.lidStock : saved.stock)) < 1e-3);
   }
   function wire() {
     // Lengths and feeds in any unit (1/4", 6.35mm, 60ipm, 12mm + 1/8in):
