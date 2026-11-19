@@ -246,12 +246,15 @@ function checkEdges(plan, gcode) {
     const on = all.filter(({ h, e }) => Math.abs(shapeDistance(e.shape, e.t, p.x - h.at.x, p.y - h.at.y)) < tol(e) && p.z >= e.z0 - e.depth - 1e-6);
     // Above an edge's top, going down to it in the air.
     const above = all.some(({ h, e }) => Math.abs(shapeDistance(e.shape, e.t, p.x - h.at.x, p.y - h.at.y)) < tol(e) && p.z >= e.z0 - 1e-6);
-    assert.ok(on.length || above, 'edge bit off its edges: ' + JSON.stringify(p));
+    assert.ok(on.length || above, 'edge bit off its edges: ' + JSON.stringify(p) + ' ' + plan.o.lipOn + ' ' + plan.o.shape + ' ' + JSON.stringify(plan.o.edges));
     // Below an edge's top, the bit's bottom stays on the air side: a
-    // V-bit's point on the edge, a roundover bit's flat end beside it.
-    const ed = plan.o.edges, half = ((ed.bit === 'round' ? ed.tip : ed.vtip) || 0) / 2;
+    // V-bit's point on the edge (or out by its shift, as much deeper), a
+    // roundover bit's flat end beside it.
+    const ed = plan.o.edges, tipHalf = ((ed.bit === 'round' ? ed.tip : ed.vtip) || 0) / 2;
     for (const { h, e } of on) {
       if (p.z >= e.z0 - 1e-6) continue;
+      const half = e.u * (e.t - e.at);
+      assert.ok(half >= tipHalf - 1e-9 && Math.abs(e.depth - e.chamfer - (half - tipHalf) / Math.tan((ed.angle || 90) * Math.PI / 360)) < 1e-9 || ed.bit === 'round');
       const out = e.u * shapeDistance(e.shape, e.at, p.x - h.at.x, p.y - h.at.y);
       assert.ok(Math.abs(out - half) < tol(e) + 0.005, h.name + ' ' + e.what + ': bit ' + out.toFixed(3) + ' off the edge, not ' + half);
     }
@@ -287,12 +290,23 @@ test('chamfered and rounded edges, cut last after a tool change, or on their own
         const seam = plan.edges[h.name].find((e) => e.what === 'outside seam edge');
         const clearing = h.cuts.find((c) => /shoulder|faced/.test(c.what));
         if (seam && seam.z0 < 0) {
-          const reach = edges.bit === 'round' ? edges.tip + edges.radius : Math.min((seam.depth - seam.z0) * Math.tan(edges.angle * Math.PI / 360), edges.diameter / 2);
+          const reach = edges.bit === 'round' ? edges.tip + edges.radius : seam.u * (seam.t - seam.at) + Math.min((seam.depth - seam.z0) * Math.tan(edges.angle * Math.PI / 360), edges.diameter / 2);
           assert.ok((clearing.tOut ?? clearing.t) >= reach + 1 - 1e-9, h.name + ' waste not cleared for the seam');
         }
       }
     }
   }
+});
+
+test('a V-bit cuts its chamfers higher up its cone where there\'s room, not round a heart\'s corners', () => {
+  const V = { bit: 'v', angle: 90, diameter: 12.7, vtip: 0.3, outside: 1, inside: 0.8, pocket: 0.6 };
+  const shiftOf = (i) => boxPlan(i).edges.base.map((e) => e.u * (e.t - e.at) - 0.15);
+  const round = shiftOf({ wall: 12, lipWidth: 5, bit: 6.35, gap: 20, edges: V });
+  assert.ok(round.every((s) => s > 1.5), JSON.stringify(round));
+  // The outline's slot is all the room an outside seam at the stock top has.
+  const tight = boxPlan({ lipOn: 'lid', wall: 12, lipWidth: 5, bit: 3.175, gap: 20, edges: V }).edges.base.find((e) => /seam/.test(e.what));
+  assert.ok(tight.t - tight.at > 0.5 && 2 * (tight.t - tight.at - 0.15) + 0.3 + 1 <= 3.175 - 0.3 + 1e-9);
+  assert.ok(shiftOf({ shape: 'heart', length: 127, width: 120, cornerRadius: 12.7, wall: 12, lipWidth: 5, bit: 6.35, gap: 20, edges: V }).every((s) => Math.abs(s) < 1e-9));
 });
 
 test('pocket edges: the lip\'s inner edge and the step\'s, on either half', () => {

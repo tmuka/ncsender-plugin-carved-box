@@ -2309,8 +2309,45 @@ function boxPlan(input) {
     // An inside pocket's corners are at least the bit's radius: an edge
     // there follows them.
     var shapeFor = function(h, t) { return cornered ? Object.assign({}, SH[h], { cr: Math.max(SH[h].cr, rb - t) }) : SH[h]; };
+    // A V-bit higher up its cone (its edge faster there, cleaner in soft
+    // wood): its axis further out into the air by s, its tip s / tan
+    // deeper, the chamfer the same; as far as the air side has room, up to
+    // the cone's middle. A slope's tip stays at its foot.
+    var shiftFor = function(h, t, u, z0, d, what) {
+      // A heart's or drawing's corners: the box bit leaves them rounder
+      // than the loops the edge follows, and a cone further out would cut
+      // into what it leaves.
+      if (!vbit || /slope/.test(what) || (S.kind === 'outline' && !oval)) return 0;
+      var w = width(d), s = ed.diameter / 4 - tip / 2 - w, top = -faces[h];
+      // The tip m above what's below it; the cone's far side (2s + tip +
+      // w from the edge at the top) inside the room there.
+      var over = function(floorZ, m) { s = Math.min(s, (z0 - d - floorZ - m) * tan); };
+      var room = function(r) { s = Math.min(s, (r - tip - w) / 2); };
+      if (what === 'outside seam edge') {
+        over(top - height[h] + (o.tabs ? o.tabs.height : 0), 0.5);
+        // At the stock top: in the outline's slot. Lower: the waste round
+        // it is cleared as far as the bit reaches, the Gap allowing.
+        if (z0 > -1e-9) room(2 * rb - 0.3);
+        else if (!B.sep) s = Math.min(s, (o.gap - o.bit - 1 - (tip / 2 + Math.min(tip / 2 + (-z0 + d) * tan, ed.diameter / 2))) / 2);
+      } else if (what === 'lip\'s outer edge') {
+        over(z0 - lipUp, 0.2);
+        room(-tLip + 2 * rb - 0.3);
+      } else if (what === 'opening edge') over(z0 - rabbetDepth, 0.2);
+      else {
+        over(top - (height[h] - under[h]) + (o.corners ? o.corners.radius : 0), 0.5);
+        room(2 * (deep + tInside) - 1);
+      }
+      // Inside, round corners at least the box bit's: the bit's axis still
+      // goes round them.
+      if (u < 0) s = Math.min(s, rb - tip / 2 - 0.2);
+      return s > 0.05 ? Math.floor(s * 100) / 100 : 0;
+    };
     var add = function(h, t, u, z0, d, what) {
-      if (d > 0) edgeAt[h].push({ op: 'edge', shape: u < 0 ? shapeFor(h, t) : SH[h], t: t + u * tip / 2, u: u, at: t, z0: z0, depth: d, width: width(d), what: what });
+      if (!(d > 0)) return;
+      // air: how far it goes down before it touches (to the program's
+      // 0.001 mm, the shift from it).
+      var air = Math.floor(shiftFor(h, t, u, z0, d, what) / tan * 1000) / 1000, s = air * tan;
+      edgeAt[h].push({ op: 'edge', shape: u < 0 ? shapeFor(h, t) : SH[h], t: t + u * (tip / 2 + s), u: u, at: t, z0: z0, depth: d + air, air: air, chamfer: d, width: width(d), what: what });
     };
     var tops = { base: -faces.base, lid: -faces.lid };
     add(rabbetHalf, 0, 1, tops[rabbetHalf], ed.outside, 'outside seam edge');
@@ -2349,7 +2386,7 @@ function boxPlan(input) {
       ['base', 'lid'].forEach(function(h) {
         var e = edgeAt[h].filter(function(x) { return x.what === 'outside seam edge'; })[0], high = e ? -e.z0 + e.depth : 0;
         // From the edge: the bit's axis half the tip out, its widest at that height.
-        if (e && -e.z0 > 1e-9) reachOut[h] = vbit ? tip / 2 + Math.min(tip / 2 + high * tan, ed.diameter / 2) : tip + R;
+        if (e && -e.z0 > 1e-9) reachOut[h] = vbit ? e.u * (e.t - e.at) + Math.min(tip / 2 + high * tan, ed.diameter / 2) : tip + R;
       });
     }
     // The bit's tip stays above what's below the edges inside: the
@@ -3318,8 +3355,8 @@ function boxProgram(plan, f, only) {
       h.plan[g.key][h.name].forEach(function(e) {
         comment(cap(h.label) + ': ' + e.what);
         if (e.op === 'pocket') return pocket(h.at.x + e.dx, h.at.y + e.dy, e);
-        var loop = shapeLoop(e.shape, e.t);
-        cutLoops(h.at.x, h.at.y, [loop], e.z0, e.depth, Math.max(0.2, loopLength(loop) * 0.05));
+        var loop = shapeLoop(e.shape, e.t), air = e.air || 0;
+        cutLoops(h.at.x, h.at.y, [loop], e.z0 - air, e.depth - air, Math.max(0.2, loopLength(loop) * 0.05));
       });
     });
   });
@@ -3699,7 +3736,7 @@ if (typeof module !== 'undefined' && module.exports) {
     // The edges' sizes: { depth, width, R (a roundover's radius) }.
     var edgeOf = function (half, what) {
       var e = plan.edges[half].filter(function (x) { return x.what === what; })[0];
-      return e ? { depth: e.depth, width: e.width, R: o.edges.bit === 'round' ? o.edges.radius : 0 } : null;
+      return e ? { depth: e.chamfer != null ? e.chamfer : e.depth, width: e.width, R: o.edges.bit === 'round' ? o.edges.radius : 0 } : null;
     };
     var lipH = lipBase ? 'base' : 'lid', rabH = lipBase ? 'lid' : 'base';
     var eSeamL = edgeOf(lipH, 'outside seam edge'), eSeamR = edgeOf(rabH, 'outside seam edge'), eOpen = edgeOf(rabH, 'opening edge');
