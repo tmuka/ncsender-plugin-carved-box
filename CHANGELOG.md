@@ -6,6 +6,7 @@
 - **Height** in place of Base Height: the box closed. The **Lid Height** is its share, from the top to the seam where the halves meet; the base is the rest. The lip stands above the seam, from the same board. Settings saved before this come back as the same box, measured the new way.
 - An empty Height or Lid Height shows how high the boards allow; one typed as that follows the stock when it changes, as an empty one does.
 - The Lip Height is lowered, with a note, when the lip's opening would come within 1 mm of the inside of its half (the lid's top, or the base's floor).
+- Fixed: a small V-bit's Outside Seam beside a tall lip was refused ("would cut into the lip") though its axis is out in the air and clears it; the Inside Rim was refused for the step's edge even when that edge is left out.
 - On an inch machine, problems and notes give their sizes in inches.
 - A preset also resets the Slope Height and the Glued-On Bottom's sizes.
 

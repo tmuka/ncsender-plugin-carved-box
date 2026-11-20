@@ -313,6 +313,29 @@ function checkEdges(plan, gcode) {
   }
 }
 
+test('a small V-bit\'s seam beside a tall lip: up its cone, clear of the lip; an Inside Rim beside a skipped step', () => {
+  // A stout 2 1/4" box (as saved on the shop's machine): a 1/4" 90° V-bit,
+  // the shoulder outside the lip as wide as its radius.
+  const stout = { diameter: 57.15, stock: 21.016, wall: 6.35, floor: 4.762, top: 4.762, lipHeight: 9.525, lipWidth: 3.175, clearance: 0.254, gap: 15.083, margin: 4.762,
+    bit: 6.35, layout: 'y', tabs: { count: 3, width: 9.525, height: 0.795 }, finish: 0.25, lidHeight: 12.7,
+    edges: { bit: 'v', angle: 90, diameter: 6.35, vtip: 0.254, outside: 0.508, inside: 0.762, pocket: 0.508 } };
+  for (const lipOn of ['base', 'lid']) {
+    const plan = boxPlan({ ...stout, lipOn, lidHeight: lipOn === 'lid' ? 10 : 12.7 });
+    assert.deepEqual(plan.problems, [], lipOn);
+    const gcode = boxProgram(plan, Object.assign({}, FEEDS, { edges: { toolNumber: 3, feed: 1000, plunge: 300, rpm: 16000, doc: 2 } }), 'edges').gcode;
+    checkEdges(plan, gcode);
+    const half = plan.halves.find((h) => h.name === (lipOn === 'lid' ? 'lid' : 'base')), lipTop = -(plan.faces[half.name] || 0);
+    const seam = plan.edges[half.name].find((e) => e.what === 'outside seam edge');
+    const ed = plan.o.edges, tan = Math.tan(ed.angle * Math.PI / 360);
+    for (const p of simulate(gcode).filter((q) => q.z < lipTop - 1e-6)) {
+      const x = p.x - half.at.x, y = p.y - half.at.y;
+      if (Math.abs(shapeDistance(seam.shape, seam.t, x, y)) > 0.01) continue;
+      const r = Math.min(ed.vtip / 2 + (lipTop - p.z) * tan, ed.diameter / 2);
+      assert.ok(shapeDistance(plan.shape, plan.tLip, x, y) >= r + 0.2, lipOn + ': the seam\'s bit reaches the lip');
+    }
+  }
+});
+
 test('chamfered and rounded edges, cut last after a tool change, or on their own', () => {
   const EF = { toolNumber: 7, feed: 1200, plunge: 300, rpm: 16000, delay: 2, doc: 2 };
   for (const lipOn of ['base', 'lid']) for (const shape of [{}, { shape: 'rect', length: 120, width: 80, cornerRadius: 12 }]) {
