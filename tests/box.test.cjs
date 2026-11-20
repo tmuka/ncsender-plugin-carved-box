@@ -178,13 +178,13 @@ test('numbers that make no box say why', () => {
   said({ wall: 45 }, /inside must be wider than the bit/);
   said({ wall: 3, lipWidth: 2.5 }, /Wall must be at least 1 mm more/);
   said({ floor: 19 }, /Base Floor must be between/);
-  said({ lipHeight: 16, top: 18 }, /Lip Height must be less/);
+  said({ lipHeight: 16, top: 18.7 }, /Lip Height must be less/);
   said({ gap: 3 }, /Gap Between must be at least/);
   said({ tabs: { count: 30, width: 10, height: 2 } }, /Too many or too wide tabs/);
   assert.equal(BOX_DEFAULTS.lipOn, 'base');
 });
 
-test('Base and Lid Height are the outside to the seam; a lip too high for the other half is lowered', () => {
+test('Base and Lid Height are the outside to the seam; a lip too high for the other half goes as deep as its inside, flat', () => {
   for (const lipOn of ['base', 'lid']) {
     const plan = boxPlan({ lipOn, stock: 19, baseHeight: 12, lidHeight: 10, lipHeight: 5, clearance: 0.3 });
     assert.deepEqual(plan.problems, []);
@@ -194,12 +194,31 @@ test('Base and Lid Height are the outside to the seam; a lip too high for the ot
     const full = boxPlan({ lipOn, stock: 19, lipHeight: 5, clearance: 0.3 });
     assert.ok(Math.abs(full[lipOn + 'Out'] - 14.3) < 1e-9 && full[(lipOn === 'lid' ? 'base' : 'lid') + 'Out'] === 19);
     assert.ok(boxPlan({ lipOn, stock: 19, [lipOn + 'Height']: 15, lipHeight: 5, clearance: 0.3 }).problems.some((p) => /Height can't be more than 14\.3 mm with this stock/.test(p)));
-    // The opening 1 mm clear of the other half's top or floor.
-    const low = boxPlan({ lipOn, stock: 19, [(lipOn === 'lid' ? 'base' : 'lid') + 'Height']: 8, floor: 4, top: 4, lipHeight: 5 });
-    assert.deepEqual(low.problems, []);
-    assert.equal(low.rabbetDepth, 3);
-    assert.ok(low.notes.some((n) => /Lip Height lowered to 3 mm/.test(n)), low.notes.join(' '));
-    check({ lipOn, stock: 19, [(lipOn === 'lid' ? 'base' : 'lid') + 'Height']: 8, floor: 4, top: 4, lipHeight: 5 });
+    // The opening as deep as the other half's inside (or within 1 mm of
+    // it, raised): one flat inside, no step.
+    const other = (lipOn === 'lid' ? 'base' : 'lid') + 'Height';
+    for (const [lipHeight, say] of [[5, 'lowered'], [3.4, 'raised']]) {
+      const low = boxPlan({ lipOn, stock: 19, [other]: 8, floor: 4, top: 4, lipHeight });
+      assert.deepEqual(low.problems, []);
+      assert.equal(low.rabbetDepth, 4);
+      assert.ok(low.notes.some((n) => new RegExp('Lip Height ' + say + ' to 4 mm.*one flat inside').test(n)), low.notes.join(' '));
+      const half = low.halves.find((h) => h.name === (lipOn === 'lid' ? 'base' : 'lid'));
+      assert.deepEqual(half.cuts.filter((c) => /^inside/.test(c.what)).map((c) => [c.t, c.depth]), [[low.tRabbet, 4]]);
+      check({ lipOn, stock: 19, [other]: 8, floor: 4, top: 4, lipHeight });
+    }
+    assert.equal(boxPlan({ lipOn, stock: 19, [other]: 8, floor: 4, top: 4, lipHeight: 2.9 }).rabbetDepth, 2.9);
+  }
+});
+
+test('a lip as deep as the other half\'s inside: one flat inside, with coves, sloped lips, a glued-on bottom and edges', () => {
+  const V = { bit: 'v', angle: 90, diameter: 12.7, vtip: 0.3, outside: 0.5, inside: 0.8, pocket: 0.5 };
+  for (const lipOn of ['base', 'lid']) for (const extra of [{ corners: { diameter: 6.35, radius: 3.175 } }, { edges: V }, { edges: { ...V, angle: 60, slope: true, pocket: 0 }, lipWidth: 6, wall: 12 },
+    { edges: { ...V, slope: true, slopeHeight: 2, pocket: 0 } }, { bottom: { board: 6.35, step: 2 } }, { shape: 'rect', length: 110, width: 80, cornerRadius: 12 }]) {
+    const input = { lipOn, wall: 10, lipWidth: 4, stock: 19, [(lipOn === 'lid' ? 'base' : 'lid') + 'Height']: 10, floor: 4, top: 4, lipHeight: 9, ...extra };
+    const { plan, gcode } = check(input);
+    assert.ok(plan.notes.some((n) => /one flat inside/.test(n)), JSON.stringify(extra) + plan.notes.join(' '));
+    assert.ok(!plan.notes.some((n) => /step's inner edge/.test(n)) && !plan.edges[plan.halves.find((h) => h.name !== (lipOn === 'lid' ? 'lid' : 'base')).name].some((e) => /step/.test(e.what)));
+    if (extra.edges) checkEdges(plan, boxProgram(plan, Object.assign({}, FEEDS, { edges: { toolNumber: 3, feed: 1000, plunge: 300, rpm: 16000, doc: 2 } }), 'edges').gcode);
   }
 });
 
@@ -313,7 +332,7 @@ function checkEdges(plan, gcode) {
   }
 }
 
-test('a small V-bit\'s seam beside a tall lip: up its cone, clear of the lip; an Inside Rim beside a skipped step', () => {
+test('a small V-bit\'s seam beside a tall lip: up its cone, clear of the lip', () => {
   // A stout 2 1/4" box (as saved on the shop's machine): a 1/4" 90° V-bit,
   // the shoulder outside the lip as wide as its radius.
   const stout = { diameter: 57.15, stock: 21.016, wall: 6.35, floor: 4.762, top: 4.762, lipHeight: 9.525, lipWidth: 3.175, clearance: 0.254, gap: 15.083, margin: 4.762,
