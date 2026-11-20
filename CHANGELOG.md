@@ -2,8 +2,9 @@
 
 ## Unreleased
 
-- **Base Height and Lid Height are now the box's outside, to the seam** where the halves meet, so the two add up to the box closed. The lip stands above the seam, from the same board, so the half with the lip needs its height plus the lip's. Settings saved with lower heights before this make the half with the lip taller by the lip: check them.
-- An empty Base or Lid Height shows how high its board allows; one typed as that follows the stock when it changes, as an empty one does.
+- **Measure: Outside or Inside.** Inside, a round, rectangular or polygon box's sizes are what it holds, and the Height its inside; the outside follows from the wall, floor and top. Switching shows the same box the other way; the program's header gives the inside size too.
+- **Height** in place of Base Height: the box closed. The **Lid Height** is its share, from the top to the seam where the halves meet; the base is the rest. The lip stands above the seam, from the same board. Settings saved before this come back as the same box, measured the new way.
+- An empty Height or Lid Height shows how high the boards allow; one typed as that follows the stock when it changes, as an empty one does.
 - The Lip Height is lowered, with a note, when the lip's opening would come within 1 mm of the inside of its half (the lid's top, or the base's floor).
 - On an inch machine, problems and notes give their sizes in inches.
 - A preset also resets the Slope Height and the Glued-On Bottom's sizes.

@@ -214,20 +214,25 @@
         <div class="cb-drawing-row"><button type="button" class="cb-btn cb-btn-quiet cb-btn-small" id="cb-drawing-btn" title="An SVG or DXF file: its biggest closed shape is the box's outline, as seen from above (the top of the drawing to the back).">Open SVG or DXF&hellip;</button><input type="file" id="cb-drawing-file" accept=".svg,.dxf,image/svg+xml" hidden><span class="cb-hint" id="cb-drawing-name"></span></div>
         <div class="cb-grain-row"><label class="cb-switch" title="Typing the Width sets the Length to match, and the other way round, so the drawing isn't stretched."><input type="checkbox" id="cb-keep" aria-label="Keep its proportions"><span></span></label><span class="cb-hint">Keep its proportions</span></div>
       </div>
-      <div class="cb-sub-h">Outside size</div>
+      <div class="cb-field"><label>Measure</label>
+        <div class="cb-seg" id="cb-measure" role="radiogroup" aria-label="Measure" title="Outside: the sizes and Height are the box's outside. Inside: what it holds; a round, rectangular or polygon box's sizes are its inside (the outside two walls more), and the Height its inside (the floor and top more). An oval's, heart's or drawing's size stays its outside.">
+          <button type="button" role="radio" data-v="outside">Outside</button><button type="button" role="radio" data-v="inside">Inside</button>
+        </div>
+      </div>
+      <div class="cb-sub-h" id="cb-size-h">Outside size</div>
       <div class="cb-row" id="cb-size-rect">
-        <div class="cb-field" id="cb-size-round"><label for="cb-diameter">Diameter</label><input class="cb-input" id="cb-diameter" data-unit="length" title="Across the outside of the box."></div>
-        <div class="cb-field"><label for="cb-length">Width (X)</label><input class="cb-input" id="cb-length" data-unit="length" title="The outside, left to right (along X)."></div>
-        <div class="cb-field"><label for="cb-width">Length (Y)</label><input class="cb-input" id="cb-width" data-unit="length" title="The outside, front to back (along Y)."></div>
+        <div class="cb-field" id="cb-size-round"><label for="cb-diameter">Diameter</label><input class="cb-input" id="cb-diameter" data-unit="length" title="Across the box: its outside, or (Measure: Inside) its inside."></div>
+        <div class="cb-field"><label for="cb-length">Width (X)</label><input class="cb-input" id="cb-length" data-unit="length" title="Left to right (along X): the outside, or (Measure: Inside) the inside."></div>
+        <div class="cb-field"><label for="cb-width">Length (Y)</label><input class="cb-input" id="cb-width" data-unit="length" title="Front to back (along Y): the outside, or (Measure: Inside) the inside."></div>
         <div class="cb-field"><label for="cb-sides">Sides</label><input class="cb-input" id="cb-sides" title="3 to 12: 6 for a hexagon, 8 for an octagon. A flat side faces the front."></div>
-        <div class="cb-field"><label for="cb-flats">Across Flats</label><input class="cb-input" id="cb-flats" data-unit="length" title="The outside, from one flat side to the one across; with an odd number of sides, across the circle that fits inside (a flat side to the middle, twice)."></div>
+        <div class="cb-field"><label for="cb-flats">Across Flats</label><input class="cb-input" id="cb-flats" data-unit="length" title="From one flat side to the one across (the outside, or with Measure: Inside the inside); with an odd number of sides, across the circle that fits inside (a flat side to the middle, twice)."></div>
         <div class="cb-field"><label for="cb-corner">Corner Radius</label><input class="cb-input" id="cb-corner" data-unit="length" title="How round the outside corners are. The inside's are smaller by the wall, and at least half the bit."></div>
       </div>
       <div class="cb-sub-h">Board and walls</div>
       <div class="cb-row">
         <div class="cb-field"><label for="cb-stock">Stock Thickness</label><input class="cb-input" id="cb-stock" data-unit="length" title="Measure your board: each half is its full thickness, unless its height is set lower."></div>
-        <div class="cb-field"><label for="cb-base-h">Base Height</label><input class="cb-input" id="cb-base-h" data-unit="length" placeholder="full" title="The base's outside, from the bottom of the box to the seam where the halves meet (a lip stands above it). Empty: as high as the stock allows, no wood wasted. Lower: the base's area is faced down first; its outline still goes through the stock."></div>
-        <div class="cb-field"><label for="cb-lid-h">Lid Height</label><input class="cb-input" id="cb-lid-h" data-unit="length" placeholder="full" title="The lid's outside, from the top of the box to the seam where the halves meet. Base Height + Lid Height is the box closed. Empty: as high as the board allows, no wood wasted. Lower: the lid's area is faced down first."></div>
+        <div class="cb-field"><label for="cb-height">Height</label><input class="cb-input" id="cb-height" data-unit="length" placeholder="full" title="The box closed: its outside, or (Measure: Inside) its inside, from the floor to the underside of the top. Empty: as high as the boards allow, no wood wasted. Lower: the base's area is faced down first; its outline still goes through the stock."></div>
+        <div class="cb-field"><label for="cb-lid-h">Lid Height</label><input class="cb-input" id="cb-lid-h" data-unit="length" placeholder="full" title="The lid's share of the Height: its outside, from the top of the box to the seam where the halves meet. The base is the rest (a lip stands above the seam, from its half's board). Empty: as high as the board allows, no wood wasted. Lower: the lid's area is faced down first."></div>
       </div>
       <div class="cb-row">
         <div class="cb-field"><label for="cb-wall">Wall Thickness</label><input class="cb-input" id="cb-wall" data-unit="length" title="How thick the side walls are, the lip included."></div>
@@ -416,7 +421,8 @@
       <h3>Getting started</h3>
       <ol>
         <li>For a quick start, pick a <b>preset</b> in the <b>Start</b> card: it loads right away and sets the box's shape, size and options. <b>Save</b> your own settings there under a name, to load again later.</li>
-        <li>Measure your board and type its <b>Stock Thickness</b> (or tap <b>Stock</b> beside it, with Spoilboard Toolbox). <b>Base Height</b> and <b>Lid Height</b> are the box's outside, from its bottom and its top to the seam where the halves meet, so together they're the box closed; the lip stands above the seam, cut from the same board. Empty, each is as high as its board allows. Lower, its area is faced down first, and its outline still goes through the stock.</li>
+        <li>Measure your board and type its <b>Stock Thickness</b> (or tap <b>Stock</b> beside it, with Spoilboard Toolbox). The <b>Height</b> is the box closed, and the <b>Lid Height</b> its share, from the top to the seam where the halves meet; the base is the rest, and the lip stands above the seam, cut from the same board. Empty, each is as high as its board allows. Lower, a half's area is faced down first, and its outline still goes through the stock.</li>
+        <li><b>Measure</b>: <b>Outside</b>, the sizes and Height are the box's outside; <b>Inside</b>, what it holds. A round, rectangular or polygon box's sizes are then its inside (the outside is two walls more, and grows when Auto Sizes thickens the wall), and the Height its inside, from the floor to the underside of the top. An oval's, heart's or drawing's size stays its outside. Switching it shows the same box the other way.</li>
         <li>Pick the <b>Shape</b> and type its outside size.</li>
         <li>In <b>Tool &amp; Feeds</b>, pick the bit from the Tool Library and the <b>Material</b>. The feeds fill in for them.</li>
         <li>Turn on <b>Auto Sizes</b>: the wall, lip, clearance, tabs and the rest fill in (in color) to fit each other. Type in one to set it yourself.</li>
@@ -2152,8 +2158,11 @@ function boxPlan(input) {
     need(S.cr + tOpen >= rb - 1e-9, 'Corner Radius must be at least Wall \u2212 Lip Thickness \u2212 Clearance + half the bit' + slantSay + ', so the lip\'s corners fit the opening');
   } else need(o.diameter > 0, 'Diameter must be more than 0');
   need(T > 0, 'Stock Thickness must be more than 0');
-  need(lidH <= B.lid + 1e-9, 'Lid Height can\'t be more than ' + +(B.lid - lidH + B.lidOut).toFixed(2) + ' mm with this ' + (B.sep ? 'lid board' : 'stock'));
-  need(baseH <= T + 1e-9, 'Base Height can\'t be more than ' + +(T - baseH + B.baseOut).toFixed(2) + ' mm with this stock');
+  need(lidH <= B.lid + 1e-9, 'Lid Height can\'t be more than ' + down2(B.lid - lidH + B.lidOut) + ' mm with this ' + (B.sep ? 'lid board' : 'stock'));
+  // (Given as the Height: the most it can be.)
+  need(baseH <= T + 1e-9, o.height > 0 ? 'Height can\'t be more than ' + down2(T - baseH + B.baseOut + B.lidOut - (o.measure === 'inside' ? heightCaps(o) : 0)) + ' mm with this stock'
+    : 'Base Height can\'t be more than ' + down2(T - baseH + B.baseOut) + ' mm with this stock');
+  need(!o.baseLow, 'Height too low for the Lid Height (' + down2(o.lidHeight) + ' mm): the base needs more than its ' + (bot ? 'bottom' : 'floor') + '; raise the Height or lower the Lid Height');
   if (B.sep) need(B.lid > 0, 'Lid Board must be more than 0');
   need(o.bit >= 0.8, 'Bit Diameter must be at least 0.8 mm: check it\'s in the right units');
   need(w > 0, 'Wall must be more than 0');
@@ -2615,6 +2624,32 @@ function boardsOf(o) {
     bottom: bot, bottomOwn: !!o.bottom && Math.abs(bot - T) > 1e-6 };
 }
 
+// The floor (or a glued-on bottom's board) and the top: what's between
+// the box's inside height and its outside.
+function down2(v) { return Math.floor(v * 100 + 1e-6) / 100; }
+function heightCaps(o) { return (o.bottom ? (o.bottom.board > 0 ? o.bottom.board : o.stock) : o.floor) + o.top; }
+
+// The settings as a plan takes them, from the box's sizes as given.
+// measure 'inside': a round, rectangular or polygon box's sizes are its
+// inside (the outside two walls more), and the height its inside (the
+// floor and top more). height: the box closed, its base what the Lid
+// Height leaves of it (baseLow: nothing left), or null for as high as
+// the boards allow.
+function outsideInput(input) {
+  var o = Object.assign({}, DEFAULTS, input || {}), inside = o.measure === 'inside';
+  if (inside && /^(circle|rect|poly)$/.test(o.shape)) ['diameter', 'length', 'width', 'flats'].forEach(function(k) { if (o[k] > 0) o[k] += 2 * o.wall; });
+  o.baseLow = false;
+  if (o.height > 0) {
+    // A Lid Height left empty: as high as its board allows with the lip
+    // as set (a lip lowered for a low base doesn't raise it).
+    if (!(o.lidHeight > 0)) o.lidHeight = boardsOf(Object.assign({}, o, { baseHeight: null })).lidOut;
+    o.baseHeight = o.height + (inside ? heightCaps(o) : 0) - o.lidHeight;
+    // Nothing left of the base above its floor (or the bottom's board).
+    o.baseLow = !(o.baseHeight > (o.bottom ? heightCaps(o) - o.top : o.floor));
+  }
+  return o;
+}
+
 // A small box with the same fit, only as deep inside as the lip needs:
 // cut it first to try the Clearance, both halves from one board. No
 // magnets, notch, edges (but a sloped lip) or faced lid. A
@@ -2630,7 +2665,7 @@ function testFitInput(input) {
   var fit = function(hf) {
     return Object.assign({}, o, {
       diameter: 2 * hf, length: k ? 2 * hf * o.length * k : 2 * hf, width: k ? 2 * hf * o.width * k : 2 * hf, flats: 2 * hf, cornerRadius: cr,
-      lidHeight: null, baseHeight: null, magnets: null, notch: null, corners: null, cut: 'both', grain: false, bottom: null,
+      lidHeight: null, baseHeight: null, height: null, baseLow: false, magnets: null, notch: null, corners: null, cut: 'both', grain: false, bottom: null,
       edges: o.edges && o.edges.slope ? Object.assign({}, o.edges, { outside: 0, inside: 0, pocket: 0 }) : null,
       floor: Math.max(1, B.base - deep), top: Math.max(1, B.base - deep)
     });
@@ -2650,7 +2685,7 @@ function fixable(q) {
   return !/must be wider than the (Magnet )?[Bb]it|^The Magnet Bit is a drill|^Magnet holes too deep|^Magnet hole depth|^Magnets: the count|even number of magnets/.test(q);
 }
 function nestInputs(input, count, gap, tune) {
-  var list = [Object.assign({}, DEFAULTS, input || {}, { cut: 'both', baseHeight: null })];
+  var list = [Object.assign({}, DEFAULTS, input || {}, { cut: 'both', baseHeight: null, height: null, baseLow: false })];
   var cm = function(v) { return Math.floor(v * 100 + 1e-6) / 100; };
   for (var i = 1; i < count; i++) {
     // Clear of the wall, the gap, and any rounded floor corners (so it sits
@@ -2968,7 +3003,7 @@ if (typeof module !== 'undefined' && module.exports) {
   var loopAt = shapeLib.loopAt, loopNearest = shapeLib.loopNearest, loopExtent = shapeLib.loopExtent, shapeLoops = shapeLib.shapeLoops, shapeDistance = shapeLib.shapeDistance;
   var outlineLib = require('./box-outline.cjs'), heartShape = outlineLib.heartShape, ovalShape = outlineLib.ovalShape;
   var customShape = outlineLib.customShape, selfCrossing = outlineLib.selfCrossing;
-  module.exports = { boxPlan: boxPlan, boardsOf: boardsOf, testFitInput: testFitInput, autoSizes: autoSizes, fitOption: fitOption, nestInputs: nestInputs, setPlan: setPlan, finishFor: finishFor, BOX_DEFAULTS: DEFAULTS };
+  module.exports = { boxPlan: boxPlan, boardsOf: boardsOf, outsideInput: outsideInput, heightCaps: heightCaps, testFitInput: testFitInput, autoSizes: autoSizes, fitOption: fitOption, nestInputs: nestInputs, setPlan: setPlan, finishFor: finishFor, BOX_DEFAULTS: DEFAULTS };
 }
 /* END lib/box-plan.cjs */
 /* BEGIN lib/box-gcode.cjs */
@@ -3314,7 +3349,7 @@ function boxProgram(plan, f, only) {
   if (plan.set) comment('Each box as its own settings say: magnets, notch, edges, corners');
   else if (plan.magnetAt.length && !(o.magnets.bit > 0)) comment('Magnets: ' + plan.magnetAt.length + ' holes ' + mm3(o.magnets.diameter) + unit + ' wide, ' + mm3(o.magnets.depth) + unit + ' deep, both halves');
   if (plan.notch && !plan.set) comment((plan.notches.length > 1 ? plan.notches.length + ' finger notches' : 'Finger notch') + ' in the base, ' + mm3(o.notch.width) + unit + ' wide, ' + mm3(o.notch.depth) + unit + ' deep');
-  comment('Closed ' + n3(plan.closedHeight) + unit + ' high, ' + n3(plan.insideHeight) + unit + ' inside');
+  comment('Closed ' + n3(plan.closedHeight) + unit + ' high, ' + n3(plan.insideHeight) + unit + ' inside' + (insideSize(plan, mm3, unit) ? '; inside ' + insideSize(plan, mm3, unit) : ''));
   comment('Origin: ' + (plan.originSay || (o.origin === 'center' ? 'the middle of the pair' : 'the stock\'s front-left corner')));
   comment('Z0: top of the ' + (B.sep ? 'board' : 'stock'));
   if (!only) comment('Bit ' + mm3(o.bit) + unit + ', feed ' + Math.round(f.feed) + ', plunge ' + Math.round(f.plunge) + unit + '/min, ' + n3(doc) + unit + ' a pass');
@@ -3419,6 +3454,12 @@ function reverseLoop(loop) {
 var MAX_LINES = 300000;
 function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 // A box's size, as said in the program.
+// A round, rectangular or polygon box's inside, across (others: '').
+function insideSize(p, mm3, unit) {
+  var o = p.o, w2 = 2 * o.wall;
+  return p.shape.kind === 'rect' ? mm3(o.length - w2) + ' x ' + mm3(o.width - w2) + unit : p.shape.kind === 'poly' ? mm3(o.flats - w2) + unit + ' across flats'
+    : p.shape.kind === 'circle' && o.shape === 'circle' ? mm3(o.diameter - w2) + unit + ' across' : '';
+}
 function boxSize(p, mm3, unit) {
   var o = p.o;
   return p.shape.kind === 'rect' ? mm3(o.length) + ' x ' + mm3(o.width) + unit : p.shape.kind === 'poly' ? p.shape.n + ' sides, ' + mm3(o.flats) + unit + ' across'
@@ -3449,7 +3490,7 @@ if (typeof module !== 'undefined' && module.exports) {
   var FIELDS = [
     ['cb-diameter', 'diameter', 'length', 80], ['cb-length', 'length', 'length', 120], ['cb-width', 'width', 'length', 80],
     ['cb-corner', 'cornerRadius', 'length', 10], ['cb-sides', 'sides', 'count', 6], ['cb-flats', 'flats', 'length', 80], ['cb-stock', 'stock', 'length', 19], ['cb-wall', 'wall', 'length', 6],
-    ['cb-floor', 'floor', 'length', 4], ['cb-top-t', 'top', 'length', 4], ['cb-base-h', 'baseHeight', 'length', null, true], ['cb-lid-h', 'lidHeight', 'length', null, true],
+    ['cb-floor', 'floor', 'length', 4], ['cb-top-t', 'top', 'length', 4], ['cb-height', 'height', 'length', null, true], ['cb-lid-h', 'lidHeight', 'length', null, true],
     ['cb-lip-h', 'lipHeight', 'length', 4], ['cb-lip-w', 'lipWidth', 'length', 3], ['cb-clear', 'clearance', 'length', 0.381],
     ['cb-gap', 'gap', 'length', 12], ['cb-margin', 'margin', 'length', 5], ['cb-lid-stock', 'lidStock', 'length', null, true],
     ['cb-nest-n', 'nestCount', 'count', 3], ['cb-nest-gap', 'nestGap', 'length', 1.5],
@@ -3509,7 +3550,10 @@ if (typeof module !== 'undefined' && module.exports) {
     // back to yours when it doesn't).
     var v = collect().v, own = state.cornerOwn != null ? state.cornerOwn : v.cornerRadius;
     // The lid as high as the stock: nothing faced away.
-    var a = autoSizes(Object.assign({}, boxPlan(inputOf(v)).o, { cornerRadius: own, lidHeight: null }), v.material, state.imperial);
+    var auto = function (v) { return autoSizes(Object.assign({}, boxPlan(inputOf(v)).o, { cornerRadius: own, lidHeight: null }), v.material, state.imperial); };
+    var a = auto(v);
+    // Measured inside: the outside as much bigger as the wall it gets.
+    if (v.measure === 'inside' && Math.abs(a.wall - v.wall) > 1e-6) a = auto(Object.assign({}, v, { wall: a.wall }));
     a.lidHeight = null;
     state.lidOwn = false; state.lipForBit = !!a.lipForBit;
     AUTO.forEach(function (x) {
@@ -3530,7 +3574,7 @@ if (typeof module !== 'undefined' && module.exports) {
     ['cb-notch-n', function (x) { return x >= 1 && x <= 4 && x === Math.round(x); }, 'must be 1, 2, 3 or 4'],
     ['cb-cfeed', function (x) { return x >= 25; }, 'must be at least 25 mm/min (1 in/min)'], ['cb-crpm', function (x) { return x >= 0; }, 'can\u2019t be negative'], ['cb-erpm', function (x) { return x >= 0; }, 'can\u2019t be negative']
   ];
-  var SEGS = [['cb-ebit', 'edgeBit', 'v'], ['cb-shape', 'shape', 'circle'], ['cb-lip-on', 'lipOn', 'base'], ['cb-layout', 'layout', 'x'], ['cb-origin', 'origin', 'front-left'], ['cb-cut', 'cut', 'both']];
+  var SEGS = [['cb-ebit', 'edgeBit', 'v'], ['cb-shape', 'shape', 'circle'], ['cb-measure', 'measure', 'outside'], ['cb-lip-on', 'lipOn', 'base'], ['cb-layout', 'layout', 'x'], ['cb-origin', 'origin', 'front-left'], ['cb-cut', 'cut', 'both']];
   var K = function () { return state.imperial ? 25.4 : 1; };
   var round = function (v, dp) { var k = Math.pow(10, dp == null ? (state.imperial ? 4 : 3) : dp); return Math.round(v * k) / k; };
 
@@ -3591,19 +3635,21 @@ if (typeof module !== 'undefined' && module.exports) {
   // it needs).
   // The lid's board: its own when the lid is cut on its own from one.
   function lidBoard(v) { return !v.nestOn && (v.cut === 'base' || v.cut === 'lid') && v.lidStock > 0 ? v.lidStock : v.stock; }
-  // Base and Lid Height as high as the boards allow (with the lip, and a
-  // glued-on bottom).
+  // The Height and Lid Height as high as the boards allow (with the lip,
+  // a glued-on bottom, and the Lid Height as typed); the Height as
+  // measured.
   function fullOut(v) {
-    var B = boardsOf({ stock: v.stock, lidStock: v.lidStock, cut: v.nestOn ? 'both' : v.cut, lipOn: v.lipOn, lipHeight: v.lipHeight, clearance: v.clearance, floor: v.floor, top: v.top,
-      bottom: v.botOn && !v.nestOn ? { board: v.bottomBoard, step: v.bottomStep } : null, baseHeight: null, lidHeight: null });
-    return { base: B.baseOut, lid: B.lidOut };
+    var o = { stock: v.stock, lidStock: v.lidStock, cut: v.nestOn ? 'both' : v.cut, lipOn: v.lipOn, lipHeight: v.lipHeight, clearance: v.clearance, floor: v.floor, top: v.top,
+      bottom: v.botOn && !v.nestOn ? { board: v.bottomBoard, step: v.bottomStep } : null, baseHeight: null, lidHeight: null };
+    var B = boardsOf(o), lid = v.lidHeight > 0 && state.lidOwn ? v.lidHeight : B.lidOut;
+    return { height: B.baseOut + lid - (v.measure === 'inside' ? heightCaps(o) : 0), lid: B.lidOut };
   }
   // A height not typed in (or typed as high as it goes) follows the boards.
   function followHeights() {
     var full = fullOut(collect().v);
-    if (!state.baseOwn && String($('cb-base-h').value).trim() && full.base > 0) show('cb-base-h', full.base, 'length');
     if (!state.lidOwn && String($('cb-lid-h').value).trim() && full.lid > 0) show('cb-lid-h', full.lid, 'length');
-    if (full.base > 0) $('cb-base-h').placeholder = fmt(full.base);
+    if (!state.heightOwn && String($('cb-height').value).trim() && full.height > 0) show('cb-height', full.height, 'length');
+    if (full.height > 0) $('cb-height').placeholder = fmt(full.height);
     if (full.lid > 0) $('cb-lid-h').placeholder = fmt(full.lid);
   }
   function planOf(v) {
@@ -3620,8 +3666,8 @@ if (typeof module !== 'undefined' && module.exports) {
     return nestBot(plan);
   }
   function inputOf(v) {
-    return ({
-      shape: v.shape, diameter: v.diameter, length: v.length, width: v.width, sides: v.sides, flats: v.flats, cornerRadius: v.cornerRadius, outline: v.outline, stock: v.stock, baseHeight: v.baseHeight, lidHeight: v.lidHeight, wall: v.wall, floor: v.floor, top: v.top,
+    return outsideInput({
+      shape: v.shape, diameter: v.diameter, length: v.length, width: v.width, sides: v.sides, flats: v.flats, cornerRadius: v.cornerRadius, outline: v.outline, stock: v.stock, measure: v.measure, height: v.nestOn ? null : v.height, lidHeight: v.lidHeight, wall: v.wall, floor: v.floor, top: v.top,
       magnets: v.magOn ? { count: Math.round(v.magCount), diameter: v.magDiameter, depth: v.magDepth, bit: magnetsInBox(v) ? toolEntry(v.magTool).mm : null, drill: magnetsInBox(v) && toolEntry(v.magTool).type === 'drill' } : null,
       notch: v.notchOn ? { width: v.notchWidth, depth: v.notchDepth, count: v.notchCount, angle: v.notchAngle } : null,
       lipOn: v.lipOn, lipHeight: v.lipHeight, lipWidth: v.lipWidth, clearance: v.clearance,
@@ -4132,7 +4178,9 @@ if (typeof module !== 'undefined' && module.exports) {
     // A glued-on bottom: no floor of the base's own, and its own Cut choice.
     $('cb-floor').closest('.cb-field').hidden = v.botOn && !v.nestOn;
     // A nested set's first box is the stock's height.
-    $('cb-base-h').closest('.cb-field').hidden = v.nestOn;
+    $('cb-height').closest('.cb-field').hidden = v.nestOn;
+    var across = /^(circle|rect|poly)$/.test(v.shape) && v.measure === 'inside';
+    $('cb-size-h').textContent = across ? 'Inside size' : 'Outside size';
     $('cb-cut-bottom').hidden = !v.botOn;
     if (!v.botOn && $('cb-cut-bottom').classList.contains('on')) setSeg('cb-cut', 'both');
     ROOT.querySelectorAll('#cb-cut button').forEach(function (b) { b.disabled = v.nestOn; });
@@ -4321,6 +4369,23 @@ if (typeof module !== 'undefined' && module.exports) {
     $('cb-drawing-name').textContent = drawingSaid; $('cb-drawing-name').classList.add('cb-bad');
   }
   // Keep its proportions: the other size follows the one just set.
+  // Measure switched: the sizes typed shown the other way, the box the same.
+  function remeasure(to) {
+    var v = collect().v;
+    if (v.measure === to) return;
+    var sign = to === 'inside' ? -1 : 1;
+    if (/^(circle|rect|poly)$/.test(v.shape)) ['cb-diameter', 'cb-length', 'cb-width', 'cb-flats'].forEach(function (id) { var x = read(id, 'length'); if (x > 0) show(id, x + sign * 2 * v.wall, 'length'); });
+    var h = read('cb-height', 'length');
+    if (h > 0) show('cb-height', h + sign * heightCaps({ bottom: v.botOn && !v.nestOn ? { board: v.bottomBoard } : null, stock: v.stock, floor: v.floor, top: v.top }), 'length');
+  }
+  // Measured inside: an oval's, heart's or drawing's size is its outside,
+  // so a Width and Length typed as a round or rectangular box's inside
+  // turn into the outside they make (and back).
+  function reshape(to) {
+    var v = collect().v, was = /^(circle|rect|poly)$/.test(v.shape), now = /^(circle|rect|poly)$/.test(to);
+    if (v.measure !== 'inside' || was === now) return;
+    ['cb-length', 'cb-width'].forEach(function (id) { var x = read(id, 'length'); if (x > 0) show(id, x + (now ? -2 : 2) * v.wall, 'length'); });
+  }
   function followProportion(id) {
     var drawn = ROOT.querySelector('#cb-shape button.on'), d = state.outline;
     if (!(state.keep && d && drawn && drawn.dataset.v === 'custom' && (id === 'cb-length' || id === 'cb-width'))) return;
@@ -4348,7 +4413,7 @@ if (typeof module !== 'undefined' && module.exports) {
   function settingsNow() {
     var v = Object.assign({}, lastPlan ? lastPlan.v : collect().v, { feedsAuto: state.feedsAuto, autoSizes: state.autoSizes, cornerOwn: state.cornerOwn });
     v.lidHeight = state.lidOwn ? v.lidHeight : null;
-    v.baseHeight = state.baseOwn ? v.baseHeight : null;
+    v.height = state.heightOwn ? v.height : null;
     // Every length kept in mm (feeds in mm/min), shown in the machine's units.
     v.units = 'mm';
     return v;
@@ -4357,7 +4422,7 @@ if (typeof module !== 'undefined' && module.exports) {
   // ---------- Start: presets, and your own saved settings ----------
   // A preset sets the box and its options (Auto Sizes fills in the rest
   // for your stock, bit and material); saved settings bring back all.
-  var PRESET_BASE = { autoSizes: true, lipOn: 'base', cut: 'both', grain: false, nestOn: false, tabsOn: true, magOn: false, notchOn: false, edgesOn: false, slope: false, cornersOn: false, botOn: false, baseHeight: null, lidHeight: null,
+  var PRESET_BASE = { autoSizes: true, lipOn: 'base', cut: 'both', grain: false, nestOn: false, tabsOn: true, magOn: false, notchOn: false, edgesOn: false, slope: false, cornersOn: false, botOn: false, measure: 'outside', height: null, lidHeight: null,
     notchCount: 1, notchAngle: 0, slopeHeight: null, bottomBoard: null, bottomStep: null, bottomOversize: null };
   // Each shows off an option or two.
   var PRESETS = [
@@ -4506,9 +4571,19 @@ if (typeof module !== 'undefined' && module.exports) {
     state.cornerOwn = typeof saved.cornerOwn === 'number' ? saved.cornerOwn : typeof saved.cornerRadius === 'number' ? saved.cornerRadius : null;
     // A height as high as the boards allow follows them; one typed lower stays.
     sizeFor(saved.shape || 'circle');
+    // Saved before the Height (0.3.5 and older): each half's Base or Lid
+    // Height was its own, the lip in it; the same box, measured to the seam.
+    var v0 = collect().v, h = typeof saved.height === 'number' ? saved.height : null, lid = saved.lidHeight;
+    if (!('height' in saved)) {
+      var up = v0.lipHeight - v0.clearance, botX = v0.botOn ? (v0.bottomBoard > 0 ? v0.bottomBoard : v0.stock) - v0.bottomStep : 0;
+      if (typeof lid === 'number' && v0.lipOn === 'lid') { lid -= up; show('cb-lid-h', lid, 'length'); }
+      if (typeof saved.baseHeight === 'number') { h = saved.baseHeight + (typeof saved.lidHeight === 'number' ? saved.lidHeight : lidBoard(v0)) - up + botX; show('cb-height', h, 'length'); }
+    }
+    state.lidOwn = false;
     var full = fullOut(collect().v);
-    state.baseOwn = typeof saved.baseHeight === 'number' && !(Math.abs(saved.baseHeight - full.base) < 0.03);
-    state.lidOwn = typeof saved.lidHeight === 'number' && !(Math.abs(saved.lidHeight - full.lid) < 0.03);
+    state.lidOwn = typeof lid === 'number' && !(Math.abs(lid - full.lid) < 0.03);
+    full = fullOut(collect().v);
+    state.heightOwn = h != null && !(Math.abs(h - full.height) < 0.03);
   }
   function wire() {
     // Lengths and feeds in any unit (1/4", 6.35mm, 60ipm, 12mm + 1/8in):
@@ -4522,6 +4597,8 @@ if (typeof module !== 'undefined' && module.exports) {
     SEGS.forEach(function (s) {
       ROOT.querySelectorAll('#' + s[0] + ' button').forEach(function (b) {
         b.addEventListener('click', function () {
+          if (s[0] === 'cb-measure') remeasure(b.dataset.v);
+          if (s[0] === 'cb-shape') reshape(b.dataset.v);
           ROOT.querySelectorAll('#' + s[0] + ' button').forEach(function (x) { var on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-checked', String(on)); });
           if (s[0] === 'cb-shape') {
             // A drawing's corners start as round as the lip needs, not the last shape's.
@@ -4549,10 +4626,8 @@ if (typeof module !== 'undefined' && module.exports) {
         if (e.isTrusted && AUTO.some(function (x) { return x[0] === f[0]; })) state.autoSizes = false;
         if (e.isTrusted && f[0] === 'cb-corner') { var cr = read('cb-corner', 'length'); if (cr != null && !isNaN(cr)) state.cornerOwn = cr; }
         // A height typed as high as it goes follows the boards, as an empty one does.
-        if (e.isTrusted && (f[0] === 'cb-base-h' || f[0] === 'cb-lid-h')) {
-          var hv = read(f[0], 'length'), full = fullOut(collect().v), own = hv != null && !isNaN(hv) && Math.abs(hv - (f[0] === 'cb-base-h' ? full.base : full.lid)) > 0.03;
-          if (f[0] === 'cb-base-h') state.baseOwn = own; else state.lidOwn = own;
-        }
+        if (e.isTrusted && f[0] === 'cb-lid-h') { state.lidOwn = false; var lv = read('cb-lid-h', 'length'); state.lidOwn = lv != null && !isNaN(lv) && Math.abs(lv - fullOut(collect().v).lid) > 0.03; }
+        if (e.isTrusted && f[0] === 'cb-height') { var hv = read('cb-height', 'length'); state.heightOwn = hv != null && !isNaN(hv) && Math.abs(hv - fullOut(collect().v).height) > 0.03; }
         // A drawing kept in proportion: the other way follows.
         if (e.isTrusted) followProportion(f[0]);
         soon();
@@ -4757,7 +4832,7 @@ if (typeof module !== 'undefined' && module.exports) {
     [/^Finger notch depth/, 'cb-notch-d'], [/^Only \d+ boxes fit|^No box fits/, 'cb-nest-n'],
     [/^Magnets: the count|even number of magnets|^Too many magnets/, 'cb-mag-n'], [/^Magnet hole depth|^Magnet holes too deep/, 'cb-mag-depth'],
     [/Lip Thickness/, 'cb-lip-w'], [/Lip Height/, 'cb-lip-h'], [/Clearance/, 'cb-clear'], [/Corner Radius|ends are too tight|Point/, 'cb-corner'],
-    [/^Bottom Board/, 'cb-bot-t'], [/^Locating Step/, 'cb-bot-step'], [/^Oversize/, 'cb-bot-over'], [/Glued-On Bottom/, 'cb-bot-on'], [/^Base Height/, 'cb-base-h'], [/Base Floor|floor/, 'cb-floor'], [/Lid Top/, 'cb-top-t'], [/Lid Height/, 'cb-lid-h'], [/Lid Board/, 'cb-lid-stock'], [/Gap Between|Gap/, 'cb-gap'], [/Edge Margin/, 'cb-margin'],
+    [/^Bottom Board/, 'cb-bot-t'], [/^Locating Step/, 'cb-bot-step'], [/^Oversize/, 'cb-bot-over'], [/Glued-On Bottom/, 'cb-bot-on'], [/^Height/, 'cb-height'], [/Base Floor|floor/, 'cb-floor'], [/Lid Top/, 'cb-top-t'], [/Lid Height/, 'cb-lid-h'], [/Lid Board/, 'cb-lid-stock'], [/Gap Between|Gap/, 'cb-gap'], [/Edge Margin/, 'cb-margin'],
     [/[Tt]abs/, 'cb-tab-n'], [/^The Magnet Bit|than the Magnet Bit/, 'cb-mtool-row'], [/[Mm]agnet/, 'cb-mag-d'], [/[Nn]otch/, 'cb-notch-w'], [/Lead-In/, 'cb-ein'], [/Inside Rim/, 'cb-epk'], [/seam/, 'cb-eout'],
     [/^Corners: the radius/, 'cb-crad'], [/Corners:/, 'cb-cdiam'], [/Stock Thickness|stock thickness/, 'cb-stock'], [/Wall/, 'cb-wall'], [/Bit Diameter|bit/, 'cb-bit']];
   // The name it starts with first ("Wall must be at least ... Lip Thickness"), else any it uses.

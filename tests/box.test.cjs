@@ -2,7 +2,7 @@
 // bit's center goes, at what depth, against what must be left standing.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { boxPlan, testFitInput, autoSizes, fitOption, nestInputs, setPlan, BOX_DEFAULTS } = require('../lib/box-plan.cjs');
+const { boxPlan, testFitInput, autoSizes, fitOption, nestInputs, setPlan, outsideInput, BOX_DEFAULTS } = require('../lib/box-plan.cjs');
 const { boxProgram, MAX_LINES } = require('../lib/box-gcode.cjs');
 const { shapeDistance, shapeLoop, shapeLoops, loopLength, loopPoint } = require('../lib/box-shape.cjs');
 
@@ -201,6 +201,33 @@ test('Base and Lid Height are the outside to the seam; a lip too high for the ot
     assert.ok(low.notes.some((n) => /Lip Height lowered to 3 mm/.test(n)), low.notes.join(' '));
     check({ lipOn, stock: 19, [(lipOn === 'lid' ? 'base' : 'lid') + 'Height']: 8, floor: 4, top: 4, lipHeight: 5 });
   }
+});
+
+test('sizes measured outside or inside, the Height closed with the Lid Height its share', () => {
+  // Inside widths: round, rectangle and polygon two walls less; an oval's stays its outside.
+  assert.equal(outsideInput({ measure: 'inside', diameter: 68, wall: 6 }).diameter, 80);
+  const r = outsideInput({ measure: 'inside', shape: 'rect', length: 100, width: 60, wall: 5 });
+  assert.ok(r.length === 110 && r.width === 70);
+  assert.equal(outsideInput({ measure: 'inside', shape: 'poly', flats: 70, wall: 5 }).flats, 80);
+  assert.equal(outsideInput({ measure: 'inside', shape: 'oval', length: 100, wall: 5 }).length, 100);
+  const { gcode } = check(outsideInput({ measure: 'inside', diameter: 68, wall: 6 }));
+  assert.match(gcode, /inside 68mm across/);
+  for (const lipOn of ['base', 'lid']) for (const [extra, H] of [[{}, 26], [{ lidHeight: 12 }, 26], [{ bottom: { board: 6.35, step: 2 } }, 30], [{ lipHeight: 7, lidHeight: 12 }, 24]]) {
+    // The Height, outside: the box closed.
+    const out = boxPlan(outsideInput({ lipOn, height: H, ...extra }));
+    assert.deepEqual(out.problems, [], JSON.stringify({ lipOn, ...extra }));
+    assert.ok(Math.abs(out.closedHeight - H) < 1e-6, out.closedHeight);
+    if (extra.lidHeight) assert.equal(out.lidOut, 12);
+    // Inside: what it holds (the floor or bottom, and the top, less).
+    const hIn = H - (extra.bottom ? 6.35 : 4) - 4, ins = boxPlan(outsideInput({ lipOn, measure: 'inside', height: hIn, ...extra }));
+    assert.deepEqual(ins.problems, [], JSON.stringify({ lipOn, ...extra }));
+    assert.ok(Math.abs(ins.insideHeight - hIn) < 1e-6 && Math.abs(ins.closedHeight - H) < 1e-6, ins.insideHeight);
+  }
+  const high = boxPlan(outsideInput({ height: 40, lidHeight: 10 })).problems;
+  assert.ok(high.some((p) => /^Height can't be more than 25\.2 mm with this stock/.test(p)), high.join(' '));
+  assert.ok(boxPlan(outsideInput({ height: 8, lidHeight: 10 })).problems.some((p) => /^Height too low for the Lid Height/.test(p)));
+  // A test fit and a nested set don't take the Height.
+  assert.deepEqual(boxPlan(testFitInput(outsideInput({ height: 8, lidHeight: 10 }))).problems, []);
 });
 
 test('a lid lower than the stock, magnets and a finger notch', () => {
