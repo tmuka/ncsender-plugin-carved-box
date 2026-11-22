@@ -61,6 +61,8 @@ function allowed(set, half, p) {
   const facing = half.cuts.find((c) => /faced down/.test(c.what));
   if (facing && -p.z <= face + eps && (facing.op === 'ring' ? at(facing.tIn + rb) >= -eps : at(facing.t - rb) <= eps)) return true;
   const inset = plan.bottom && plan.bottom.style === 'inset';
+  // A drop-in lid's panel: only its outline, cut through.
+  if (plan.drop && half.name === 'lid') return at(half.outline.t + rb) >= -eps && d <= half.outline.depth + eps;
   // A bottom's outline: an inset panel's in from the box's.
   if (at(rb + (half.name === 'bottom' ? (inset ? plan.bottom.t : plan.bottom.oversize) : 0)) >= -eps) return d <= half.outline.depth + eps;
   // An inset bottom's panel: nothing cut inside its outline.
@@ -91,7 +93,7 @@ function allowed(set, half, p) {
     if (Math.hypot(px - m.dx, py - m.dy) <= o.magnets.diameter / 2 - rb + eps && d <= meet + o.magnets.depth + eps) return true;
   }
   if (half.name === 'base') for (const n of plan.notches || []) {
-    if (Math.hypot(px - n.dx, py - n.dy) <= n.shape.r - rb + eps && d <= meet + o.notch.depth + eps) return true;
+    if (Math.hypot(px - n.dx, py - n.dy) <= n.shape.r - rb + eps && d <= (plan.drop ? plan.rabbetDepth : meet) + o.notch.depth + eps) return true;
   }
   return false;
 }
@@ -1505,3 +1507,45 @@ test('a plug lid: solid, its lip a plug under a flat top; with the lip on the li
   const q = boxPlan({ lipOn: 'lid', lidStyle: 'plug' });
   assert.ok(Math.abs(q.insideHeight - (19 - 4 - q.lipUp)) < 1e-9);
 });
+
+test('a drop-in lid: a panel from the Bottom Board flush in a rabbet round the ring\'s top, a notch to lift it', () => {
+  const base = { shape: 'rect', length: 200, width: 120, cornerRadius: 12, stock: 19, bit: 6.35, wall: 10, lipWidth: 4, lipOn: 'lid', lidStyle: 'drop', gap: 20,
+    bottom: { board: 6.35, step: 2, oversize: 1.5 }, notch: { width: 20, depth: 5 } };
+  for (const shape of [{}, { shape: 'circle', diameter: 120 }, { shape: 'oval' }, { shape: 'heart', length: 160, width: 150, cornerRadius: 20 }, { shape: 'poly', sides: 6, flats: 120, cornerRadius: 10 }])
+    for (const layout of ['x', 'y']) for (const origin of ['front-left', 'center']) for (const cut of ['both', 'bottom']) {
+      const { plan } = check(Object.assign({}, base, shape, { layout, origin, cut }));
+      assert.equal(plan.lidStyle, 'drop');
+      if (cut === 'both') assert.deepEqual(plan.halves.map((h) => h.name), ['base']);
+      else {
+        assert.deepEqual(plan.halves.map((h) => h.name).sort(), ['bottom', 'lid']);
+        // Both on the board, from the bottom's board.
+        assert.equal(plan.stock.thick, 6.35);
+        for (const h of plan.halves) assert.ok(h.at.x - plan.stock.x0 > 0 && h.at.y - plan.stock.y0 > 0 && plan.stock.x0 + plan.stock.w - h.at.x > 0 && plan.stock.y0 + plan.stock.h - h.at.y > 0, h.name + ' off the board');
+      }
+      // Flush: the rabbet as deep as the panel; the panel the Clearance inside it.
+      assert.equal(plan.rabbetDepth, 6.35);
+      assert.ok(Math.abs(plan.drop.t - plan.tRabbet + o(plan).clearance) < 1e-9 || plan.shape.kind === 'outline');
+      assert.ok(Math.abs(plan.closedHeight - (19 + 6.35 - 2)) < 1e-9 && Math.abs(plan.insideHeight - (19 - 2 - 6.35)) < 1e-9);
+    }
+  // Edges: on the ring only; the panel square.
+  const ed = check(Object.assign({}, base, { edges: { bit: 'v', angle: 90, diameter: 12.7, outside: 0.5, inside: 0.5, pocket: 0 } })).plan;
+  assert.equal(ed.edges.lid.length, 0);
+  assert.ok(ed.edges.base.length >= 2);
+  // What it isn't for.
+  const said = (x) => boxPlan(Object.assign({}, base, x)).problems.join(' | ');
+  assert.match(said({ bottom: { style: 'inset', board: 6.35, rabbet: 3 } }), /Drop-In Lid needs a Glued-On Bottom of the Plug kind/);
+  assert.match(said({ bottom: null }), /Drop-In Lid needs a Glued-On Bottom/);
+  assert.match(said({ bottom: { board: null, step: 2 } }), /cut from the Bottom Board/);
+  assert.match(said({ magnets: { count: 4, diameter: 8, depth: 3 } }), /Magnets aren.t for a Drop-In Lid/);
+  assert.match(said({ lipOn: 'base' }), /needs the lip on the lid/);
+  assert.match(said({ cut: 'lid' }), /cut with Bottom Only/);
+  assert.match(said({ wall: 6, lipWidth: 3 }), /fingertip beside the panel/);
+  // Measured inside, with a Height: the inside that high.
+  const p = boxPlan(outsideInput(Object.assign({}, base, { measure: 'inside', height: 8, notch: null })));
+  assert.deepEqual(p.problems, []);
+  assert.ok(Math.abs(p.insideHeight - 8) < 1e-9, p.insideHeight);
+  // Auto Sizes fits it.
+  const a = autoSizes(Object.assign({}, base, { wall: null, lipWidth: null }), 'hardwood');
+  assert.deepEqual(a.problems, []);
+});
+function o(plan) { return plan.o; }

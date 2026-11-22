@@ -6,6 +6,8 @@ An [ncSender](https://github.com/siganberg/ncSender) plugin that carves a round,
 
 ## Getting started
 
+Lid styles: **Carved**, **Plug (solid)**, or **Drop-In Panel**, a flat panel flush in a rabbet round the top of a ring glued onto a bottom (both panels from the Bottom Board, with Bottom Only).
+
 **Guided Setup**, in the Start card, asks five questions about the box and sets it up with Auto Sizes on, then lists the job: the board, the programs in order (by whether ncSender has a tool change set up), and the assembly.
 
 1. For a quick start, pick a preset in the **Start** card (a ring box, a trinket box, a keepsake box with magnets, a hexagon, an oval, a heart, a nested set): it loads right away and sets the box's shape, size and options, keeping your stock, bit and feeds. **Save** your own settings there under a name to load again later, everything included.

@@ -14,13 +14,13 @@ function inputOf(v, stock, bit) {
     edges: v.edgesOn ? { bit: v.edgeBit, angle: 60, diameter: 12.7, radius: 3.175, tip: 3.175, slope: v.slope } : null,
     corners: v.cornersOn ? { diameter: 6.35, radius: 3.175 } : null,
     bottom: v.botOn ? (v.bottomStyle === 'inset' ? { style: 'inset', board: v.bottomBoard, rabbet: v.bottomRabbet, recess: v.bottomRecess } : { board: v.bottomBoard, step: v.bottomStep, oversize: v.bottomOversize }) : null,
-    lidStyle: v.lidStyle === 'plug' ? 'plug' : null
+    lidStyle: v.lidStyle === 'carved' ? null : v.lidStyle
   });
 }
 
 test('guided setup: every kind, look, lid and finish gives a box with no problems', () => {
   let n = 0;
-  for (const kind of Object.keys(GUIDE_KINDS)) for (const look of ['carved', 'inset', 'plug']) for (const lid of ['lift', 'plug', 'slope'])
+  for (const kind of Object.keys(GUIDE_KINDS)) for (const look of ['carved', 'inset', 'plug']) for (const lid of ['lift', 'plug', 'slope', 'panel'])
     for (const edges of ['none', 'v', 'round']) for (const corners of [false, true]) {
       if (lid === 'slope' && edges === 'round') continue;
       const g = guidedSettings({ kind, look, lid, edges, corners });
@@ -49,6 +49,9 @@ test('guided setup: what an inset bottom or a glued bottom leaves out, it says',
   const p = guidedSettings({ kind: 'big', lid: 'plug' });
   assert.equal(p.v.lidStyle, 'plug'); assert.equal(p.v.lipOn, 'lid'); assert.equal(p.v.botOn, true);
   assert.equal(guidedSettings({ kind: 'ring' }).v.botOn, false);
+  const d = guidedSettings({ kind: 'big', look: 'plug', lid: 'panel', magnets: true });
+  assert.equal(d.v.lidStyle, 'drop'); assert.equal(d.v.magOn, false); assert.equal(d.v.lipOn, 'lid');
+  assert.equal(guidedSettings({ kind: 'keepsake', look: 'carved', lid: 'panel' }).v.lidStyle, 'plug');
 });
 
 test('guided recipe: the programs by machine', () => {
