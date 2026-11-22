@@ -60,7 +60,17 @@ function allowed(set, half, p) {
   // A lid lower than the stock: its area faced down first.
   const facing = half.cuts.find((c) => /faced down/.test(c.what));
   if (facing && -p.z <= face + eps && (facing.op === 'ring' ? at(facing.tIn + rb) >= -eps : at(facing.t - rb) <= eps)) return true;
-  if (at(rb + (half.name === 'bottom' ? plan.bottom.oversize : 0)) >= -eps) return d <= half.outline.depth + eps;
+  const inset = plan.bottom && plan.bottom.style === 'inset';
+  // A bottom's outline: an inset panel's in from the box's.
+  if (at(rb + (half.name === 'bottom' ? (inset ? plan.bottom.t : plan.bottom.oversize) : 0)) >= -eps) return d <= half.outline.depth + eps;
+  // An inset bottom's panel: nothing cut inside its outline.
+  if (half.name === 'bottom' && inset) return false;
+  // An inset bottom's ring: its middle cut through, the rabbet round it.
+  if (inset && half.name === 'base') {
+    const r = plan.bottom.rabbet;
+    if (shapeDistance(plan.bottom.shape, r.tIn - rb, px, py) <= eps) return -p.z <= o.stock + o.through + eps;
+    return d <= r.depth + eps && shapeDistance(plan.bottom.shape, r.tOut - rb, px, py) <= eps;
+  }
   // A glued-on bottom: the step round its plug; a ring's middle, cut out
   // through from the stock's top.
   if (half.name === 'bottom') return -p.z <= plan.bottom.step + eps && (shapeDistance(plan.bottom.shape, plan.bottom.t + rb, px, py) >= -eps || clearOfPlug(plan, px, py, rb - 0.03));
@@ -70,7 +80,9 @@ function allowed(set, half, p) {
   // Rounded floor corners: the box's bit stays the radius off the wall
   // for that last bit of the pocket (the corner bit's to cut).
   const rc = o.corners ? o.corners.radius : 0;
-  if (at(plan.tInside - rb) <= eps && d <= floor + eps && (d <= floor - rc + eps || at(plan.tInside - rc - rb) <= eps)) return true;
+  // A plug lid: its inside left solid.
+  const solid = o.lidStyle === 'plug' && half.name === 'lid';
+  if (!solid && at(plan.tInside - rb) <= eps && d <= floor + eps && (d <= floor - rc + eps || at(plan.tInside - rc - rb) <= eps)) return true;
   if (withLip && at(plan.tLip + rb) >= -eps && d <= plan.lipUp + eps) return true;
   // The widened opening, by depth: a sloped lip's only to its floor's
   // width, a part slope's narrowing in steps.
@@ -1401,4 +1413,95 @@ test('a glued-on bottom: the base a ring cut through, the bottom stepped round a
     edges: { bit: 'v', angle: 90, diameter: 12.7, outside: 0, inside: 0, pocket: 0, slope: true, slopeHeight: 3 } });
   assert.equal(new Set(sloped.halves[0].cuts.filter((c) => c.op === 'ring').map((c) => c.tIn)).size, 1);
   check(sloped);
+});
+
+const inset0 = { lipOn: 'lid', wall: 12, lipWidth: 3, stock: 25.4, bottom: { board: 6.35, step: 2, style: 'inset', rabbet: 4, recess: 0.5 } };
+test('an inset bottom: the ring\'s inside the opening, cut through, a rabbet round it for a panel glued in from below', () => {
+  const shapes = [{}, { shape: 'rect', length: 160, width: 110, cornerRadius: 14 }, { shape: 'poly', sides: 6, flats: 110, cornerRadius: 14 },
+    { shape: 'oval', length: 150, width: 100 }, { shape: 'heart', length: 150, width: 140, cornerRadius: 14 }];
+  for (const shape of shapes) for (const layout of ['x', 'y']) for (const lidStyle of [null, 'plug']) {
+    const input = Object.assign({ lipOn: 'lid', layout, lidStyle, wall: 12, lipWidth: 3, stock: 25.4, finish: 0.3, bottom: { board: 6.35, step: 2, style: 'inset', rabbet: 4, recess: 0.5 } }, shape);
+    const { plan, pts, gcode } = check(input);
+    // The panel is its own board: the ring and the lid here, the panel with Bottom Only.
+    assert.deepEqual(plan.halves.map((h) => h.name), ['base', 'lid']);
+    const base = plan.halves[0], rb = plan.o.bit / 2, r = plan.bottom.rabbet;
+    assert.ok(Math.abs(r.tIn - plan.tRabbet) < 1e-9 && Math.abs(r.tOut - r.tIn - 4) < 1e-9 && Math.abs(r.depth - 6.85) < 1e-9);
+    // The rabbet is cut all round, at its depth, out to its edge.
+    const rab = pts.filter((p) => Math.abs(p.z + r.depth) < 1e-6 && Math.abs(shapeDistance(plan.bottom.shape, r.tOut - rb, p.x - base.at.x, p.y - base.at.y)) < 0.05);
+    const ring = shapeLoop(plan.bottom.shape, r.tOut - rb), rl = loopLength(ring);
+    for (let k = 0; k < 40; k++) {
+      const q = loopPoint(ring, rl * k / 40);
+      assert.ok(rab.some((p) => Math.hypot(p.x - base.at.x - q.x, p.y - base.at.y - q.y) <= 1), 'the rabbet\'s edge cut near ' + JSON.stringify(q) + ' ' + JSON.stringify(shape));
+    }
+    // The inside goes through, last, held by tabs.
+    const through = base.cuts[base.cuts.length - 1];
+    assert.ok(through.op === 'profile' && through.side === 'in' && Math.abs(through.t - plan.tRabbet) < 1e-9 && through.tabs);
+    assert.ok(pts.some((p) => Math.abs(p.z + plan.o.stock + plan.o.through) < 1e-6 && Math.abs(shapeDistance(plan.bottom.shape, r.tIn - rb, p.x - base.at.x, p.y - base.at.y)) < 0.05));
+    // The panel fits the rabbet: inside it, the Clearance in all round.
+    const panel = shapeLoop(plan.bottom.shape, plan.bottom.t), pl = loopLength(panel);
+    for (let k = 0; k < 120; k++) {
+      const q = loopPoint(panel, pl * k / 120);
+      assert.ok(shapeDistance(plan.bottom.shape, r.tOut, q.x, q.y) <= -plan.o.clearance + 0.03, 'the panel outside the rabbet at ' + JSON.stringify(q));
+    }
+    // A plug lid: nothing cut inside its lip, so the plug is solid.
+    const lid = plan.halves[1];
+    if (lidStyle === 'plug') assert.ok(!lid.cuts.some((c) => c.op === 'pocket' && !c.shape), 'a pocket in a plug lid');
+    // The lip reaches no further than the panel.
+    assert.ok(plan.lipUp < plan.baseHeight - r.depth);
+    assert.match(gcode, /Inset bottom: a panel/);
+  }
+  // A drawing: the ring is turned over too, so both halves are cut from
+  // the mirrored drawing and land as drawn, matching.
+  const ell = { shape: 'custom', outline: { pts: [0, 0, 100, 0, 100, 40, 40, 40, 40, 100, 0, 100] }, length: 150, width: 150, cornerRadius: 16, wall: 12, lipWidth: 3, stock: 25.4, lipOn: 'lid', gap: 14 };
+  for (const layout of ['x', 'y']) {
+    const p = check({ ...ell, layout, bottom: { board: 6.35, step: 2, style: 'inset', rabbet: 4, recess: 0.5 } }).plan;
+    const carved = boxPlan({ ...ell, layout });
+    assert.deepEqual(p.halves[0].shape, p.halves[1].shape);
+    assert.deepEqual(p.halves[0].shape, carved.halves[1].shape, 'the ring cut as the carved lid is, mirrored');
+  }
+  assert.ok(boxPlan({ ...inset0, grain: true, cut: 'base' }).problems.some((q) => /Grain Match isn't for an Inset Bottom/.test(q)));
+  // The panel on its own board, with Bottom Only: only its outline.
+  const only = check({ lipOn: 'lid', wall: 12, lipWidth: 3, stock: 25.4, bottom: { board: 6.35, step: 2, style: 'inset', rabbet: 4, recess: 0.5 }, cut: 'bottom' });
+  assert.deepEqual(only.plan.halves.map((h) => h.name), ['bottom']);
+  assert.deepEqual(only.plan.halves[0].cuts, []);
+  assert.ok(Math.abs(only.plan.halves[0].outline.t - only.plan.bottom.t) < 1e-9);
+});
+
+test('an inset bottom says what it can\'t do: the lip on the base, magnets, notches, a sloped lip, a thin wall, a deep lip', () => {
+  const inset = { stock: 25.4, wall: 12, lipWidth: 3, lipOn: 'lid', bottom: { board: 6.35, step: 2, style: 'inset', rabbet: 4, recess: 0.5 } };
+  const said = (extra, re) => assert.ok(boxPlan({ ...inset, ...extra }).problems.some((p) => re.test(p)), JSON.stringify(extra) + ' ' + JSON.stringify(boxPlan({ ...inset, ...extra }).problems));
+  said({ lipOn: 'base' }, /Inset Bottom needs the lip on the lid/);
+  said({ magnets: { count: 4, diameter: 6.35, depth: 3 } }, /Magnets go in the base/);
+  said({ notch: { width: 14, depth: 4, count: 2 } }, /Finger notches go in the base/);
+  said({ edges: { bit: 'v', angle: 90, diameter: 12.7, vtip: 0.2, outside: 0, inside: 0, pocket: 0, slope: true } }, /Sloped Lip isn/);
+  said({ wall: 8 }, /Rabbet Width/);
+  said({ lipHeight: 20 }, /Lip Height too deep for the ring/);
+  said({ bottom: { ...inset.bottom, board: null } }, /set the Bottom Board/);
+  // Edges on the ring: left, with a note; the lid's still cut.
+  const e = boxPlan({ ...inset, edges: { bit: 'v', angle: 90, diameter: 12.7, vtip: 0.2, outside: 0.5, inside: 1, pocket: 0.5 } });
+  assert.deepEqual(e.problems, []);
+  assert.ok(e.notes.some((n) => /base's edges are left/.test(n)) && !e.edges.base.length && e.edges.lid.length);
+  // Auto Sizes fits the wall to the rabbet.
+  const a = autoSizes({ shape: 'rect', length: 160, width: 110, cornerRadius: 14, stock: 25.4, lipOn: 'lid', bit: 6.35, bottom: inset.bottom }, 'hardwood', false);
+  assert.deepEqual(a.problems, []);
+  // The closed box's height: the ring and the lid; nothing under the ring.
+  const p = boxPlan({ ...inset });
+  assert.ok(Math.abs(p.closedHeight - (25.4 + 25.4 - p.lipUp)) < 1e-9 && Math.abs(p.insideHeight - (25.4 - 6.85 + 25.4 - 4 - p.lipUp)) < 1e-9);
+});
+
+test('a plug lid: solid, its lip a plug under a flat top; with the lip on the lid only', () => {
+  const p = check({ lipOn: 'lid', lidStyle: 'plug', stock: 19, lidStock: 9, cut: 'lid', lipHeight: 5 }).plan;
+  assert.deepEqual(p.halves[0].cuts.map((c) => c.what), ['shoulder round the lip']);
+  assert.ok(boxPlan({ lipOn: 'base', lidStyle: 'plug' }).problems.some((q) => /Plug Lid needs the lip on the lid/.test(q)));
+  assert.ok(boxPlan({ lipOn: 'lid', lidStyle: 'plug', cut: 'lid', lidStock: 5, lipHeight: 4 }).problems.some((q) => /at least 2 mm thicker than the plug/.test(q)));
+  // No floor corners or inner lip edge on a solid lid.
+  const c = boxPlan({ lipOn: 'lid', lidStyle: 'plug', wall: 10, corners: { diameter: 6.35, radius: 3.175 }, edges: { bit: 'v', angle: 90, diameter: 12.7, vtip: 0.2, outside: 0.5, inside: 1, pocket: 0.5 } });
+  assert.deepEqual(c.problems, []);
+  assert.ok(!c.corners.lid.length && !c.edges.lid.some((e) => e.u < 0));
+  // A deep lip isn't raised to the base's floor (the plug would fill it): said instead.
+  const deep = boxPlan({ lipOn: 'lid', lidStyle: 'plug', stock: 19, lipHeight: 16.5, bottom: { board: 6.35, step: 2 } });
+  assert.ok(Math.abs(deep.o.lipHeight - 16.5) < 1e-9 && deep.problems.some((q) => /the plug would fill the base/.test(q)), deep.problems.join('; '));
+  // Its inside height: the base's, less the plug in it.
+  const q = boxPlan({ lipOn: 'lid', lidStyle: 'plug' });
+  assert.ok(Math.abs(q.insideHeight - (19 - 4 - q.lipUp)) < 1e-9);
 });

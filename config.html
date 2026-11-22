@@ -248,6 +248,11 @@
           <button type="button" role="radio" data-v="base">Base</button><button type="button" role="radio" data-v="lid">Lid</button>
         </div>
       </div>
+      <div class="cb-field"><label>Lid</label>
+        <div class="cb-seg" id="cb-lid-style" role="radiogroup" aria-label="Lid style" title="Carved: the lid is hollowed out like the base. Plug: the lid stays solid, a flat top with its lip left as a plug that fits the base's opening; quicker, and it can be cut from a thinner board. A plug needs the lip on the lid.">
+          <button type="button" role="radio" data-v="carved">Carved</button><button type="button" role="radio" data-v="plug">Plug (solid)</button>
+        </div>
+      </div>
       <div class="cb-row">
         <div class="cb-field"><label for="cb-lip-h">Lip Height</label><input class="cb-input" id="cb-lip-h" data-unit="length" title="How deep the other half's opening is cut for the lip. The lip stands up this less the Clearance, so it stops short of the bottom and the halves close tight on the shoulder."></div>
         <div class="cb-field"><label for="cb-lip-w">Lip Thickness</label><input class="cb-input" id="cb-lip-w" data-unit="length" title="How thick the lip is: part of the wall, on its inside."></div>
@@ -366,12 +371,21 @@
     </div>
     <div class="cb-card">
       <h3><span class="cb-grow">Glued-On Bottom</span><label class="cb-switch"><input type="checkbox" id="cb-bot-on" aria-label="Glued-on bottom"><span></span></label></h3>
-      <div class="cb-row" id="cb-bot-fields">
+      <div id="cb-bot-fields">
+      <div class="cb-field"><label>Bottom</label>
+        <div class="cb-seg" id="cb-bot-style" role="radiogroup" aria-label="Bottom style" title="Plug: the ring is glued onto the bottom, a step round its edge leaving a plug that lines it up; the joint shows round the bottom edge. Inset: a flat panel glued into a rabbet round the ring's underside, out of sight; needs the lip on the lid.">
+          <button type="button" role="radio" data-v="plug">Plug, glued on</button><button type="button" role="radio" data-v="inset">Inset, from below</button>
+        </div>
+      </div>
+      <div class="cb-row">
         <div class="cb-field"><label for="cb-bot-t">Bottom Board</label><input class="cb-input" id="cb-bot-t" data-unit="length" placeholder="= stock" title="The bottom's board's thickness, such as 1/4&quot; plywood. Empty: cut from the stock, beside the halves. Thinner or thicker: cut it from its own board with Bottom Only."></div>
         <div class="cb-field"><label for="cb-bot-step">Locating Step</label><input class="cb-input" id="cb-bot-step" data-unit="length" title="How far the bottom's edge is cut down round the plug that fits inside the ring. The ring sits on the step."></div>
         <div class="cb-field"><label for="cb-bot-over">Oversize</label><input class="cb-input" id="cb-bot-over" data-unit="length" title="Extra round the bottom's outline, past the ring, so it needn't line up exactly at glue-up. Trim it flush with the ring afterwards, with a flush-trim bit in a router. 0: cut to the box's size."></div>
+        <div class="cb-field"><label for="cb-bot-rab">Rabbet Width</label><input class="cb-input" id="cb-bot-rab" data-unit="length" title="How far the rabbet the panel sits in reaches out into the ring's wall, past the opening. The ring keeps at least 2 mm outside it."></div>
+        <div class="cb-field"><label for="cb-bot-rec">Recess</label><input class="cb-input" id="cb-bot-rec" data-unit="length" title="How far up inside the rabbet the panel sits, so the box stands on the ring and doesn't rock if the panel bows. 0: flush with the bottom."></div>
       </div>
-      <p class="cb-hint">Quicker for a big box: the base is a ring, its inside cut out through instead of pocketed, and glued onto a bottom. A step round the bottom's edge leaves a plug that fits inside the ring and lines it up while the glue sets. Oversize leaves the bottom a little bigger, to trim flush once it's glued.</p>
+      </div>
+      <p class="cb-hint" id="cb-bot-hint">Quicker for a big box: the base is a ring, its inside cut out through instead of pocketed, and glued onto a bottom. A step round the bottom's edge leaves a plug that fits inside the ring and lines it up while the glue sets. Oversize leaves the bottom a little bigger, to trim flush once it's glued.</p>
     </div>
     <div class="cb-card">
       <h3><span class="cb-grow">Magnets</span><label class="cb-switch"><input type="checkbox" id="cb-mag-on" aria-label="Magnets"><span></span></label></h3>
@@ -495,6 +509,17 @@
         <li><b>Oversize</b> cuts the bottom that much bigger all round (1 to 2 mm), its step out to the edge. Then the ring needn't sit exactly on the bottom's edge, and squeeze-out goes onto what's trimmed off: once the glue's set, run a flush-trim bit round it, its bearing on the ring.</li>
         <li>Glue the ring on the step, clamp it flat, and wipe off what squeezes out inside.</li>
       </ul>
+      <h3>An inset bottom, out of sight</h3>
+      <p>Set <b>Bottom</b> to <b>Inset, from below</b> and no joint shows from the outside. The ring's inside is the lid's opening, cut out through, and a <b>rabbet</b> is cut round it on the face that's up while it's cut. Turn the ring over: the rabbet is underneath, and a flat panel drops into it from below.</p>
+      <ul>
+        <li>The panel is the rabbet's shape, the Clearance smaller. Cut it from the <b>Bottom Board</b> (1/4" plywood, or a contrasting wood) with <b>Cut: Bottom Only</b>.</li>
+        <li><b>Rabbet Width</b> is how far it reaches into the wall; the ring keeps at least 2 mm outside it. <b>Recess</b> sits the panel a little up inside it, so the box stands on the ring and doesn't rock if the panel bows.</li>
+        <li>The ring's top is the board's underside while it's cut, so nothing is cut there: the lip goes on the lid, into the ring's opening. Magnets, finger notches and a sloped lip aren't for it, and the ring's edges are left as they are.</li>
+        <li>Glue the panel in with the ring still rabbet side up, as it was cut, the panel the way up it was cut too; then turn the base over. (A drawing's ring and lid are both cut from the mirrored drawing, so they land as drawn.)</li>
+        <li>Glue a plywood panel all round. A solid-wood panel moves across its grain: glue it only at the middle of the front and back, so it can't split the ring.</li>
+      </ul>
+      <h3>A plug lid</h3>
+      <p>Set <b>Lid</b> to <b>Plug (solid)</b> and the lid isn't hollowed out: its lip is left solid, a plug under a flat top that fits the base's opening. It's quicker, and it can be cut from a thinner board with <b>Cut: Lid Only</b>. The lip goes on the lid. With an inset bottom, both are flat panels from one setup.</p>
     </div>
     <div class="cb-card">
       <h3>Auto Sizes</h3>
@@ -2023,7 +2048,13 @@ if (typeof module !== 'undefined' && module.exports) {
  * A glued-on bottom (bottom): the base is a ring, its inside cut through
  * (the middle held by tabs) instead of pocketed, glued onto a bottom cut
  * from its own board, a step round its edge leaving a plug that fits
- * inside the ring.
+ * inside the ring. An inset bottom (bottom.style 'inset'): the ring's
+ * inside is the lid's opening, cut through, and a rabbet round it from
+ * the face that's up while it's cut; turned over, that face is the box's
+ * underside and a flat panel is glued into the rabbet, out of sight. Its
+ * top (the board's underside) isn't cut, so the lip is on the lid.
+ * A plug lid (lidStyle 'plug'): the lid isn't hollowed: its lip is left
+ * solid, a plug that fits the base's opening, under a flat top.
  *
  * A cut: { op: 'pocket' (inside the outline moved t), op: 'ring' (between
  * the outline moved tIn and tOut), shape (its own, for a hole; else the
@@ -2057,15 +2088,19 @@ if (typeof module !== 'undefined' && module.exports) {
 // is the base's resawn leaf, turned over as the lid turns over, so the
 // lid is cut where the base is, mirrored, for the grain to run on across
 // the seam. bottom: { board (its thickness; null: as the stock), step
-// (how far down round the plug) }, or null for a base with its own floor;
-// cut 'bottom': only the bottom, on its board.
+// (how far down round the plug), oversize, style: 'plug' (glued on, the
+// default) or 'inset' (a panel glued into a rabbet round the ring's
+// underside: rabbet, its width; recess, how far the panel sits up inside
+// it) }, or null for a base with its own floor; cut 'bottom': only the
+// bottom, on its board. lidStyle: 'plug' for a solid lid (its lip a plug),
+// else carved.
 var DEFAULTS = {
   shape: 'circle', diameter: 80, length: 120, width: 80, cornerRadius: 10, sides: 6, flats: 80, outline: null,
   stock: 19, lidHeight: null, baseHeight: null, cut: 'both', lidStock: null, grain: false, wall: 6, floor: 4, top: 4,
   lipOn: 'base', lipHeight: 4, lipWidth: 3, clearance: 0.2,
   gap: 12, layout: 'x', origin: 'front-left', margin: 5,
   bit: 3.175, through: 0.5, tabs: { count: 4, width: 6, height: 1.5 },
-  magnets: null, notch: null, edges: null, corners: null, finish: 0, finishDir: 'conventional', bottom: null
+  magnets: null, notch: null, edges: null, corners: null, finish: 0, finishDir: 'conventional', bottom: null, lidStyle: null
 };
 
 function boxPlan(input) {
@@ -2080,6 +2115,9 @@ function boxPlan(input) {
   // A drawing's lid: its mirror image, as it's turned over onto the base
   // (the others are the same either way).
   var mirror = custom ? (o.layout === 'y' ? 'y' : 'x') : null, SL = custom && S ? shapeOf(o, mirror) : S;
+  // An inset bottom's ring is turned over too: it's cut from the mirrored
+  // drawing as well, so both halves land as drawn (and match).
+  if (custom && SL && o.bottom && o.bottom.style === 'inset') { S = SL; mirror = null; }
   // A drawing that crosses itself: said, before anything else about it.
   var crossAt = custom && o.outline && o.outline.pts ? selfCrossing(o.outline.pts) : null;
   if (crossAt) problems.push('The drawing\'s outline crosses itself (near ' + crossAt.x.toFixed(1) + ', ' + crossAt.y.toFixed(1) + ' mm from the middle of the file\'s outline): fix it in the drawing');
@@ -2134,10 +2172,17 @@ function boxPlan(input) {
   }
   // A glued-on bottom: the base a ring, no floor of its own.
   var bot = o.bottom || null, botH = B.bottom, botStep = bot ? bot.step : 0, botOv = bot && bot.oversize > 0 ? bot.oversize : 0;
+  // An inset bottom: a rabbet rabW wide round the ring's inside (the lid's
+  // opening), rabD deep from the face that's up while it's cut: the panel
+  // and the Recess it sits up in it. The inside starts that far up.
+  // A plug lid: no inside pocket, its lip left solid.
+  var inset = !!(bot && bot.style === 'inset'), plugLid = o.lidStyle === 'plug';
+  var rabW = inset && bot.rabbet > 0 ? bot.rabbet : 0, recess = inset && bot.recess > 0 ? bot.recess : 0, rabD = inset ? botH + recess : 0, tR2 = tRabbet + rabW;
+  if (inset) { botStep = rabD; botOv = 0; }
   var height = { base: baseH, lid: lidH }, under = { base: bot ? 0 : o.floor, lid: o.top };
   var lipHalf = lipOnLid ? 'lid' : 'base', rabbetHalf = lipOnLid ? 'base' : 'lid';
   // The opening as deep as the inside: one flat pocket, no step.
-  var flush = Math.abs(rabbetDepth - (height[rabbetHalf] - under[rabbetHalf] - (bot && rabbetHalf === 'base' ? botStep : 0))) < 1e-6;
+  var flush = !inset && !plugLid && Math.abs(rabbetDepth - (height[rabbetHalf] - under[rabbetHalf] - (bot && rabbetHalf === 'base' ? botStep : 0))) < 1e-6;
 
   if (rect || oval || heart || custom) need(o.length > 0 && o.width > 0, 'Width and Length must be more than 0');
   // A drawing: one piece, not crossing itself; its inside corners as the
@@ -2169,14 +2214,30 @@ function boxPlan(input) {
   need(o.bit >= 0.8, 'Bit Diameter must be at least 0.8 mm: check it\'s in the right units');
   need(w > 0, 'Wall must be more than 0');
   if (!bot) need(o.floor > 0 && o.floor < baseH, 'Base Floor must be between 0 and the stock thickness');
-  else {
+  else if (inset) {
+    need(lipOnLid, 'An Inset Bottom needs the lip on the lid: the ring\'s top is the board\'s underside while it\'s cut, so nothing is cut there');
+    need(bot.board > 0, 'Inset Bottom: set the Bottom Board to the panel\'s thickness, such as 1/4" plywood');
+    need(botH > 0 && rabW > 0, 'Rabbet Width must be more than 0');
+    need(!(bot.recess < 0 || bot.recess > 5), 'Recess must be between 0 and 5 mm');
+    need(-tR2 >= 2, 'Wall must be at least Lip Thickness + Clearance + Rabbet Width + 2 mm, for the ring outside the inset bottom\'s rabbet');
+    need(lipUp < baseH - rabD - 0.5, 'Lip Height too deep for the ring: the lid\'s lip would reach the inset bottom (the ring\'s height less the Bottom Board and the Recess)');
+    need(!(o.magnets && o.magnets.count > 0), 'Magnets go in the base\'s rim, which is the board\'s underside while an Inset Bottom\'s ring is cut: turn them off, or use a Plug bottom');
+    need(!(o.notch && o.notch.width > 0), 'Finger notches go in the base\'s rim, which is the board\'s underside while an Inset Bottom\'s ring is cut: turn them off, or use a Plug bottom');
+    need(!slope, 'A Sloped Lip isn\'t for an Inset Bottom: the ring\'s opening would be sloped from its underside');
+    need(!o.grain, 'Grain Match isn\'t for an Inset Bottom: the ring is turned over, so its seam is the board\'s underside and the grain can\'t run on across it');
+  } else {
     need(botH > 0, 'Bottom Board must be more than 0');
     need(botStep > 0 && botStep <= botH - 2, 'Locating Step must be more than 0, and leave at least 2 mm of the Bottom Board under it');
     need(botStep <= baseH - 1, 'Locating Step must be at least 1 mm less than the ring\'s height');
     need(!(bot.oversize < 0 || bot.oversize > 10), 'Oversize must be between 0 and 10 mm');
   }
   if (o.cut === 'bottom') need(!!bot, 'Bottom Only needs the Glued-On Bottom');
-  need(o.top > 0 && o.top < lidH, 'Lid Top must be between 0 and the lid height');
+  if (plugLid) {
+    need(lipOnLid, 'A Plug Lid needs the lip on the lid: the plug is the lip, left solid');
+    need(lidH - lipUp >= 2, 'Plug Lid: the lid must be at least 2 mm thicker than the plug (the Lip Height less the Clearance)');
+    // The plug goes into the base's inside: room left under it.
+    need(baseH - under.base - botStep - lipUp >= 2, 'Plug Lid: the plug would fill the base: make the Lip Height lower, so at least 2 mm of the inside is left under it');
+  } else need(o.top > 0 && o.top < lidH, 'Lid Top must be between 0 and the lid height');
   need(o.lipHeight > 0, 'Lip Height must be more than 0');
   need(!(o.lipHeight > 0) || lipUp > 0.5, 'Lip Height must be at least 0.5 mm more than the Clearance');
   need(o.lipWidth > 0, 'Lip Thickness must be more than 0');
@@ -2186,28 +2247,30 @@ function boxPlan(input) {
   // can come apart into the lobes, and is cut a piece at a time).
   if (S.kind === 'outline') need(shapeLoops(S, tInside).length <= 1 && shapeLoops(S, tInside - rb).length <= 1, 'Wall too thick for the shape: its inside comes apart in two');
   need(w - o.lipWidth - o.clearance >= 1, 'Wall must be at least 1 mm more than Lip Thickness + Clearance, for the wall outside the lip');
-  need(lipUp < height[lipHalf] - under[lipHalf], 'Lip Height must be less than the inside depth of the half with the lip');
-  need(flush || rabbetDepth < height[rabbetHalf] - under[rabbetHalf], 'Lip Height must be less than the inside depth of the half without the lip');
+  if (!plugLid) need(lipUp < height[lipHalf] - under[lipHalf], 'Lip Height must be less than the inside depth of the half with the lip');
+  if (!inset) need(flush || rabbetDepth < height[rabbetHalf] - under[rabbetHalf], 'Lip Height must be less than the inside depth of the half without the lip');
   need(o.margin >= 0, 'Edge Margin can\'t be negative');
   var fin = o.finish > 0 ? o.finish : 0;
   need(!(o.finish < 0 || o.finish > 1), 'Finish Allowance must be between 0 and 1 mm');
   if (!B.sep) need(o.gap >= 2 * o.bit + 1, 'Gap Between must be at least 2 bit diameters + 1 mm, so the outlines don\'t meet');
   // The ring's inside, a rectangle's or polygon's corners as round as the
   // bit leaves them (the plug's the same, the Clearance smaller).
-  var SA = cornered && S.kind !== 'outline' && S.cr < rb - tInside ? Object.assign({}, S, { cr: Math.max(S.cr, rb - tInside) }) : S;
+  // (An inset bottom's ring: its inside is the opening, the rabbet round it.)
+  var tRing = inset ? tRabbet : tInside;
+  var SA = cornered && S.kind !== 'outline' && S.cr < rb - tRing ? Object.assign({}, S, { cr: Math.max(S.cr, rb - tRing) }) : S;
   var outlineLoop = shapeLoop(S, rb), round = outlineLoop ? loopLength(outlineLoop) : 0;
   if (o.tabs) {
-    need(o.tabs.height > 0 && o.tabs.width > 0 && o.tabs.count >= 1 && o.tabs.height < Math.min(baseH - under.base, lidH - o.top, bot ? botH - botStep : Infinity),
-      'Tabs: give a count, a width and a height less than the halves' + (bot ? ' and the Bottom Board less the Locating Step' : ''));
+    need(o.tabs.height > 0 && o.tabs.width > 0 && o.tabs.count >= 1 && o.tabs.height < Math.min(baseH - under.base, plugLid ? lidH - lipUp : lidH - o.top, bot ? (inset ? botH : botH - botStep) : Infinity),
+      'Tabs: give a count, a width and a height less than the halves' + (inset ? ' and the Bottom Board' : bot ? ' and the Bottom Board less the Locating Step' : ''));
     // Each tab, with the bit's width either side, well inside its own
     // share of the way round (it sits in the middle of it).
     var each = o.tabs.width + o.bit;
     need(o.tabs.count * each < 0.6 * round, 'Too many or too wide tabs for the outline');
     // The ring's inside is held by tabs too, round a shorter loop.
-    var inLoop = bot ? shapeLoop(SA, tInside - rb) : null;
+    var inLoop = bot ? shapeLoop(SA, tRing - rb) : null;
     if (inLoop) need(o.tabs.count * each < 0.6 * loopLength(inLoop), 'Too many or too wide tabs for the ring\'s inside');
   } else if (bot) notes.push('With no Holding Tabs, the ring\'s middle comes loose when its inside is cut through: hold it down.');
-  if ((!bot && o.floor < 2) || o.top < 2) notes.push('A floor or top under 2 mm can flex or crack.');
+  if ((!bot && o.floor < 2) || (!plugLid && o.top < 2)) notes.push('A floor or top under 2 mm can flex or crack.');
   if (o.clearance < 0.1) notes.push('Under 0.1 mm of clearance, the lid may bind once the wood moves.');
 
   // Where the halves meet, from each half's top: the shoulder round a lip,
@@ -2374,8 +2437,17 @@ function boxPlan(input) {
       if (u < 0) s = Math.min(s, rb - tip / 2 - 0.2);
       return s > 0.05 ? Math.floor(s * 100) / 100 : 0;
     };
+    var insetSaid = false;
     var add = function(h, t, u, z0, d, what) {
       if (!(d > 0)) return;
+      // An inset bottom's ring: its top is the board's underside as it's cut.
+      if (inset && h === 'base') {
+        if (!insetSaid) notes.push('Inset Bottom: the base\'s edges are left as they are, as its top is the board\'s underside while it\'s cut.');
+        insetSaid = true;
+        return;
+      }
+      // A plug lid has no inside: the lip has no inner edge.
+      if (plugLid && h === 'lid' && u < 0) return;
       if (ringIn(h, t, u) && (vbit ? reachAt(0, z0, d, 0) : tip + R) > t - tInside + 2 * rb - 0.3) {
         notes.push('Glued-On Bottom: the ring\'s ' + what + ' is left as it is, as the edge bit would reach its middle, held only by tabs.');
         return;
@@ -2403,7 +2475,7 @@ function boxPlan(input) {
     var stepW = tOpen - tInside, upStep = rabbetDepth + ed.pocket;
     var stepFits = !flush && ePk <= stepW - 0.3 && (vbit ? (slope && !part ? ePk : Math.min(upStep * tan, ed.diameter / 2) - slopeD * tan) : R) <= stepW - 0.3;
     if (stepFits) add(rabbetHalf, tInside, -1, tops[rabbetHalf] - rabbetDepth, ed.pocket, 'step\'s inner edge');
-    else if (ed.pocket > 0 && !flush) notes.push('Inside Rim: the step\'s inner edge in the ' + rabbetHalf + ' is left as it is, as the edge bit would cut the opening\'s wall above it. A narrower V-bit, a wider Lip Thickness or a lower Lip Height lets it be cut.');
+    else if (ed.pocket > 0 && !flush && !inset) notes.push('Inside Rim: the step\'s inner edge in the ' + rabbetHalf + ' is left as it is, as the edge bit would cut the opening\'s wall above it. A narrower V-bit, a wider Lip Thickness or a lower Lip Height lets it be cut.');
     // What each edge leaves: the rim between the outline and the widened
     // opening, the shoulder outside the lip, the lip itself.
     need(eOut + eRim <= -tRabbet - 0.5, 'Edges too big for the rim round the widened opening: make them smaller, or the wall thicker');
@@ -2457,7 +2529,7 @@ function boxPlan(input) {
     need(deep + tInside - rc > rb + 0.1, 'Corners: the inside is too small for the box\'s bit to clear the floor inside the rounded corners');
     // (A ring has no floor to round.)
     // (Nor a flat inside as wide as the opening: no wall under the lip.)
-    (bot ? ['lid'] : ['base', 'lid']).filter(function(h) { return !(flush && h === rabbetHalf); }).forEach(function(h) {
+    (bot ? ['lid'] : ['base', 'lid']).filter(function(h) { return !(flush && h === rabbetHalf) && !(plugLid && h === 'lid'); }).forEach(function(h) {
       var depth = height[h] - under[h] - (h === rabbetHalf ? rabbetDepth : 0);
       // In the half without the lip, the wall between its floor and the
       // step the lip sits on.
@@ -2481,7 +2553,12 @@ function boxPlan(input) {
   // A glued-on bottom on the same board: past the lid, the Gap from it.
   var onBoard = bot && !B.sep && !B.bottomOwn;
   // Oversize: its outline that much further out all round.
-  var extB = { minX: ext.minX - botOv, maxX: ext.maxX + botOv, minY: ext.minY - botOv, maxY: ext.maxY + botOv };
+  // An inset bottom's panel: the rabbet's outline the Clearance smaller
+  // (a heart's or drawing's half the bit more, as the plug), only cut out;
+  // its own reach, in from the box's.
+  var panelT = tR2 - o.clearance - (S.kind === 'outline' && !(oval && S.cr + tR2 >= rb - 1e-9) ? rb : 0);
+  var panelLoop = inset ? shapeLoop(SA, panelT) : null;
+  var extB = panelLoop ? loopExtent(panelLoop) : { minX: ext.minX - botOv, maxX: ext.maxX + botOv, minY: ext.minY - botOv, maxY: ext.maxY + botOv };
   var bottomAt = B.sep || !onBoard ? { x: 0, y: 0 } : o.layout === 'y' ? { x: 0, y: lid.y + extL.maxY + o.gap - extB.minY } : { x: lid.x + extL.maxX + o.gap - extB.minX, y: 0 };
   // Both halves' reach from the base's middle (one on its own board: its own).
   var all = B.sep ? (o.cut === 'lid' ? extL : o.cut === 'bottom' ? extB : ext) : { minX: Math.min(ext.minX, lid.x + extL.minX, onBoard ? bottomAt.x + extB.minX : Infinity),
@@ -2512,6 +2589,16 @@ function boxPlan(input) {
   }
   function inside(name) {
     var z0 = -faces[name], cuts = [], ring = bot && name === 'base';
+    // An inset bottom's ring: faced down if it's lower, the rabbet round
+    // its inside, then the inside (the lid's opening) cut through.
+    if (ring && inset) {
+      var wasteI = Math.max(2 * rb, reachOut[name] + 1);
+      if (faces[name] > 1e-9) cuts.push({ op: 'ring', shape: SA, tIn: tRabbet - 2 * rb, tOut: wasteI, dx: 0, dy: 0, z0: 0, depth: faces[name], what: 'faced down to the base height' });
+      cuts.push({ op: 'ring', shape: SA, tIn: tRabbet - 2 * rb, tOut: tR2, finishOut: fin, floor: fin, dx: 0, dy: 0, z0: z0, depth: rabD, what: 'rabbet for the inset bottom' });
+      cuts.push({ op: 'profile', side: 'in', shape: SA, t: tRabbet, dx: 0, dy: 0, z0: 0, depth: T + o.through, tabs: o.tabs, finish: fin, last: true,
+        what: 'inside (the lid\'s opening) cut through' + (o.tabs ? ', the middle held by tabs' : '') });
+      return cuts;
+    }
     // A ring's facing and opening steps all in to the same loop, the
     // innermost any step reaches (its middle is never pocketed down).
     var ringIn = !ring ? tInside : name !== rabbetHalf ? tInside
@@ -2537,7 +2624,7 @@ function boxPlan(input) {
     // A flat inside's the opening's pocket (a part slope's steps only go
     // round its wall: its middle cleared here, no coves without a wall).
     var inDepth = height[name] - under[name], flat = flush && name === rabbetHalf;
-    if (!ring && !(flat && openSteps.length === 1)) {
+    if (!ring && !(flat && openSteps.length === 1) && !(plugLid && name === 'lid')) {
       if (rc > 0 && !flat) {
         cuts.push({ op: 'pocket', t: tInside, dx: 0, dy: 0, z0: z0, depth: inDepth - rc, finish: fin, what: 'inside' });
         cuts.push({ op: 'pocket', t: tInside - rc, dx: 0, dy: 0, z0: z0 - (inDepth - rc), depth: rc, what: 'inside, its floor short of the corners' });
@@ -2568,6 +2655,7 @@ function boxPlan(input) {
   // glued) into the waste.
   var plugT = tInside - o.clearance - (S.kind === 'outline' && !(oval && S.cr + tInside >= rb - 1e-9) ? rb : 0);
   function bottomCuts() {
+    if (inset) return [];
     var waste = botOv + 2 * rb;
     if (SA === S) return [{ op: 'ring', tIn: plugT, tOut: waste, finish: fin, floor: fin, dx: 0, dy: 0, z0: 0, depth: botStep, what: 'step round the plug' }];
     return [{ op: 'ring', shape: SA, tIn: plugT, tOut: tInside + 2 * rb, finish: fin, floor: fin, dx: 0, dy: 0, z0: 0, depth: botStep, what: 'step round the plug' },
@@ -2578,8 +2666,8 @@ function boxPlan(input) {
       outline: { op: 'profile', t: 0, z0: -faces.base, depth: baseH + o.through, tabs: o.tabs, what: 'outline' } },
     { name: 'lid', label: 'lid', at: lid, height: lidH, cuts: inside('lid'), shape: SL, magnetAt: magnetsOf('lid'),
       outline: { op: 'profile', t: 0, z0: -faces.lid, depth: lidH + o.through, tabs: o.tabs, what: 'outline' } }
-  ].concat(bot ? [{ name: 'bottom', label: 'bottom', at: B.sep ? base : bottomAt, height: botH, cuts: bottomCuts(), shape: S, magnetAt: [],
-      outline: { op: 'profile', t: botOv, z0: 0, depth: botH + o.through, tabs: o.tabs, what: botOv ? 'outline, oversize' : 'outline' } }] : [])
+  ].concat(bot ? [{ name: 'bottom', label: inset ? 'inset bottom' : 'bottom', at: B.sep ? base : bottomAt, height: botH, cuts: bottomCuts(), shape: inset ? SA : S, magnetAt: [],
+      outline: { op: 'profile', t: inset ? panelT : botOv, z0: 0, depth: botH + o.through, tabs: o.tabs, what: inset ? 'panel\'s outline' : botOv ? 'outline, oversize' : 'outline' } }] : [])
     .filter(function(h) { return B.sep ? h.name === o.cut : h.name !== 'bottom' || onBoard; });
   // (Bottom Only without a bottom: nothing to cut, said.)
   var one = halves[0] || { name: 'base', at: base };
@@ -2592,10 +2680,14 @@ function boxPlan(input) {
       : { w: stockW, h: stockH, x0: shift.x + all.minX - m, y0: shift.y + all.minY - m, thick: T },
     // A glued-on bottom: the plug, how far it's in from the outline, the
     // step, where the ring sits on it (from its underside).
-    bottom: bot ? { t: plugT, shape: SA, step: botStep, height: botH, up: botH - botStep, own: !!B.bottomOwn, oversize: botOv } : null,
+    // An inset bottom: the panel's (t) in from the outline, the rabbet
+    // (from the ring's inside, tIn, out to tOut, depth deep) it's glued in.
+    bottom: bot ? { style: inset ? 'inset' : 'plug', t: inset ? panelT : plugT, shape: SA, step: botStep, height: botH, up: inset ? recess : botH - botStep, own: !!B.bottomOwn, oversize: botOv,
+      rabbet: inset ? { tIn: tRabbet, tOut: tR2, depth: rabD, width: rabW } : null, recess: recess } : null,
+    lidStyle: plugLid ? 'plug' : 'carved',
     // Each half's outside, to the seam; closed, the two.
     baseOut: B.baseOut, lidOut: B.lidOut, closedHeight: B.baseOut + B.lidOut,
-    insideHeight: (baseH - under.base - botStep) + (lidH - o.top) - lipUp
+    insideHeight: (baseH - under.base - botStep) + (plugLid ? 0 : lidH - o.top) - lipUp
   };
   // Each half knows its box (a nested set's halves come from several).
   halves.forEach(function(h) { Object.defineProperty(h, 'plan', { value: plan }); });
@@ -2625,10 +2717,14 @@ function shapeOf(o, mirror) {
 // half its opening's cut in is made as deep as it (lip): no step there.
 function boardsOf(o) {
   var sep = o.cut === 'base' || o.cut === 'lid' || o.cut === 'bottom', T = o.stock, lid = (o.cut === 'base' || o.cut === 'lid') && o.lidStock > 0 ? o.lidStock : T;
-  var bot = o.bottom ? (o.bottom.board > 0 ? o.bottom.board : T) : 0, botX = o.bottom ? bot - o.bottom.step : 0, onLid = o.lipOn === 'lid';
+  // (An inset bottom's panel is inside the ring: nothing under it.)
+  var inset = !!(o.bottom && o.bottom.style === 'inset');
+  var bot = o.bottom ? (o.bottom.board > 0 ? o.bottom.board : T) : 0, botX = o.bottom && !inset ? bot - o.bottom.step : 0, onLid = o.lipOn === 'lid';
   var openH = onLid ? (o.baseHeight > 0 ? o.baseHeight - botX : T) : (o.lidHeight > 0 ? o.lidHeight : lid);
   var room = openH - (onLid ? (o.bottom ? o.bottom.step : o.floor) : o.top), lip = o.lipHeight;
-  if (lip > room - 1 && lip !== room && room - o.clearance > 0.5) lip = room;
+  // (An inset bottom's ring has no step to meet: the lip stops short of the panel.)
+  // (Nor a plug lid's: raised to the floor, the plug would fill the base.)
+  if (!inset && o.lidStyle !== 'plug' && lip > room - 1 && lip !== room && room - o.clearance > 0.5) lip = room;
   var up = lip - o.clearance;
   var baseH = o.baseHeight > 0 ? o.baseHeight - botX + (onLid ? 0 : up) : T, lidH = o.lidHeight > 0 ? o.lidHeight + (onLid ? up : 0) : lid;
   return { sep: sep, base: T, lid: lid, baseH: baseH, lidH: lidH, lip: lip, lipFlush: lip !== o.lipHeight,
@@ -2639,7 +2735,18 @@ function boardsOf(o) {
 // The floor (or a glued-on bottom's board) and the top: what's between
 // the box's inside height and its outside.
 function down2(v) { return Math.floor(v * 100 + 1e-6) / 100; }
-function heightCaps(o) { return (o.bottom ? (o.bottom.board > 0 ? o.bottom.board : o.stock) : o.floor) + o.top; }
+// Under the inside: the floor, a bottom's board (an inset one's and its
+// Recess too). Over it: the top, or a plug lid's whole height.
+function capsUnder(o) {
+  var b = o.bottom;
+  return b ? (b.board > 0 ? b.board : o.stock) + (b.style === 'inset' && b.recess > 0 ? b.recess : 0) : o.floor;
+}
+function capsOver(o) {
+  if (o.lidStyle !== 'plug') return o.top;
+  var lid = (o.cut === 'base' || o.cut === 'lid') && o.lidStock > 0 ? o.lidStock : o.stock;
+  return o.lidHeight > 0 ? o.lidHeight + o.lipHeight - o.clearance : lid;
+}
+function heightCaps(o) { return capsUnder(o) + capsOver(o); }
 
 // The settings as a plan takes them, from the box's sizes as given.
 // measure 'inside': a round, rectangular or polygon box's sizes are its
@@ -2657,7 +2764,7 @@ function outsideInput(input) {
     if (!(o.lidHeight > 0)) o.lidHeight = boardsOf(Object.assign({}, o, { baseHeight: null })).lidOut;
     o.baseHeight = o.height + (inside ? heightCaps(o) : 0) - o.lidHeight;
     // Nothing left of the base above its floor (or the bottom's board).
-    o.baseLow = !(o.baseHeight > (o.bottom ? heightCaps(o) - o.top : o.floor));
+    o.baseLow = !(o.baseHeight > capsUnder(o));
   }
   return o;
 }
@@ -2677,7 +2784,7 @@ function testFitInput(input) {
   var fit = function(hf) {
     return Object.assign({}, o, {
       diameter: 2 * hf, length: k ? 2 * hf * o.length * k : 2 * hf, width: k ? 2 * hf * o.width * k : 2 * hf, flats: 2 * hf, cornerRadius: cr,
-      lidHeight: null, baseHeight: null, height: null, baseLow: false, magnets: null, notch: null, corners: null, cut: 'both', grain: false, bottom: null,
+      lidHeight: null, baseHeight: null, height: null, baseLow: false, magnets: null, notch: null, corners: null, cut: 'both', grain: false, bottom: null, lidStyle: null,
       edges: o.edges && o.edges.slope ? Object.assign({}, o.edges, { outside: 0, inside: 0, pocket: 0 }) : null,
       floor: Math.max(1, B.base - deep), top: Math.max(1, B.base - deep)
     });
@@ -2842,7 +2949,7 @@ function autoSizes(input, material, imperial) {
   var rect = o.shape === 'rect', poly = o.shape === 'poly', long = rect || o.shape === 'oval' || o.shape === 'heart' || o.shape === 'custom';
   var small = long ? Math.min(o.length, o.width) : poly ? o.flats : o.diameter;
   // Each half as high as set (not counting a lip), or its board.
-  var B = boardsOf(o), T = o.baseHeight > 0 ? B.baseOut - (o.bottom ? B.bottom - o.bottom.step : 0) : B.base, lidH = o.lidHeight > 0 ? B.lidOut : B.lid, b = o.bit;
+  var B = boardsOf(o), T = o.baseHeight > 0 ? B.baseOut - (o.bottom && o.bottom.style !== 'inset' ? B.bottom - o.bottom.step : 0) : B.base, lidH = o.lidHeight > 0 ? B.lidOut : B.lid, b = o.bit;
   // To the grid: the nearest step, or (up) the next one.
   var grid = function(v) { return imperial ? (v < 1 ? 0.127 : 25.4 / 32) : (v < 1 ? 0.05 : 0.5); };
   var half = function(v) { var g = grid(v); return Math.max(g, Math.round(v / g) * g); };
@@ -2852,7 +2959,11 @@ function autoSizes(input, material, imperial) {
   a.floor = half(clamp(T * 0.2, 2, 6));
   a.top = half(clamp(lidH * 0.2, 2, 6));
   a.wall = half(clamp(small * 0.08, 4, 15));
-  var depth = Math.min(T - a.floor, lidH - a.top);
+  // An inset bottom's ring: its inside above the panel; a plug lid: no
+  // inside of its own, the base's alone.
+  var ins = o.bottom && o.bottom.style === 'inset', rabW = ins && o.bottom.rabbet > 0 ? o.bottom.rabbet : 0;
+  var under0 = ins ? (o.bottom.board > 0 ? o.bottom.board : T) + (o.bottom.recess > 0 ? o.bottom.recess : 0) : a.floor;
+  var depth = o.lidStyle === 'plug' ? Math.min(T - under0, lidH - 2) : Math.min(T - under0, lidH - a.top);
   // In wood, a lip at least 1/4" high (when the box is deep enough), so
   // the lid sits firmly.
   var minLip = Math.min(WOOD[material] ? 6.35 : 2, Math.max(2, depth - 3));
@@ -2880,6 +2991,9 @@ function autoSizes(input, material, imperial) {
     // the wall grows), so the wall needn't be twice what they need.
     var down = function(v) { return Math.floor(v / grid(v) + 1e-9) * grid(v); };
     a.lipWidth = Math.max(grid(1), down(a.wall / 2));
+    // An inset bottom's ring is only the rim outside the opening: a thinner
+    // lip leaves it room for the rabbet (3 mm left outside it), down to 3 mm.
+    if (ins) a.lipWidth = Math.max(Math.min(3, a.lipWidth), Math.min(a.lipWidth, down(a.wall - a.clearance - rabW - 3)));
     if (a.magnets) a.lipWidth = Math.min(a.lipWidth, Math.max(6.35, down(a.wall - a.clearance - a.magnets.diameter - 1.6 - 0.05)));
     // A sloped lip as thick as its slant at the V-bit's angle, and 1 mm more at its top.
     if (slope) a.lipWidth = Math.max(a.lipWidth, upHalf(Math.min(a.lipHeight - a.clearance, a.edges.slopeHeight > 0 ? a.edges.slopeHeight : Infinity) * slant + (a.edges.pocket || 0) * slant + 1.05));
@@ -3351,8 +3465,13 @@ function boxProgram(plan, f, only) {
   if (plan.set) plan.set.forEach(function(p, i) {
     comment('Box ' + (i + 1) + ': ' + boxSize(p, mm3, unit) + ', ' + n3(p.closedHeight) + unit + ' closed, ' + n3(p.insideHeight) + unit + ' inside');
   });
-  comment('Wall ' + mm3(o.wall) + ', ' + (plan.bottom ? 'no floor (the bottom glued on)' : 'floor ' + mm3(o.floor)) + ', top ' + mm3(o.top) + unit);
-  if (plan.bottom) comment('Bottom ' + mm3(plan.bottom.height) + unit + ' thick, stepped down ' + mm3(plan.bottom.step) + unit + ' round a plug that fits in the ring');
+  var inset = plan.bottom && plan.bottom.style === 'inset', plugLid = plan.lidStyle === 'plug';
+  comment('Wall ' + mm3(o.wall) + ', ' + (inset ? 'no floor (an inset bottom)' : plan.bottom ? 'no floor (the bottom glued on)' : 'floor ' + mm3(o.floor)) + ', ' + (plugLid ? 'a plug lid (solid)' : 'top ' + mm3(o.top)) + unit);
+  if (inset) {
+    comment('Inset bottom: a panel ' + mm3(plan.bottom.height) + unit + ' thick, glued into a rabbet');
+    comment(mm3(plan.bottom.rabbet.width) + unit + ' wide, ' + mm3(plan.bottom.rabbet.depth) + unit + ' deep round the ring: turn the ring over,');
+    comment('rabbet down, and the panel goes in from below' + (plan.bottom.recess > 0 ? ', ' + mm3(plan.bottom.recess) + unit + ' up' : ''));
+  } else if (plan.bottom) comment('Bottom ' + mm3(plan.bottom.height) + unit + ' thick, stepped down ' + mm3(plan.bottom.step) + unit + ' round a plug that fits in the ring');
   if (plan.bottom && plan.bottom.oversize > 0) comment('Bottom ' + mm3(plan.bottom.oversize) + unit + ' oversize all round: trim it flush once glued');
   comment('Lip on the ' + o.lipOn + ': ' + mm3(plan.lipUp) + ' high, ' + mm3(o.lipWidth) + (plan.slope ? ' wide at its foot, its side sloped, ' : ' wide, ') + mm3(o.clearance) + unit + ' clearance');
   if (!plan.set) ['base', 'lid'].forEach(function(h) {
@@ -3510,6 +3629,7 @@ if (typeof module !== 'undefined' && module.exports) {
     ['cb-mag-n', 'magCount', 'count', 4], ['cb-mag-d', 'magDiameter', 'length', 5], ['cb-mag-depth', 'magDepth', 'length', 3.2],
     ['cb-notch-w', 'notchWidth', 'length', 16], ['cb-notch-d', 'notchDepth', 'length', 4], ['cb-notch-n', 'notchCount', 'count', 2], ['cb-notch-a', 'notchAngle', 'count', 0],
     ['cb-bot-t', 'bottomBoard', 'length', null, true], ['cb-bot-step', 'bottomStep', 'length', 2], ['cb-bot-over', 'bottomOversize', 'length', 0],
+    ['cb-bot-rab', 'bottomRabbet', 'length', 4], ['cb-bot-rec', 'bottomRecess', 'length', 0.5],
     ['cb-bit', 'bit', 'length', 3.175], ['cb-feed', 'feed', 'feed', 1500], ['cb-plunge', 'plunge', 'feed', 400],
     ['cb-doc', 'doc', 'length', 1.5], ['cb-stepover', 'stepoverPct', 'count', 40], ['cb-rpm', 'rpm', 'count', 18000],
     ['cb-delay', 'delay', 'count', 2],
@@ -3586,7 +3706,8 @@ if (typeof module !== 'undefined' && module.exports) {
     ['cb-notch-n', function (x) { return x >= 1 && x <= 4 && x === Math.round(x); }, 'must be 1, 2, 3 or 4'],
     ['cb-cfeed', function (x) { return x >= 25; }, 'must be at least 25 mm/min (1 in/min)'], ['cb-crpm', function (x) { return x >= 0; }, 'can\u2019t be negative'], ['cb-erpm', function (x) { return x >= 0; }, 'can\u2019t be negative']
   ];
-  var SEGS = [['cb-ebit', 'edgeBit', 'v'], ['cb-shape', 'shape', 'circle'], ['cb-measure', 'measure', 'outside'], ['cb-lip-on', 'lipOn', 'base'], ['cb-layout', 'layout', 'x'], ['cb-origin', 'origin', 'front-left'], ['cb-cut', 'cut', 'both']];
+  var SEGS = [['cb-ebit', 'edgeBit', 'v'], ['cb-shape', 'shape', 'circle'], ['cb-measure', 'measure', 'outside'], ['cb-lip-on', 'lipOn', 'base'], ['cb-layout', 'layout', 'x'], ['cb-origin', 'origin', 'front-left'], ['cb-cut', 'cut', 'both'],
+    ['cb-lid-style', 'lidStyle', 'carved'], ['cb-bot-style', 'bottomStyle', 'plug']];
   var K = function () { return state.imperial ? 25.4 : 1; };
   var round = function (v, dp) { var k = Math.pow(10, dp == null ? (state.imperial ? 4 : 3) : dp); return Math.round(v * k) / k; };
 
@@ -3612,6 +3733,8 @@ if (typeof module !== 'undefined' && module.exports) {
       .concat(seg('cb-ebit') === 'round' ? ['cb-eangle', 'cb-ediam', 'cb-evtip'] : ['cb-erad', 'cb-etip'])
       .concat(seg('cb-cut') === 'both' || seg('cb-cut') === 'bottom' || $('cb-nest-on').checked ? ['cb-lid-stock'] : [])
       .concat($('cb-bot-on').checked && !$('cb-nest-on').checked ? ['cb-floor'] : [])
+      .concat(seg('cb-bot-style') === 'inset' ? ['cb-bot-step', 'cb-bot-over'] : ['cb-bot-rab', 'cb-bot-rec'])
+      .concat(seg('cb-lid-style') === 'plug' ? ['cb-top-t'] : [])
       .concat(seg('cb-ebit') !== 'round' && $('cb-slope').checked ? ['cb-ein'] : ['cb-eslope']);
     var off = function (id) {
       return unused.indexOf(id) >= 0 || GROUPS.some(function (g) { return !$(g[1]).checked && $(g[0]).contains($(id)); });
@@ -3652,7 +3775,7 @@ if (typeof module !== 'undefined' && module.exports) {
   // measured.
   function fullOut(v) {
     var o = { stock: v.stock, lidStock: v.lidStock, cut: v.nestOn ? 'both' : v.cut, lipOn: v.lipOn, lipHeight: v.lipHeight, clearance: v.clearance, floor: v.floor, top: v.top,
-      bottom: v.botOn && !v.nestOn ? { board: v.bottomBoard, step: v.bottomStep } : null, baseHeight: null, lidHeight: null };
+      bottom: v.botOn && !v.nestOn ? bottomOf(v) : null, lidStyle: v.lidStyle === 'plug' ? 'plug' : null, baseHeight: null, lidHeight: null };
     var B = boardsOf(o), lid = v.lidHeight > 0 && state.lidOwn ? v.lidHeight : B.lidOut;
     return { height: B.baseOut + lid - (v.measure === 'inside' ? heightCaps(o) : 0), lid: B.lidOut };
   }
@@ -3689,8 +3812,13 @@ if (typeof module !== 'undefined' && module.exports) {
       corners: v.cornersOn ? { diameter: v.cornerDiameter, radius: v.cornerBitRadius } : null,
       finish: v.finishAllow, finishDir: v.finishDir,
       cut: v.nestOn ? 'both' : v.cut, lidStock: v.lidStock, grain: (v.cut === 'base' || v.cut === 'lid') && v.grain,
-      bottom: v.botOn && !v.nestOn ? { board: v.bottomBoard, step: v.bottomStep, oversize: v.bottomOversize } : null
+      bottom: v.botOn && !v.nestOn ? bottomOf(v) : null, lidStyle: v.lidStyle === 'plug' ? 'plug' : null
     });
+  }
+  // A glued-on bottom: on a plug, or inset into a rabbet from below.
+  function bottomOf(v) {
+    return v.bottomStyle === 'inset' ? { board: v.bottomBoard, step: v.bottomStep, style: 'inset', rabbet: v.bottomRabbet, recess: v.bottomRecess }
+      : { board: v.bottomBoard, step: v.bottomStep, oversize: v.bottomOversize };
   }
   // The edge bit's feeds; its T number when the program can change to it.
   function edgeFeeds(v) {
@@ -3736,7 +3864,9 @@ if (typeof module !== 'undefined' && module.exports) {
       var plan = h.plan, o = plan.o, rb = o.bit / 2, S = h.shape || plan.shape;
       var path = function (cls, t, cx, cy) { return '<path class="' + cls + '" d="' + shapePath(S, t, cx, cy, s) + '"/>'; };
       // A glued-on bottom's Oversize: its outline that much further out.
-      var ov = h.name === 'bottom' && plan.bottom ? plan.bottom.oversize : 0;
+      // An inset bottom's panel: in from it.
+      var ins = !!(plan.bottom && plan.bottom.style === 'inset');
+      var ov = h.name === 'bottom' && plan.bottom ? (ins ? plan.bottom.t : plan.bottom.oversize) : 0;
       var tabLoop = shapeLoop(S, ov + rb);
       var cx = X(h.at.x), cy = Y(h.at.y), withLip = (o.lipOn === 'lid') === (h.name === 'lid');
       // A tab every share of the way round a loop, across it.
@@ -3753,6 +3883,12 @@ if (typeof module !== 'undefined' && module.exports) {
       out += path('cb-cut', ov + o.bit, cx, cy) + path('cb-wood', ov, cx, cy);
       // A glued-on bottom: the step round its edge (lower), the plug; the
       // box's outline on it, where it's trimmed flush to.
+      if (h.name === 'bottom' && ins) {
+        if (o.tabs) out += tabsOn(tabLoop);
+        var fsP = Math.min(4, Math.max(1.6, 2 * plan.halfX * s / 6));
+        out += '<text class="cb-label" data-field="cb-bot-t" style="font-size:' + fsP.toFixed(2) + 'px" x="' + cx + '" y="' + (cy + fsP * 0.35) + '">Bottom</text>';
+        return;
+      }
       if (h.name === 'bottom') {
         out += path('cb-wood-dark', ov, cx, cy) + (ov > 0 ? '<path class="cb-trim" d="' + shapePath(S, 0, cx, cy, s) + '"/>' : '') + '<path class="cb-wood" d="' + shapePath(plan.bottom.shape, plan.bottom.t, cx, cy, s) + '"/>';
         if (o.tabs) out += tabsOn(tabLoop);
@@ -3761,8 +3897,11 @@ if (typeof module !== 'undefined' && module.exports) {
         return;
       }
       if (withLip) out += path('cb-wood-dark', 0, cx, cy) + path('cb-wood', plan.tLip, cx, cy);
+      // An inset bottom's ring: the rabbet round its inside, cut down.
+      else if (ins && h.name === 'base') out += '<path class="cb-wood-dark" d="' + shapePath(plan.bottom.shape, plan.bottom.rabbet.tOut, cx, cy, s) + '"/>';
       else out += path('cb-wood-dark', plan.tRabbet, cx, cy);
-      out += path('cb-cut', plan.tInside, cx, cy);
+      if (ins && h.name === 'base') out += '<path class="cb-cut" d="' + shapePath(plan.bottom.shape, plan.bottom.rabbet.tIn, cx, cy, s) + '"/>';
+      else if (!(plan.lidStyle === 'plug' && h.name === 'lid')) out += path('cb-cut', plan.tInside, cx, cy);
       // Rounded floor corners: a band as wide as the cove.
       plan.corners[h.name].forEach(function (k) {
         out += '<path class="cb-edge" stroke-width="' + Math.max(0.4, o.corners.radius * s).toFixed(2) + '" d="' + shapePath(k.shape, plan.tInside - o.corners.radius / 2, cx, cy, s) + '"/>';
@@ -3777,7 +3916,7 @@ if (typeof module !== 'undefined' && module.exports) {
       if (h.name === 'base') (plan.notches || []).forEach(function (n) { out += '<circle class="cb-cut" cx="' + (cx + n.dx * s).toFixed(2) + '" cy="' + (cy - n.dy * s).toFixed(2) + '" r="' + (n.shape.r * s).toFixed(2) + '"/>'; });
       if (o.tabs) out += tabsOn(tabLoop);
       // A ring's inside, cut through: its tabs too.
-      if (o.tabs && plan.bottom && h.name === 'base') out += tabsOn(shapeLoop(plan.bottom.shape, plan.tInside - rb));
+      if (o.tabs && plan.bottom && h.name === 'base') out += tabsOn(shapeLoop(plan.bottom.shape, (ins ? plan.bottom.rabbet.tIn : plan.tInside) - rb));
       var fs = Math.min(4, Math.max(1.6, 2 * plan.halfX * s / 6));
       out += '<text class="cb-label" data-field="' + (o.shape === 'circle' ? 'cb-diameter' : o.shape === 'poly' ? 'cb-flats' : 'cb-length') + '" style="font-size:' + fs.toFixed(2) + 'px" x="' + cx + '" y="' + (cy + fs * 0.35) + '">' + (/^box/.test(h.label) ? h.label.replace(/^box (\d+) (\w)\w*/, function (m0, n, c) { return n + c.toUpperCase(); }) : h.name === 'base' ? (plan.bottom ? 'Ring' : 'Base') : 'Lid') + '</text>';
     });
@@ -3825,7 +3964,8 @@ if (typeof module !== 'undefined' && module.exports) {
     var lipBase = o.lipOn !== 'lid';
     // A glued-on bottom: the ring and the lid drawn up on it by where the
     // ring sits (b0), the ring with no floor of its own.
-    var bt = plan.bottom, b0 = bt ? bt.up : 0;
+    // An inset bottom: the ring stands on the table, the panel up in its rabbet.
+    var bt = plan.bottom, ins = !!(bt && bt.style === 'inset'), b0 = bt && !ins ? bt.up : 0, plugL = plan.lidStyle === 'plug';
     // One wall's section, x from inner to outer (a side: +1 right, -1 left).
     // A corner [x, y, edge] is chamfered or rounded over as the edge says.
     function poly(pts, cls) {
@@ -3887,12 +4027,19 @@ if (typeof module !== 'undefined' && module.exports) {
       } else {
         // Lip on the lid: the base's opening is widened; the lid's lip hangs down into it.
         var rabB = Ri + o.lipWidth + c, rimB = T, oB = Math.min(openTo(rabB), T - (bt ? bt.height - bt.up : o.floor));
-        out += poly(foot(side, [[f(Ri), o.floor, flB && cove(T - oB - o.floor)], [f(Ri), T - oB, oB < up + c ? null : eStep], [f(rabB - (oB - st) * sl), T - oB]].concat(bendO ? [[f(rabB), T - st]] : []).concat([[f(rabB), T, eOpen], [f(R), T, eSeamR], [f(R), 0], [0, 0], [0, o.floor]])), 'cb-wood');
+        // An inset bottom's ring: its inside the opening all the way down,
+        // the rabbet round its foot (cut with the ring upside down).
+        if (ins) out += poly([[f(R + bt.rabbet.tIn), bt.rabbet.depth], [f(R + bt.rabbet.tIn), T], [f(R), T], [f(R), 0], [f(R + bt.rabbet.tOut), 0], [f(R + bt.rabbet.tOut), bt.rabbet.depth]], 'cb-wood');
+        else out += poly(foot(side, [[f(Ri), o.floor, flB && cove(T - oB - o.floor)], [f(Ri), T - oB, oB < up + c ? null : eStep], [f(rabB - (oB - st) * sl), T - oB]].concat(bendO ? [[f(rabB), T - st]] : []).concat([[f(rabB), T, eOpen], [f(R), T, eSeamR], [f(R), 0], [0, 0], [0, o.floor]])), 'cb-wood');
         var top2 = T + LH - up;
-        out += poly([[f(Ri), top2 - o.top, fl], [f(Ri), rimB - lipUpTo, lipUpTo < up ? null : eLipIn], [f(lipTopX), rimB - lipUpTo, eLipOut]].concat(bendL ? [[f(Ri + o.lipWidth), rimB - st]] : []).concat([[f(Ri + o.lipWidth), rimB], [f(R), rimB, eSeamL], [f(R), top2], [0, top2], [0, top2 - o.top]]), 'cb-wood-dark');
+        // A plug lid: solid, its lip a plug under the top.
+        out += poly((plugL ? [[0, rimB - lipUpTo], [f(lipTopX), rimB - lipUpTo, eLipOut]] : [[f(Ri), top2 - o.top, fl], [f(Ri), rimB - lipUpTo, lipUpTo < up ? null : eLipIn], [f(lipTopX), rimB - lipUpTo, eLipOut]])
+          .concat(bendL ? [[f(Ri + o.lipWidth), rimB - st]] : []).concat([[f(Ri + o.lipWidth), rimB], [f(R), rimB, eSeamL], [f(R), top2], [0, top2]]).concat(plugL ? [] : [[0, top2 - o.top]]), 'cb-wood-dark');
       }
       // The bottom: the step round its edge, the plug up inside the ring.
-      if (bt) {
+      // An inset bottom's panel, up in the rabbet by its Recess.
+      if (ins) out += poly([[0, bt.recess], [f(R + bt.t), bt.recess], [f(R + bt.t), bt.recess + bt.height], [0, bt.recess + bt.height]], 'cb-wood-dark');
+      else if (bt) {
         var px0 = R + bt.t, b1 = b0;
         b0 = 0;
         out += poly([[0, 0], [f(R + bt.oversize), 0], [f(R + bt.oversize), bt.up], [f(px0), bt.up], [f(px0), bt.height], [0, bt.height]], 'cb-wood-dark');
@@ -3905,20 +4052,22 @@ if (typeof module !== 'undefined' && module.exports) {
     var xr = X(R) + 3;
     out += '<line class="cb-dim-line" x1="' + xr + '" y1="' + Y(0) + '" x2="' + xr + '" y2="' + Y(hTot) + '"/>' +
       '<text class="cb-dim" x="' + (xr + 1) + '" y="' + ((Y(0) + Y(hTot)) / 2) + '" transform="rotate(-90 ' + (xr + 1) + ' ' + ((Y(0) + Y(hTot)) / 2) + ')" dy="-1">' + fmt(plan.closedHeight) + ' ' + unit() + ' closed</text>';
-    var floorY = P0.bottom ? P0.bottom.height : o.floor;
-    if (boxes.length === 1) out += '<text class="cb-dim" x="' + X(0) + '" y="' + ((Y(floorY) + Y(hTot - o.top)) / 2 + 2) + '">' + fmt(plan.insideHeight) + ' ' + unit() + ' inside</text>';
+    var floorY = P0.bottom ? (P0.bottom.style === 'inset' ? P0.bottom.rabbet.depth : P0.bottom.height) : o.floor;
+    // (A plug lid's inside ends at the plug's underside.)
+    var insideTop = P0.lidStyle === 'plug' ? (P0.bottom && P0.bottom.style !== 'inset' ? P0.bottom.up : 0) + P0.baseHeight - P0.lipUp : hTot - o.top;
+    if (boxes.length === 1) out += '<text class="cb-dim" x="' + X(0) + '" y="' + ((Y(floorY) + Y(insideTop)) / 2 + 2) + '">' + fmt(plan.insideHeight) + ' ' + unit() + ' inside</text>';
     out += '<text class="cb-dim" x="' + X(0) + '" y="' + (Y(0) + 4.5) + '">' + (plan.shape.kind === 'rect' ? fmt(o.length) + ' × ' + fmt(o.width) : plan.shape.kind === 'poly' ? plan.shape.n + ' sides, ' + fmt(o.flats) : o.shape === 'oval' ? 'oval ' + fmt(o.length) + ' × ' + fmt(o.width) : o.shape === 'heart' ? 'heart ' + fmt(o.length) + ' × ' + fmt(o.width) : o.shape === 'custom' ? 'drawing ' + fmt(o.length) + ' × ' + fmt(o.width) : 'Ø ' + fmt(o.diameter)) + ' ' + unit() + ' · lip on the ' + o.lipOn + '</text>';
     // The sizes, labelled down the left, each pointing at its part of the
     // left wall: a tap on one goes to its field.
-    var BT = P0.bottom, B0 = BT ? BT.up : 0;
+    var BT = P0.bottom, BI = !!(BT && BT.style === 'inset'), B0 = BT && !BI ? BT.up : 0;
     var Ri = R + P0.tInside, lw = o.lipWidth, c = Math.max(o.clearance, 0.4), lipTop = B0 + P0.baseHeight, lipBot = lipTop - P0.lipUp;
-    var tags = [
-      ['cb-top-t', 'Lid Top', -R * 0.4, hTot - o.top / 2],
+    var tags = (P0.lidStyle === 'plug' ? [] : [['cb-top-t', 'Lid Top', -R * 0.4, hTot - o.top / 2]]).concat([
       ['cb-lip-h', 'Lip Height', -(Ri + lw / 2), lipTop - o.lipHeight * 0.2],
       ['cb-lip-w', 'Lip Thickness', -(Ri + lw / 2), lipTop - o.lipHeight * 0.6],
       ['cb-clear', 'Clearance', -(Ri + lw + c / 2), lipBot + o.lipHeight * 0.5],
       ['cb-wall', 'Wall', -(Ri + R) / 2, B0 + (lipBot - B0) * 0.45]
-    ].concat(BT ? [['cb-bot-t', 'Bottom Board', -R * 0.4, BT.height / 2], ['cb-bot-step', 'Locating Step', -(R + (R + BT.t)) / 2, BT.up + BT.step / 2]] : [['cb-floor', 'Base Floor', -R * 0.4, o.floor / 2]]);
+    ]).concat(BI ? [['cb-bot-t', 'Bottom Board', -R * 0.4, BT.recess + BT.height / 2], ['cb-bot-rab', 'Rabbet', -(R + (R + BT.rabbet.tOut)) / 2, BT.rabbet.depth / 2]]
+      : BT ? [['cb-bot-t', 'Bottom Board', -R * 0.4, BT.height / 2], ['cb-bot-step', 'Locating Step', -(R + (R + BT.t)) / 2, BT.up + BT.step / 2]] : [['cb-floor', 'Base Floor', -R * 0.4, o.floor / 2]]);
     // The edges and floor corners, where they're cut: the seam at the
     // outside, the lead-in or slope on the lip's outside, the Inside Rim
     // on its inside, the cove at the base's floor.
@@ -4190,6 +4339,16 @@ if (typeof module !== 'undefined' && module.exports) {
     $('cb-sep-fields').hidden = !sep;
     // A glued-on bottom: no floor of the base's own, and its own Cut choice.
     $('cb-floor').closest('.cb-field').hidden = v.botOn && !v.nestOn;
+    // A plug lid has no Lid Top; an inset bottom no step or oversize, a plug one no rabbet.
+    $('cb-top-t').closest('.cb-field').hidden = v.lidStyle === 'plug';
+    var inset = v.bottomStyle === 'inset';
+    // An inset bottom's panel needs its own board's thickness.
+    $('cb-bot-t').placeholder = inset ? 'the panel' : '= stock';
+    ['cb-bot-step', 'cb-bot-over'].forEach(function (id) { $(id).closest('.cb-field').hidden = inset; });
+    ['cb-bot-rab', 'cb-bot-rec'].forEach(function (id) { $(id).closest('.cb-field').hidden = !inset; });
+    $('cb-bot-hint').textContent = inset
+      ? 'The base is a ring, its inside (the lid\u2019s opening) cut out through, with a rabbet round it on the face that\u2019s up. Turn the ring over: the rabbet is underneath, and a flat panel (cut with Bottom Only from the Bottom Board) is glued into it from below, out of sight. The lip goes on the lid; magnets and finger notches aren\u2019t for it.'
+      : 'Quicker for a big box: the base is a ring, its inside cut out through instead of pocketed, and glued onto a bottom. A step round the bottom\u2019s edge leaves a plug that fits inside the ring and lines it up while the glue sets. Oversize leaves the bottom a little bigger, to trim flush once it\u2019s glued.';
     // A nested set's first box is the stock's height.
     $('cb-height').closest('.cb-field').hidden = v.nestOn;
     var across = /^(circle|rect|poly)$/.test(v.shape) && v.measure === 'inside';
@@ -4436,7 +4595,7 @@ if (typeof module !== 'undefined' && module.exports) {
   // A preset sets the box and its options (Auto Sizes fills in the rest
   // for your stock, bit and material); saved settings bring back all.
   var PRESET_BASE = { autoSizes: true, lipOn: 'base', cut: 'both', grain: false, nestOn: false, tabsOn: true, magOn: false, notchOn: false, edgesOn: false, slope: false, cornersOn: false, botOn: false, measure: 'outside', height: null, lidHeight: null,
-    notchCount: 1, notchAngle: 0, slopeHeight: null, bottomBoard: null, bottomStep: null, bottomOversize: null };
+    notchCount: 1, notchAngle: 0, slopeHeight: null, bottomBoard: null, bottomStep: null, bottomOversize: null, lidStyle: 'carved', bottomStyle: 'plug', bottomRabbet: null, bottomRecess: null };
   // Each shows off an option or two.
   var PRESETS = [
     { name: 'Ring box, round 2", finger notch', v: { shape: 'circle', diameter: 50.8, notchOn: true } },
@@ -4611,6 +4770,8 @@ if (typeof module !== 'undefined' && module.exports) {
       ROOT.querySelectorAll('#' + s[0] + ' button').forEach(function (b) {
         b.addEventListener('click', function () {
           if (s[0] === 'cb-measure') remeasure(b.dataset.v);
+          // An inset bottom and a plug lid both need the lip on the lid.
+          if ((s[0] === 'cb-bot-style' && b.dataset.v === 'inset') || (s[0] === 'cb-lid-style' && b.dataset.v === 'plug')) setSeg('cb-lip-on', 'lid');
           if (s[0] === 'cb-shape') reshape(b.dataset.v);
           ROOT.querySelectorAll('#' + s[0] + ' button').forEach(function (x) { var on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-checked', String(on)); });
           if (s[0] === 'cb-shape') {

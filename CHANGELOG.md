@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Inset bottom**, a second kind of Glued-On Bottom: the ring's inside is the lid's opening, cut through, with a rabbet round it on the face that's up. Turned over, a flat panel from the Bottom Board is glued into the rabbet from below, out of sight: no joint shows from the outside. **Rabbet Width** and **Recess** (the panel a little up inside, so the box doesn't rock). The lip goes on the lid; no magnets, notches or sloped lip in the ring.
+- **Plug lid:** the lid left solid, its lip a plug under a flat top, quicker and from a thinner board. With an inset bottom, both are flat panels.
+
 - **Measure: Outside or Inside.** Inside, a round, rectangular or polygon box's sizes are what it holds, and the Height its inside; the outside follows from the wall, floor and top. Switching shows the same box the other way; the program's header gives the inside size too.
 - **Height** in place of Base Height: the box closed. The **Lid Height** is its share, from the top to the seam where the halves meet; the base is the rest. The lip stands above the seam, from the same board. Settings saved before this come back as the same box, measured the new way.
 - An empty Height or Lid Height shows how high the boards allow; one typed as that follows the stock when it changes, as an empty one does.
