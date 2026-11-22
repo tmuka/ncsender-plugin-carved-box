@@ -64,7 +64,7 @@ function allowed(set, half, p) {
   // A drop-in lid's panel: only its outline, cut through.
   if (plan.drop && half.name === 'lid') return at(half.outline.t + rb) >= -eps && d <= half.outline.depth + eps;
   // A bottom's outline: an inset panel's in from the box's.
-  if (at(rb + (half.name === 'bottom' ? (inset ? plan.bottom.t : plan.bottom.oversize) : 0)) >= -eps) return d <= half.outline.depth + eps;
+  if (at(rb + (half.name === 'bottom' ? (inset ? plan.bottom.part.t : plan.bottom.oversize) : 0)) >= -eps) return d <= half.outline.depth + eps;
   // An inset bottom's panel: nothing cut inside its outline.
   if (half.name === 'bottom' && inset) return false;
   // An inset bottom's ring: its middle cut through, the rabbet round it.
@@ -75,7 +75,7 @@ function allowed(set, half, p) {
   }
   // A glued-on bottom: the step round its plug; a ring's middle, cut out
   // through from the stock's top.
-  if (half.name === 'bottom') return -p.z <= plan.bottom.step + eps && (shapeDistance(plan.bottom.shape, plan.bottom.t + rb, px, py) >= -eps || clearOfPlug(plan, px, py, rb - 0.03));
+  if (half.name === 'bottom') return -p.z <= plan.bottom.step + eps && (shapeDistance(plan.bottom.part.shape, plan.bottom.part.t + rb, px, py) >= -eps || clearOfPlug(plan, px, py, rb - 0.03));
   if (plan.bottom && half.name === 'base' && shapeDistance(plan.bottom.shape, plan.tInside - rb, px, py) <= eps) return -p.z <= o.stock + o.through + eps;
   const withLip = (o.lipOn === 'lid') === (half.name === 'lid');
   const floor = half.height - (half.name === 'lid' ? o.top : o.floor), meet = withLip ? plan.lipUp : 0;
@@ -103,11 +103,11 @@ function allowed(set, half, p) {
 const plugEdges = new WeakMap();
 function clearOfPlug(plan, x, y, r) {
   if (!plugEdges.has(plan)) {
-    const loop = shapeLoop(plan.bottom.shape, plan.bottom.t), len = loopLength(loop), pts = [];
+    const loop = shapeLoop(plan.bottom.part.shape, plan.bottom.part.t), len = loopLength(loop), pts = [];
     for (let k = 0; k < 4000; k++) pts.push(loopPoint(loop, len * k / 4000));
     plugEdges.set(plan, pts);
   }
-  return shapeDistance(plan.bottom.shape, plan.bottom.t, x, y) > 0 && plugEdges.get(plan).every((q) => Math.hypot(q.x - x, q.y - y) >= r);
+  return shapeDistance(plan.bottom.part.shape, plan.bottom.part.t, x, y) > 0 && plugEdges.get(plan).every((q) => Math.hypot(q.x - x, q.y - y) >= r);
 }
 
 function check(input, extra) {
@@ -1332,7 +1332,7 @@ test('a glued-on bottom: the base a ring cut through, the bottom stepped round a
     assert.ok(pts.some((p) => Math.abs(p.z + plan.o.stock + plan.o.through) < 1e-6 && shapeDistance(plan.bottom.shape, plan.tInside - rb, p.x - base.at.x, p.y - base.at.y) > -0.05 && shapeDistance(plan.bottom.shape, plan.tInside - rb, p.x - base.at.x, p.y - base.at.y) < 0.05), 'the ring\'s inside goes through');
     // The plug: every point of it inside the hole the bit cuts (its path
     // round, the bit's radius out), the Clearance in from it.
-    const plug = shapeLoop(plan.bottom.shape, plan.bottom.t), len = loopLength(plug);
+    const plug = shapeLoop(plan.bottom.part.shape, plan.bottom.part.t), len = loopLength(plug);
     const cutPath = shapeLoop(through.shape, through.t - rb), cutLen = loopLength(cutPath), along = [];
     for (let k = 0; k < 2000; k++) along.push(loopPoint(cutPath, cutLen * k / 2000));
     for (const sg of cutPath) along.push(sg.type === 'line' ? { x: sg.x0, y: sg.y0 } : { x: sg.cx + sg.r * Math.cos(sg.a0), y: sg.cy + sg.r * Math.sin(sg.a0) });
@@ -1440,7 +1440,7 @@ test('an inset bottom: the ring\'s inside the opening, cut through, a rabbet rou
     assert.ok(through.op === 'profile' && through.side === 'in' && Math.abs(through.t - plan.tRabbet) < 1e-9 && through.tabs);
     assert.ok(pts.some((p) => Math.abs(p.z + plan.o.stock + plan.o.through) < 1e-6 && Math.abs(shapeDistance(plan.bottom.shape, r.tIn - rb, p.x - base.at.x, p.y - base.at.y)) < 0.05));
     // The panel fits the rabbet: inside it, the Clearance in all round.
-    const panel = shapeLoop(plan.bottom.shape, plan.bottom.t), pl = loopLength(panel);
+    const panel = shapeLoop(plan.bottom.part.shape, plan.bottom.part.t), pl = loopLength(panel);
     for (let k = 0; k < 120; k++) {
       const q = loopPoint(panel, pl * k / 120);
       assert.ok(shapeDistance(plan.bottom.shape, r.tOut, q.x, q.y) <= -plan.o.clearance + 0.03, 'the panel outside the rabbet at ' + JSON.stringify(q));
@@ -1466,7 +1466,7 @@ test('an inset bottom: the ring\'s inside the opening, cut through, a rabbet rou
   const only = check({ lipOn: 'lid', wall: 12, lipWidth: 3, stock: 25.4, bottom: { board: 6.35, step: 2, style: 'inset', rabbet: 4, recess: 0.5 }, cut: 'bottom' });
   assert.deepEqual(only.plan.halves.map((h) => h.name), ['bottom']);
   assert.deepEqual(only.plan.halves[0].cuts, []);
-  assert.ok(Math.abs(only.plan.halves[0].outline.t - only.plan.bottom.t) < 1e-9);
+  assert.ok(Math.abs(only.plan.halves[0].outline.t - only.plan.bottom.part.t) < 1e-9);
 });
 
 test('an inset bottom says what it can\'t do: the lip on the base, magnets, notches, a sloped lip, a thin wall, a deep lip', () => {
@@ -1549,3 +1549,31 @@ test('a drop-in lid: a panel from the Bottom Board flush in a rabbet round the r
   assert.deepEqual(a.problems, []);
 });
 function o(plan) { return plan.o; }
+
+test('a heart\'s, oval\'s or drawing\'s plug and panels follow the ring as cut: the Clearance along the walls, not half the bit more', () => {
+  const pts = [-60, -70, 60, -70, 75, 40, 40, 40, 40, 70, -40, 70, -40, 40, -75, 40];
+  const shapes = [{ shape: 'heart', length: 160, width: 150, cornerRadius: 20 }, { shape: 'oval', length: 200, width: 100 },
+    { shape: 'custom', outline: { pts, w: 150, h: 140, sized: true }, length: 150, width: 140, cornerRadius: 12 }];
+  for (const sh of shapes) for (const kind of ['plug', 'inset', 'drop']) {
+    const input = Object.assign({ stock: 19, bit: 6.35, wall: 12, lipWidth: 4, gap: 20, lipOn: kind === 'plug' ? 'base' : 'lid', clearance: 0.4,
+      bottom: kind === 'inset' ? { style: 'inset', board: 6.35, rabbet: 4 } : { board: 6.35, step: 2 }, lidStyle: kind === 'drop' ? 'drop' : null, tabs: null }, sh);
+    const plan = boxPlan(input);
+    assert.deepEqual(plan.problems, [], JSON.stringify({ sh: sh.shape, kind }));
+    const rb = 3.175;
+    // The opening it goes in, and the part, as cut.
+    const part = kind === 'drop' ? plan.drop.part : plan.bottom.part;
+    const tOpen = kind === 'plug' ? plan.tInside : kind === 'inset' ? plan.bottom.rabbet.tOut : plan.tRabbet;
+    const path = shapeLoop(plan.bottom.shape, tOpen - rb), pl = loopLength(path), along = [];
+    for (let k = 0; k < 3000; k++) along.push(loopPoint(path, pl * k / 3000));
+    const loop = shapeLoop(part.shape, part.t), len = loopLength(loop), gaps = [];
+    for (let k = 0; k < 300; k++) {
+      const q = loopPoint(loop, len * k / 300);
+      // The part's edge is between the bit's path and the wall it cut, rb out from the path.
+      gaps.push(rb - Math.min(...along.map((a) => Math.hypot(a.x - q.x, a.y - q.y))));
+    }
+    gaps.sort((a, b) => a - b);
+    assert.ok(gaps[0] >= 0.4 - 0.05, sh.shape + ' ' + kind + ': closest ' + gaps[0]);
+    // Along the walls, the Clearance (was half the bit more all round).
+    assert.ok(gaps[150] <= 0.4 + 0.1, sh.shape + ' ' + kind + ': typical gap ' + gaps[150]);
+  }
+});

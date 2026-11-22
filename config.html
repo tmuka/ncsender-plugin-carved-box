@@ -2213,6 +2213,20 @@ var DEFAULTS = {
   magnets: null, notch: null, edges: null, corners: null, finish: 0, finishDir: 'conventional', bottom: null, lidStyle: null
 };
 
+// What fits in an opening of S moved t that's cut from inside with a bit
+// of radius r, the Clearance c smaller all round: { shape, t }. A heart's,
+// oval's or drawing's opening is S moved t with its corners rounded to r,
+// as the bit leaves them (S moved t - r, then out r): the part follows it,
+// c inside, instead of being half the bit smaller all round. The others'
+// corners are arcs already as round as the bit leaves them.
+function partIn(S, t, r, c) {
+  if (S.kind !== 'outline') return { shape: S, t: t - c };
+  var segs = [];
+  outlineLoops(S, t - r).forEach(function(l) { segs = segs.concat(l); });
+  if (!segs.length) return { shape: S, t: t - c - r };
+  return { shape: { kind: 'outline', segs: segs, key: (S.key || 'outline') + ':in' + t.toFixed(4) + ',' + r.toFixed(4), step: S.step }, t: r - c };
+}
+
 function boxPlan(input) {
   var o = Object.assign({}, DEFAULTS, input || {});
   var problems = [], notes = [];
@@ -2690,13 +2704,13 @@ function boxPlan(input) {
   // An inset bottom's panel: the rabbet's outline the Clearance smaller
   // (a heart's or drawing's half the bit more, as the plug), only cut out;
   // its own reach, in from the box's.
-  var panelT = tR2 - o.clearance - (S.kind === 'outline' && !(oval && S.cr + tR2 >= rb - 1e-9) ? rb : 0);
-  var panelLoop = inset ? shapeLoop(SA, panelT) : null;
+  var panelT = tR2 - o.clearance, panel = inset ? partIn(SA, tR2, rb, o.clearance) : null;
+  var panelLoop = inset ? shapeLoop(panel.shape, panel.t) : null;
   var extB = panelLoop ? loopExtent(panelLoop) : { minX: ext.minX - botOv, maxX: ext.maxX + botOv, minY: ext.minY - botOv, maxY: ext.maxY + botOv };
   // A drop-in lid's panel: the rabbet's outline the Clearance smaller (a
   // heart's or drawing's half the bit more), beside the bottom on its board.
-  var dropT = tLip - (S.kind === 'outline' && !(oval && S.cr + tRabbet >= rb - 1e-9) ? rb : 0);
-  var extP = drop ? loopExtent(shapeLoop(S, dropT) || outlineAt0 || shapeLoop(S, 0)) : null;
+  var dropT = tLip, dropPart = drop ? partIn(S, tRabbet, rb, o.clearance) : null;
+  var extP = drop ? loopExtent(shapeLoop(dropPart.shape, dropPart.t) || outlineAt0 || shapeLoop(S, 0)) : null;
   var bottomAt = B.sep || !onBoard ? { x: 0, y: 0 } : o.layout === 'y' ? { x: 0, y: lid.y + extL.maxY + o.gap - extB.minY } : { x: lid.x + extL.maxX + o.gap - extB.minX, y: 0 };
   // Both halves' reach from the base's middle (one on its own board: its own).
   var dropAt = drop ? (o.layout === 'y' ? { x: 0, y: extB.maxY + o.gap - extP.minY } : { x: extB.maxX + o.gap - extP.minX, y: 0 }) : null;
@@ -2794,23 +2808,24 @@ function boxPlan(input) {
   // the bit rounds); its own corners as the ring's, then out past the
   // outline (and its Oversize, trimmed flush with the ring once it's
   // glued) into the waste.
-  var plugT = tInside - o.clearance - (S.kind === 'outline' && !(oval && S.cr + tInside >= rb - 1e-9) ? rb : 0);
+  var plugT = tInside - o.clearance, plug = partIn(SA, tInside, rb, o.clearance);
   function bottomCuts() {
     if (inset) return [];
     var waste = botOv + 2 * rb;
-    if (SA === S) return [{ op: 'ring', tIn: plugT, tOut: waste, finish: fin, floor: fin, dx: 0, dy: 0, z0: 0, depth: botStep, what: 'step round the plug' }];
-    return [{ op: 'ring', shape: SA, tIn: plugT, tOut: tInside + 2 * rb, finish: fin, floor: fin, dx: 0, dy: 0, z0: 0, depth: botStep, what: 'step round the plug' },
+    if (plug.shape === S) return [{ op: 'ring', tIn: plug.t, tOut: waste, finish: fin, floor: fin, dx: 0, dy: 0, z0: 0, depth: botStep, what: 'step round the plug' }];
+    // (The plug's own shape: 2 bits past it, as far as the ring's inside and more.)
+    return [{ op: 'ring', shape: plug.shape, tIn: plug.t, tOut: plug.shape === SA ? tInside + 2 * rb : plug.t + o.clearance + 2 * rb, finish: fin, floor: fin, dx: 0, dy: 0, z0: 0, depth: botStep, what: 'step round the plug' },
       { op: 'ring', tIn: tInside + rb, tOut: waste, floor: fin, dx: 0, dy: 0, z0: 0, depth: botStep, what: 'step out past the outline' }];
   }
   var halves = [
     { name: 'base', label: 'base', at: base, height: baseH, cuts: inside('base'), shape: S, magnetAt: magnetsOf('base'),
       outline: { op: 'profile', t: 0, z0: -faces.base, depth: baseH + o.through, tabs: o.tabs, what: 'outline' } },
-    drop ? { name: 'lid', label: 'drop-in lid', at: dropAt, height: botH, cuts: [], shape: S, magnetAt: [],
-      outline: { op: 'profile', t: dropT, z0: 0, depth: botH + o.through, tabs: o.tabs, what: 'panel\'s outline' } }
+    drop ? { name: 'lid', label: 'drop-in lid', at: dropAt, height: botH, cuts: [], shape: dropPart.shape, magnetAt: [],
+      outline: { op: 'profile', t: dropPart.t, z0: 0, depth: botH + o.through, tabs: o.tabs, what: 'panel\'s outline' } }
     : { name: 'lid', label: 'lid', at: lid, height: lidH, cuts: inside('lid'), shape: SL, magnetAt: magnetsOf('lid'),
       outline: { op: 'profile', t: 0, z0: -faces.lid, depth: lidH + o.through, tabs: o.tabs, what: 'outline' } }
-  ].concat(bot ? [{ name: 'bottom', label: inset ? 'inset bottom' : 'bottom', at: B.sep ? base : bottomAt, height: botH, cuts: bottomCuts(), shape: inset ? SA : S, magnetAt: [],
-      outline: { op: 'profile', t: inset ? panelT : botOv, z0: 0, depth: botH + o.through, tabs: o.tabs, what: inset ? 'panel\'s outline' : botOv ? 'outline, oversize' : 'outline' } }] : [])
+  ].concat(bot ? [{ name: 'bottom', label: inset ? 'inset bottom' : 'bottom', at: B.sep ? base : bottomAt, height: botH, cuts: bottomCuts(), shape: inset ? panel.shape : S, magnetAt: [],
+      outline: { op: 'profile', t: inset ? panel.t : botOv, z0: 0, depth: botH + o.through, tabs: o.tabs, what: inset ? 'panel\'s outline' : botOv ? 'outline, oversize' : 'outline' } }] : [])
     .filter(function(h) {
       // A drop-in lid's panel: with the bottom, on its board.
       if (drop && h.name === 'lid') return o.cut === 'bottom';
@@ -2831,9 +2846,10 @@ function boxPlan(input) {
     // step, where the ring sits on it (from its underside).
     // An inset bottom: the panel's (t) in from the outline, the rabbet
     // (from the ring's inside, tIn, out to tOut, depth deep) it's glued in.
-    bottom: bot ? { style: inset ? 'inset' : 'plug', t: inset ? panelT : plugT, shape: SA, step: botStep, height: botH, up: inset ? recess : botH - botStep, own: !!B.bottomOwn, oversize: botOv,
+    // (part: the plug's or panel's outline as cut, its own shape and offset.)
+    bottom: bot ? { style: inset ? 'inset' : 'plug', t: inset ? panelT : plugT, shape: SA, part: inset ? panel : plug, step: botStep, height: botH, up: inset ? recess : botH - botStep, own: !!B.bottomOwn, oversize: botOv,
       rabbet: inset ? { tIn: tRabbet, tOut: tR2, depth: rabD, width: rabW } : null, recess: recess } : null,
-    lidStyle: drop ? 'drop' : plugLid ? 'plug' : 'carved', drop: drop ? { t: dropT, height: botH } : null,
+    lidStyle: drop ? 'drop' : plugLid ? 'plug' : 'carved', drop: drop ? { t: dropT, height: botH, part: dropPart } : null,
     // Each half's outside, to the seam; closed, the two.
     baseOut: B.baseOut, lidOut: drop ? 0 : B.lidOut, closedHeight: B.baseOut + (drop ? 0 : B.lidOut),
     insideHeight: drop ? baseH - botStep - rabbetDepth : (baseH - under.base - botStep) + (plugLid ? 0 : lidH - o.top) - lipUp
@@ -3303,7 +3319,7 @@ if (typeof module !== 'undefined' && module.exports) {
   var shapeLoop = shapeLib.shapeLoop, shapeDeepest = shapeLib.shapeDeepest, loopLength = shapeLib.loopLength, loopPoint = shapeLib.loopPoint;
   var loopAt = shapeLib.loopAt, loopNearest = shapeLib.loopNearest, loopExtent = shapeLib.loopExtent, shapeLoops = shapeLib.shapeLoops, shapeDistance = shapeLib.shapeDistance;
   var outlineLib = require('./box-outline.cjs'), heartShape = outlineLib.heartShape, ovalShape = outlineLib.ovalShape;
-  var customShape = outlineLib.customShape, selfCrossing = outlineLib.selfCrossing;
+  var customShape = outlineLib.customShape, selfCrossing = outlineLib.selfCrossing, outlineLoops = outlineLib.outlineLoops;
   module.exports = { lipWidthFor: lipWidthFor, boxPlan: boxPlan, boardsOf: boardsOf, outsideInput: outsideInput, heightCaps: heightCaps, testFitInput: testFitInput, autoSizes: autoSizes, fitOption: fitOption, nestInputs: nestInputs, setPlan: setPlan, finishFor: finishFor, BOX_DEFAULTS: DEFAULTS };
 }
 /* END lib/box-plan.cjs */
@@ -4171,7 +4187,7 @@ if (typeof module !== 'undefined' && module.exports) {
       // A glued-on bottom's Oversize: its outline that much further out.
       // An inset bottom's panel: in from it.
       var ins = !!(plan.bottom && plan.bottom.style === 'inset');
-      var ov = h.name === 'bottom' && plan.bottom ? (ins ? plan.bottom.t : plan.bottom.oversize) : h.name === 'lid' && plan.drop ? plan.drop.t : 0;
+      var ov = h.name === 'bottom' && plan.bottom ? (ins ? plan.bottom.part.t : plan.bottom.oversize) : h.name === 'lid' && plan.drop ? plan.drop.part.t : 0;
       var tabLoop = shapeLoop(S, ov + rb);
       var cx = X(h.at.x), cy = Y(h.at.y), withLip = (o.lipOn === 'lid') === (h.name === 'lid');
       // A tab every share of the way round a loop, across it.
@@ -4201,7 +4217,7 @@ if (typeof module !== 'undefined' && module.exports) {
         return;
       }
       if (h.name === 'bottom') {
-        out += path('cb-wood-dark', ov, cx, cy) + (ov > 0 ? '<path class="cb-trim" d="' + shapePath(S, 0, cx, cy, s) + '"/>' : '') + '<path class="cb-wood" d="' + shapePath(plan.bottom.shape, plan.bottom.t, cx, cy, s) + '"/>';
+        out += path('cb-wood-dark', ov, cx, cy) + (ov > 0 ? '<path class="cb-trim" d="' + shapePath(S, 0, cx, cy, s) + '"/>' : '') + '<path class="cb-wood" d="' + shapePath(plan.bottom.part.shape, plan.bottom.part.t, cx, cy, s) + '"/>';
         if (o.tabs) out += tabsOn(tabLoop);
         var fsB = Math.min(4, Math.max(1.6, 2 * plan.halfX * s / 6));
         out += '<text class="cb-label" data-field="cb-bot-step" style="font-size:' + fsB.toFixed(2) + 'px" x="' + cx + '" y="' + (cy + fsB * 0.35) + '">Bottom</text>';
