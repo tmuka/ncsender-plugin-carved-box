@@ -38,6 +38,15 @@
   .cb-field label { font-size: 0.78rem; color: var(--color-text-secondary); font-weight: 600; }
   /* Spoilboard Toolbox's stock thickness, beside Stock Thickness. */
   .cb-field > label:has(> .cb-stock-sbt) { display: flex; align-items: center; gap: 6px; }
+  /* Lip Thickness linked to the wall: a chain link beside its label. */
+  .cb-field > label:has(> .cb-link) { display: flex; align-items: center; gap: 6px; }
+  button.cb-link {
+    margin: 0 0 0 auto !important; padding: 0 !important; min-height: 0 !important; width: 22px; height: 18px; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; border-radius: 999px !important;
+    border: 1px solid var(--cb-edge) !important; background: transparent !important; color: var(--color-text-secondary) !important;
+  }
+  button.cb-link.on { border-color: color-mix(in srgb, var(--color-accent) 45%, transparent) !important; color: var(--color-accent) !important; }
+  button.cb-link svg { width: 13px; height: 13px; }
   button.cb-stock-sbt {
     margin: 0 0 0 auto !important; padding: 0 8px !important; min-height: 0 !important; height: 18px; line-height: 16px;
     font-size: 0.72rem !important; font-weight: 600; border-radius: 999px !important; cursor: pointer;
@@ -255,7 +264,7 @@
       </div>
       <div class="cb-row">
         <div class="cb-field"><label for="cb-lip-h">Lip Height</label><input class="cb-input" id="cb-lip-h" data-unit="length" title="How deep the other half's opening is cut for the lip. The lip stands up this less the Clearance, so it stops short of the bottom and the halves close tight on the shoulder."></div>
-        <div class="cb-field"><label for="cb-lip-w">Lip Thickness</label><input class="cb-input" id="cb-lip-w" data-unit="length" title="How thick the lip is: part of the wall, on its inside."></div>
+        <div class="cb-field"><label for="cb-lip-w">Lip Thickness<button type="button" class="cb-link on" id="cb-lip-link" aria-pressed="true" aria-label="Lip Thickness follows the wall" title="Linked: the lip follows the wall (half of it, or what magnets, an inset bottom or a sloped lip need). Typing a thickness unlinks it; click to link it again."><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5"/></svg></button></label><input class="cb-input" id="cb-lip-w" data-unit="length" title="How thick the lip is: part of the wall, on its inside."></div>
         <div class="cb-field"><label for="cb-clear">Clearance Each Side</label><input class="cb-input" id="cb-clear" data-unit="length" title="Gap each side between the lip and the other half, and over its top: about 0.2 to 0.3 mm in wood, 0.1 mm in plastic."></div>
       </div>
       <p class="cb-hint">The lip stands up round the opening of one half and slides into a widened opening in the other; they meet on the shoulder outside it.</p>
@@ -2944,6 +2953,30 @@ var FINISH = {
 function finishFor(material) { return FINISH[material] || FINISH.softwood; }
 // In wood, 0.015" (tried in pine: a lid that slides on, not loose).
 var CLEARANCE = { mdf: 0.381, softwood: 0.381, hardwood: 0.381, hdpe: 0.15, acrylic: 0.1, polycarbonate: 0.1, aluminum: 0.05, foam: 0.2 };
+// The lip's thickness for a wall: half of it (down to the grid), the rest
+// outside it. With magnets, as thin as leaves their holes room outside it,
+// down to 1/4" (then the wall must grow), so the wall needn't be twice what
+// they need. An inset bottom's ring is only the rim outside the opening: a
+// thinner lip leaves it room for the rabbet (3 mm outside it), down to
+// 3 mm. A sloped lip as thick as its slant at the V-bit's angle, and 1 mm
+// more at its top. Auto Sizes uses it, and the dialog's Lip Thickness
+// follows it until one is typed.
+function lipWidthFor(input, imperial) {
+  var o = Object.assign({}, DEFAULTS, input || {});
+  var grid = function(v) { return imperial ? (v < 1 ? 0.127 : 25.4 / 32) : (v < 1 ? 0.05 : 0.5); };
+  var down = function(v) { return Math.floor(v / grid(v) + 1e-9) * grid(v); };
+  var upHalf = function(v) { var g = grid(v); return Math.ceil(v / g - 1e-9) * g; };
+  var w = Math.max(grid(1), down(o.wall / 2));
+  if (o.bottom && o.bottom.style === 'inset') w = Math.max(Math.min(3, w), Math.min(w, down(o.wall - o.clearance - (o.bottom.rabbet > 0 ? o.bottom.rabbet : 0) - 3)));
+  if (o.magnets) w = Math.min(w, Math.max(6.35, down(o.wall - o.clearance - o.magnets.diameter - 1.6 - 0.05)));
+  var ed = o.edges;
+  if (ed && ed.slope && ed.bit !== 'round') {
+    var slant = Math.tan((ed.angle || 90) * Math.PI / 360);
+    w = Math.max(w, upHalf(Math.min(o.lipHeight - o.clearance, ed.slopeHeight > 0 ? ed.slopeHeight : Infinity) * slant + (ed.pocket || 0) * slant + 1.05));
+  }
+  return w;
+}
+
 function autoSizes(input, material, imperial) {
   var o = Object.assign({}, DEFAULTS, input || {});
   var rect = o.shape === 'rect', poly = o.shape === 'poly', long = rect || o.shape === 'oval' || o.shape === 'heart' || o.shape === 'custom';
@@ -2961,7 +2994,7 @@ function autoSizes(input, material, imperial) {
   a.wall = half(clamp(small * 0.08, 4, 15));
   // An inset bottom's ring: its inside above the panel; a plug lid: no
   // inside of its own, the base's alone.
-  var ins = o.bottom && o.bottom.style === 'inset', rabW = ins && o.bottom.rabbet > 0 ? o.bottom.rabbet : 0;
+  var ins = o.bottom && o.bottom.style === 'inset';
   var under0 = ins ? (o.bottom.board > 0 ? o.bottom.board : T) + (o.bottom.recess > 0 ? o.bottom.recess : 0) : a.floor;
   var depth = o.lidStyle === 'plug' ? Math.min(T - under0, lidH - 2) : Math.min(T - under0, lidH - a.top);
   // In wood, a lip at least 1/4" high (when the box is deep enough), so
@@ -2986,17 +3019,8 @@ function autoSizes(input, material, imperial) {
   var plan, edgeWall = null, magCount0 = 0;
   var smaller = function(d) { return d > 0.3 ? half(d * 0.7) : 0; };
   for (var k = 0; k < 80; k++) {
-    // Half the wall (down to the grid): the rest outside it. With magnets,
-    // as thin as leaves their holes room outside it, down to 1/4" (then
-    // the wall grows), so the wall needn't be twice what they need.
-    var down = function(v) { return Math.floor(v / grid(v) + 1e-9) * grid(v); };
-    a.lipWidth = Math.max(grid(1), down(a.wall / 2));
-    // An inset bottom's ring is only the rim outside the opening: a thinner
-    // lip leaves it room for the rabbet (3 mm left outside it), down to 3 mm.
-    if (ins) a.lipWidth = Math.max(Math.min(3, a.lipWidth), Math.min(a.lipWidth, down(a.wall - a.clearance - rabW - 3)));
-    if (a.magnets) a.lipWidth = Math.min(a.lipWidth, Math.max(6.35, down(a.wall - a.clearance - a.magnets.diameter - 1.6 - 0.05)));
-    // A sloped lip as thick as its slant at the V-bit's angle, and 1 mm more at its top.
-    if (slope) a.lipWidth = Math.max(a.lipWidth, upHalf(Math.min(a.lipHeight - a.clearance, a.edges.slopeHeight > 0 ? a.edges.slopeHeight : Infinity) * slant + (a.edges.pocket || 0) * slant + 1.05));
+    // The lip: half the wall, or as magnets, an inset bottom or a sloped lip need.
+    a.lipWidth = lipWidthFor(Object.assign({}, o, a), imperial);
     if (rect || poly || o.shape === 'heart' || o.shape === 'custom') a.cornerRadius = Math.max(o.cornerRadius || 0, upHalf(a.wall - a.lipWidth - a.clearance + b / 2 + a.lipHeight * slant));
     // A heart's point under its lobes' radius.
     if (o.shape === 'heart') a.cornerRadius = Math.min(a.cornerRadius, Math.max(o.cornerRadius || 0, (o.length || 0) / 2 / 1.72 - 1));
@@ -3129,7 +3153,7 @@ if (typeof module !== 'undefined' && module.exports) {
   var loopAt = shapeLib.loopAt, loopNearest = shapeLib.loopNearest, loopExtent = shapeLib.loopExtent, shapeLoops = shapeLib.shapeLoops, shapeDistance = shapeLib.shapeDistance;
   var outlineLib = require('./box-outline.cjs'), heartShape = outlineLib.heartShape, ovalShape = outlineLib.ovalShape;
   var customShape = outlineLib.customShape, selfCrossing = outlineLib.selfCrossing;
-  module.exports = { boxPlan: boxPlan, boardsOf: boardsOf, outsideInput: outsideInput, heightCaps: heightCaps, testFitInput: testFitInput, autoSizes: autoSizes, fitOption: fitOption, nestInputs: nestInputs, setPlan: setPlan, finishFor: finishFor, BOX_DEFAULTS: DEFAULTS };
+  module.exports = { lipWidthFor: lipWidthFor, boxPlan: boxPlan, boardsOf: boardsOf, outsideInput: outsideInput, heightCaps: heightCaps, testFitInput: testFitInput, autoSizes: autoSizes, fitOption: fitOption, nestInputs: nestInputs, setPlan: setPlan, finishFor: finishFor, BOX_DEFAULTS: DEFAULTS };
 }
 /* END lib/box-plan.cjs */
 /* BEGIN lib/box-gcode.cjs */
@@ -3687,7 +3711,7 @@ if (typeof module !== 'undefined' && module.exports) {
     // Measured inside: the outside as much bigger as the wall it gets.
     if (v.measure === 'inside' && Math.abs(a.wall - v.wall) > 1e-6) a = auto(Object.assign({}, v, { wall: a.wall }));
     a.lidHeight = null;
-    state.lidOwn = false; state.lipForBit = !!a.lipForBit;
+    state.lidOwn = false; state.lipOwn = false; state.lipForBit = !!a.lipForBit;
     AUTO.forEach(function (x) {
       var mm = x[1](a), kind = FIELDS.filter(function (f) { return f[0] === x[0]; })[0][2];
       if (mm == null) return;
@@ -3788,6 +3812,13 @@ if (typeof module !== 'undefined' && module.exports) {
     if (!state.heightOwn && !typing('cb-height') && String($('cb-height').value).trim() && full.height > 0) show('cb-height', full.height, 'length');
     if (full.height > 0) $('cb-height').placeholder = fmt(full.height);
     if (full.lid > 0) $('cb-lid-h').placeholder = fmt(full.lid);
+  }
+  // Lip Thickness follows the wall (lipWidthFor, as Auto Sizes does) until
+  // one is typed; never under the cursor.
+  function followLip() {
+    if (state.autoSizes || state.lipOwn || document.activeElement === $('cb-lip-w')) return;
+    var v = collect().v, lw = lipWidthFor(inputOf(v), state.imperial);
+    if (v.lipWidth == null || isNaN(v.lipWidth) || Math.abs(v.lipWidth - lw) > 1e-6) show('cb-lip-w', lw, 'length');
   }
   function planOf(v) {
     var input = inputOf(v);
@@ -4325,7 +4356,13 @@ if (typeof module !== 'undefined' && module.exports) {
     // A height not typed follows the boards (a Cut or Nested Set change too).
     followHeights();
     if (state.autoSizes) { applyAuto(); followHeights(); }
+    followLip();
     AUTO.forEach(function (x) { $(x[0]).classList.toggle('cb-auto-val', state.autoSizes); });
+    // Linked, the lip's in color too; the link lit.
+    var linked = state.autoSizes || !state.lipOwn;
+    if (!state.autoSizes) $('cb-lip-w').classList.toggle('cb-auto-val', linked);
+    $('cb-lip-link').classList.toggle('on', linked);
+    $('cb-lip-link').setAttribute('aria-pressed', String(linked));
     $('cb-auto').checked = state.autoSizes;
     $('cb-auto-hint').textContent = state.autoSizes
       ? 'Auto Sizes fills in the sizes in color for this box, stock, bit and Material (Tool & Feeds). Type in one to set it yourself.'
@@ -4585,7 +4622,7 @@ if (typeof module !== 'undefined' && module.exports) {
 
   // Everything the dialog keeps, as saved.
   function settingsNow() {
-    var v = Object.assign({}, lastPlan ? lastPlan.v : collect().v, { feedsAuto: state.feedsAuto, autoSizes: state.autoSizes, cornerOwn: state.cornerOwn });
+    var v = Object.assign({}, lastPlan ? lastPlan.v : collect().v, { feedsAuto: state.feedsAuto, autoSizes: state.autoSizes, cornerOwn: state.cornerOwn, lipOwn: !!state.lipOwn });
     v.lidHeight = state.lidOwn ? v.lidHeight : null;
     v.height = state.heightOwn ? v.height : null;
     // Every length kept in mm (feeds in mm/min), shown in the machine's units.
@@ -4636,7 +4673,7 @@ if (typeof module !== 'undefined' && module.exports) {
     if (!v) return startButtons();
     var now = settingsNow(), from = v.charAt(0) === 'p' ? Object.assign({}, now, PRESET_BASE, PRESETS[i].v) : Object.assign({}, state.saved[i].v);
     // A preset's corners are its own; saved settings say theirs.
-    if (v.charAt(0) === 'p') from.cornerOwn = PRESETS[i].v.cornerRadius != null ? PRESETS[i].v.cornerRadius : null;
+    if (v.charAt(0) === 'p') { from.cornerOwn = PRESETS[i].v.cornerRadius != null ? PRESETS[i].v.cornerRadius : null; from.lipOwn = false; }
     restore(from);
     [['cb-tool', 'tool'], ['cb-etool', 'edgeTool'], ['cb-ctool', 'cornerTool'], ['cb-mtool', 'magTool']].forEach(function (x) { $(x[0]).value = toolEntry(from[x[1]]) ? String(from[x[1]]) : ''; });
     if (v.charAt(0) === 's') { $('cb-save-name').value = state.saved[i].name; }
@@ -4743,6 +4780,10 @@ if (typeof module !== 'undefined' && module.exports) {
     // On for a first try; as it was saved after that.
     state.autoSizes = typeof saved.autoSizes === 'boolean' ? saved.autoSizes : !Object.keys(saved).length;
     state.cornerOwn = typeof saved.cornerOwn === 'number' ? saved.cornerOwn : typeof saved.cornerRadius === 'number' ? saved.cornerRadius : null;
+    // The lip linked to the wall, unless it was saved unlinked (or, saved
+    // before the link, with Auto Sizes off and a thickness of its own).
+    state.lipOwn = typeof saved.lipOwn === 'boolean' ? saved.lipOwn
+      : !state.autoSizes && typeof saved.lipWidth === 'number' && Math.abs(saved.lipWidth - lipWidthFor(inputOf(collect().v), state.imperial)) > 0.03;
     // A height as high as the boards allow follows them; one typed lower stays.
     sizeFor(saved.shape || 'circle');
     // Saved before the Height (0.3.5 and older): each half's Base or Lid
@@ -4802,6 +4843,8 @@ if (typeof module !== 'undefined' && module.exports) {
         if (e.isTrusted && AUTO.some(function (x) { return x[0] === f[0]; })) state.autoSizes = false;
         if (e.isTrusted && f[0] === 'cb-corner') { var cr = read('cb-corner', 'length'); if (cr != null && !isNaN(cr)) state.cornerOwn = cr; }
         // A height typed as high as it goes follows the boards, as an empty one does.
+        // Lip Thickness typed: yours (half typed too), unless it's what the wall gives; empty links it again.
+        if (e.isTrusted && f[0] === 'cb-lip-w') { var lw0 = read('cb-lip-w', 'length'); state.lipOwn = lw0 != null && (isNaN(lw0) || Math.abs(lw0 - lipWidthFor(inputOf(collect().v), state.imperial)) > 0.03); }
         // Half typed (3/ on the way to 3/16"): yours already, not the boards'.
         if (e.isTrusted && f[0] === 'cb-lid-h') { state.lidOwn = false; var lv = read('cb-lid-h', 'length'); state.lidOwn = lv != null && (isNaN(lv) || Math.abs(lv - fullOut(collect().v).lid) > 0.03); }
         if (e.isTrusted && f[0] === 'cb-height') { var hv = read('cb-height', 'length'); state.heightOwn = hv != null && (isNaN(hv) || Math.abs(hv - fullOut(collect().v).height) > 0.03); }
@@ -4812,6 +4855,13 @@ if (typeof module !== 'undefined' && module.exports) {
       $(f[0]).addEventListener('change', function () { if (f[0] === 'cb-bit' && state.feedsAuto) { fillFeeds(); update(true); } });
     });
     $('cb-auto').addEventListener('change', function () { state.autoSizes = $('cb-auto').checked; update(true); });
+    // The chain link: unlink to keep the lip as it is, link to follow the wall.
+    $('cb-lip-link').addEventListener('click', function (e) {
+      e.preventDefault();
+      if (state.autoSizes) { state.autoSizes = false; state.lipOwn = true; }
+      else state.lipOwn = !state.lipOwn;
+      update(true);
+    });
     ['cb-tabs-on', 'cb-mag-on', 'cb-notch-on', 'cb-corners-on', 'cb-edges-on', 'cb-nest-on', 'cb-bot-on'].forEach(function (id) { $(id).addEventListener('change', function () { fitSwitched(id); update(true); }); });
     $('cb-testfit').addEventListener('click', function () { generate('test'); });
     $('cb-help-btn').addEventListener('click', function () { showHelp($('cb-help').hidden); });
@@ -5098,7 +5148,11 @@ if (typeof module !== 'undefined' && module.exports) {
     $('cb-unit').textContent = state.imperial ? 'IMPERIAL (IN)' : 'METRIC (MM)';
     ROOT.querySelectorAll('[data-unit]').forEach(function (el) {
       var lab = el.closest('.cb-field').querySelector('label');
-      if (lab && !/\(/.test(lab.textContent)) lab.textContent += ' (' + (el.dataset.unit === 'feed' ? unit() + '/min' : unit()) + ')';
+      if (!lab || /\(/.test(lab.textContent)) return;
+      // On the label's own text, so a button in it (the lip's link) stays.
+      var add = ' (' + (el.dataset.unit === 'feed' ? unit() + '/min' : unit()) + ')', tn = null;
+      for (var i = 0; i < lab.childNodes.length && !tn; i++) if (lab.childNodes[i].nodeType === 3 && lab.childNodes[i].nodeValue.trim()) tn = lab.childNodes[i];
+      if (tn) tn.nodeValue += add; else lab.textContent += add;
     });
     state.saved = (initialConfig && Array.isArray(initialConfig.saved) ? initialConfig.saved : []).filter(function (p) { return p && p.name && p.v; });
     restore();
