@@ -3782,8 +3782,10 @@ if (typeof module !== 'undefined' && module.exports) {
   // A height not typed in (or typed as high as it goes) follows the boards.
   function followHeights() {
     var full = fullOut(collect().v);
-    if (!state.lidOwn && String($('cb-lid-h').value).trim() && full.lid > 0) show('cb-lid-h', full.lid, 'length');
-    if (!state.heightOwn && String($('cb-height').value).trim() && full.height > 0) show('cb-height', full.height, 'length');
+    // (Never under the cursor: a field being typed in keeps what's typed.)
+    var typing = function (id) { return ROOT.ownerDocument && ROOT.ownerDocument.activeElement === $(id); };
+    if (!state.lidOwn && !typing('cb-lid-h') && String($('cb-lid-h').value).trim() && full.lid > 0) show('cb-lid-h', full.lid, 'length');
+    if (!state.heightOwn && !typing('cb-height') && String($('cb-height').value).trim() && full.height > 0) show('cb-height', full.height, 'length');
     if (full.height > 0) $('cb-height').placeholder = fmt(full.height);
     if (full.lid > 0) $('cb-lid-h').placeholder = fmt(full.lid);
   }
@@ -4800,8 +4802,9 @@ if (typeof module !== 'undefined' && module.exports) {
         if (e.isTrusted && AUTO.some(function (x) { return x[0] === f[0]; })) state.autoSizes = false;
         if (e.isTrusted && f[0] === 'cb-corner') { var cr = read('cb-corner', 'length'); if (cr != null && !isNaN(cr)) state.cornerOwn = cr; }
         // A height typed as high as it goes follows the boards, as an empty one does.
-        if (e.isTrusted && f[0] === 'cb-lid-h') { state.lidOwn = false; var lv = read('cb-lid-h', 'length'); state.lidOwn = lv != null && !isNaN(lv) && Math.abs(lv - fullOut(collect().v).lid) > 0.03; }
-        if (e.isTrusted && f[0] === 'cb-height') { var hv = read('cb-height', 'length'); state.heightOwn = hv != null && !isNaN(hv) && Math.abs(hv - fullOut(collect().v).height) > 0.03; }
+        // Half typed (3/ on the way to 3/16"): yours already, not the boards'.
+        if (e.isTrusted && f[0] === 'cb-lid-h') { state.lidOwn = false; var lv = read('cb-lid-h', 'length'); state.lidOwn = lv != null && (isNaN(lv) || Math.abs(lv - fullOut(collect().v).lid) > 0.03); }
+        if (e.isTrusted && f[0] === 'cb-height') { var hv = read('cb-height', 'length'); state.heightOwn = hv != null && (isNaN(hv) || Math.abs(hv - fullOut(collect().v).height) > 0.03); }
         // A drawing kept in proportion: the other way follows.
         if (e.isTrusted) followProportion(f[0]);
         soon();
