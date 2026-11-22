@@ -4,8 +4,8 @@ A short series of questions that sets up Carved Box for the box you want, and th
 
 ## Why
 Carved Box has many interacting choices:
-- a carved floor or a glued-on bottom (plug or inset)
-- a carved or plug lid, and which half the lip is on
+- a carved floor or a glued-on floor (plug or inset)
+- a carved or solid lid, and which half the lip is on
 - one board or two, grain match
 - magnets, notches, edges, rounded floor corners
 - one program with tool changes, or several programs
@@ -20,15 +20,15 @@ Each is explained, but the consequences of a combination (how many programs, a f
 ## The questions
 Each has a "not sure" answer that picks the common case. Answers that don't apply are skipped.
 
-1. **What kind of box?** Ring or trinket box (small), keepsake box (medium), big box for tools or documents, or a nested set. This sets the shape presets and the size range, and leans small boxes to a carved floor and big ones to a glued-on bottom.
+1. **What kind of box?** Ring or trinket box (small), keepsake box (medium), big box for tools or documents, or a nested set. This sets the shape presets and the size range, and leans small boxes to a carved floor and big ones to a glued-on floor.
 2. **How big, and what board?** The outside size (or the inside, with Measure: Inside), and the board's thickness. Spoilboard Toolbox's Stock button fills the thickness when it's there. It warns if the board can't make the height asked for.
 3. **What should it look like from outside?**
-   - *Solid, no joints*: carved floor, or an inset bottom.
+   - *Solid, no joints*: carved floor, or an inset floor.
    - *A contrasting or plywood bottom is fine*: glued-on plug bottom.
    - *The grain running round the seam*: grain match from a resawn board.
 4. **How should the lid sit?**
    - *Lifts off*: carved lid; ask about magnets and finger notches.
-   - *Drops in flat*: plug lid.
+   - *Drops in flat*: solid lid.
    - *Snug, it grips*: a straight lip.
    - *Centers itself*: a sloped lip, with magnets to hold it.
 5. **Finishing touches?** Chamfered or rounded edges, and rounded floor corners. Each one is offered only if the bit for it is in the Tool Library, or the answer says "I'll change bits by hand".
@@ -57,7 +57,7 @@ The answers become a short numbered list of what will happen, with times:
 1. **Boards:** "One board, 3/4" × 14" × 6", for the ring and lid. One 1/4" plywood piece, 6" × 4", for the panel."
 2. **Programs, in order,** each with its zero, bits and estimated minutes:
    - "Ring and lid: X0 Y0 at the front-left corner, Z0 on the board's top. 1/4" bit. About 28 min."
-   - "Panel (Bottom Only): on the plywood, same zero. About 4 min."
+   - "Panel (Floor Only): on the plywood, same zero. About 4 min."
 3. **Assembly:** cut the tabs, sand them flush; glue the panel into the ring's rabbet (plywood all round; solid wood only at the front and back middles); magnets with opposite poles up.
 4. **Test Fit first?** On by default for a first box: "Cut a 6-minute test in scrap of the same board and try the lid."
 
@@ -72,7 +72,7 @@ The recipe uses the same plan and time estimate the dialog already computes (`bo
 ## Order of work
 1. `guidedSettings` with the box, size and look questions, and the summary, for a carved floor and a plug bottom.
 2. The machine question, the tool-change split and the bit checks.
-3. Inset bottom, plug lid, grain match and nested sets in the guide.
+3. Inset floor, solid lid, grain match and nested sets in the guide.
 4. Remember the answers; show the recipe in the Start card after Apply.
 
 ## Open questions

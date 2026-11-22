@@ -64,8 +64,8 @@ test('guided recipe: the programs by machine', () => {
   assert.ok(!atc.some((s) => /Edges Only/.test(s.text)));
   const none = guidedRecipe(Object.assign({ machine: 'none', edgesIn: false }, base));
   assert.ok(none.some((s) => /Edges Only/.test(s.text)));
-  assert.ok(none.some((s) => /Bottom Only/.test(s.text)));
-  assert.ok(none.some((s) => /trim the bottom flush/.test(s.text)));
+  assert.ok(none.some((s) => /Floor Only/.test(s.text)));
+  assert.ok(none.some((s) => /trim the floor flush/.test(s.text)));
   const bad = guidedRecipe(Object.assign({ problems: ['Wall too thick'] }, base));
   assert.equal(bad.length, 1);
 });

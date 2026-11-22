@@ -1349,8 +1349,8 @@ test('a glued-on bottom: the base a ring cut through, the bottom stepped round a
       }
     }
     // The ring's middle is cut free last, after its floors and laps.
-    const lines = gcode.split('\n'), freed = lines.findIndex((l) => /Base: inside cut through/.test(l));
-    assert.ok(freed > 0 && !lines.slice(freed).some((l) => /Base: .*(skimmed|finishing lap)/.test(l)), 'a skim or lap after the ring\'s middle is free');
+    const lines = gcode.split('\n'), freed = lines.findIndex((l) => /Ring: inside cut through/.test(l));
+    assert.ok(freed > 0 && !lines.slice(freed).some((l) => /Ring: .*(skimmed|finishing lap)/.test(l)), 'a skim or lap after the ring\'s middle is free');
     // The step is cut all round, out to the outline, at its depth.
     const stepPts = pts.filter((p) => Math.abs(p.z + 2) < 1e-6);
     for (let k = 0; k < 60; k++) {
@@ -1376,7 +1376,7 @@ test('a glued-on bottom: the base a ring cut through, the bottom stepped round a
   // What doesn't fit says why.
   const said = (i, re) => assert.ok(boxPlan(i).problems.some((p) => re.test(p)), JSON.stringify(boxPlan(i).problems));
   said({ bottom: { board: 3, step: 2 } }, /Locating Step/);
-  said({ cut: 'bottom' }, /Bottom Only needs/);
+  said({ cut: 'bottom' }, /Floor Only needs/);
   said({ bottom: { board: 6, step: 2 }, tabs: { count: 4, width: 6, height: 4.5 } }, /Tabs/);
   said({ bottom: { board: 60, step: 45 } }, /Locating Step must be at least 1 mm less/);
   said({ diameter: 60, wall: 20, lipWidth: 4, tabs: { count: 6, width: 6, height: 1.5 }, bottom: { step: 2 } }, /tabs for the ring's inside/);
@@ -1450,7 +1450,7 @@ test('an inset bottom: the ring\'s inside the opening, cut through, a rabbet rou
     if (lidStyle === 'plug') assert.ok(!lid.cuts.some((c) => c.op === 'pocket' && !c.shape), 'a pocket in a plug lid');
     // The lip reaches no further than the panel.
     assert.ok(plan.lipUp < plan.baseHeight - r.depth);
-    assert.match(gcode, /Inset bottom: a panel/);
+    assert.match(gcode, /Inset floor: a panel/);
   }
   // A drawing: the ring is turned over too, so both halves are cut from
   // the mirrored drawing and land as drawn, matching.
@@ -1461,7 +1461,7 @@ test('an inset bottom: the ring\'s inside the opening, cut through, a rabbet rou
     assert.deepEqual(p.halves[0].shape, p.halves[1].shape);
     assert.deepEqual(p.halves[0].shape, carved.halves[1].shape, 'the ring cut as the carved lid is, mirrored');
   }
-  assert.ok(boxPlan({ ...inset0, grain: true, cut: 'base' }).problems.some((q) => /Grain Match isn't for an Inset Bottom/.test(q)));
+  assert.ok(boxPlan({ ...inset0, grain: true, cut: 'base' }).problems.some((q) => /Grain Match isn't for an Inset Floor/.test(q)));
   // The panel on its own board, with Bottom Only: only its outline.
   const only = check({ lipOn: 'lid', wall: 12, lipWidth: 3, stock: 25.4, bottom: { board: 6.35, step: 2, style: 'inset', rabbet: 4, recess: 0.5 }, cut: 'bottom' });
   assert.deepEqual(only.plan.halves.map((h) => h.name), ['bottom']);
@@ -1472,17 +1472,17 @@ test('an inset bottom: the ring\'s inside the opening, cut through, a rabbet rou
 test('an inset bottom says what it can\'t do: the lip on the base, magnets, notches, a sloped lip, a thin wall, a deep lip', () => {
   const inset = { stock: 25.4, wall: 12, lipWidth: 3, lipOn: 'lid', bottom: { board: 6.35, step: 2, style: 'inset', rabbet: 4, recess: 0.5 } };
   const said = (extra, re) => assert.ok(boxPlan({ ...inset, ...extra }).problems.some((p) => re.test(p)), JSON.stringify(extra) + ' ' + JSON.stringify(boxPlan({ ...inset, ...extra }).problems));
-  said({ lipOn: 'base' }, /Inset Bottom needs the lip on the lid/);
-  said({ magnets: { count: 4, diameter: 6.35, depth: 3 } }, /Magnets go in the base/);
-  said({ notch: { width: 14, depth: 4, count: 2 } }, /Finger notches go in the base/);
+  said({ lipOn: 'base' }, /Inset Floor needs the lip on the lid/);
+  said({ magnets: { count: 4, diameter: 6.35, depth: 3 } }, /Magnets go in the ring/);
+  said({ notch: { width: 14, depth: 4, count: 2 } }, /Finger notches go in the ring/);
   said({ edges: { bit: 'v', angle: 90, diameter: 12.7, vtip: 0.2, outside: 0, inside: 0, pocket: 0, slope: true } }, /Sloped Lip isn/);
   said({ wall: 8 }, /Rabbet Width/);
   said({ lipHeight: 20 }, /Lip Height too deep for the ring/);
-  said({ bottom: { ...inset.bottom, board: null } }, /set the Bottom Board/);
+  said({ bottom: { ...inset.bottom, board: null } }, /set the Floor Board/);
   // Edges on the ring: left, with a note; the lid's still cut.
   const e = boxPlan({ ...inset, edges: { bit: 'v', angle: 90, diameter: 12.7, vtip: 0.2, outside: 0.5, inside: 1, pocket: 0.5 } });
   assert.deepEqual(e.problems, []);
-  assert.ok(e.notes.some((n) => /base's edges are left/.test(n)) && !e.edges.base.length && e.edges.lid.length);
+  assert.ok(e.notes.some((n) => /ring's edges are left/.test(n)) && !e.edges.base.length && e.edges.lid.length);
   // Auto Sizes fits the wall to the rabbet.
   const a = autoSizes({ shape: 'rect', length: 160, width: 110, cornerRadius: 14, stock: 25.4, lipOn: 'lid', bit: 6.35, bottom: inset.bottom }, 'hardwood', false);
   assert.deepEqual(a.problems, []);
@@ -1494,7 +1494,7 @@ test('an inset bottom says what it can\'t do: the lip on the base, magnets, notc
 test('a plug lid: solid, its lip a plug under a flat top; with the lip on the lid only', () => {
   const p = check({ lipOn: 'lid', lidStyle: 'plug', stock: 19, lidStock: 9, cut: 'lid', lipHeight: 5 }).plan;
   assert.deepEqual(p.halves[0].cuts.map((c) => c.what), ['shoulder round the lip']);
-  assert.ok(boxPlan({ lipOn: 'base', lidStyle: 'plug' }).problems.some((q) => /Plug Lid needs the lip on the lid/.test(q)));
+  assert.ok(boxPlan({ lipOn: 'base', lidStyle: 'plug' }).problems.some((q) => /Solid Lid needs the lip on the lid/.test(q)));
   assert.ok(boxPlan({ lipOn: 'lid', lidStyle: 'plug', cut: 'lid', lidStock: 5, lipHeight: 4 }).problems.some((q) => /at least 2 mm thicker than the plug/.test(q)));
   // No floor corners or inner lip edge on a solid lid.
   const c = boxPlan({ lipOn: 'lid', lidStyle: 'plug', wall: 10, corners: { diameter: 6.35, radius: 3.175 }, edges: { bit: 'v', angle: 90, diameter: 12.7, vtip: 0.2, outside: 0.5, inside: 1, pocket: 0.5 } });
@@ -1533,12 +1533,12 @@ test('a drop-in lid: a panel from the Bottom Board flush in a rabbet round the r
   assert.ok(ed.edges.base.length >= 2);
   // What it isn't for.
   const said = (x) => boxPlan(Object.assign({}, base, x)).problems.join(' | ');
-  assert.match(said({ bottom: { style: 'inset', board: 6.35, rabbet: 3 } }), /Drop-In Lid needs a Glued-On Bottom of the Plug kind/);
-  assert.match(said({ bottom: null }), /Drop-In Lid needs a Glued-On Bottom/);
-  assert.match(said({ bottom: { board: null, step: 2 } }), /cut from the Bottom Board/);
+  assert.match(said({ bottom: { style: 'inset', board: 6.35, rabbet: 3 } }), /Drop-In Lid needs a Glued-On Floor of the Stepped kind/);
+  assert.match(said({ bottom: null }), /Drop-In Lid needs a Glued-On Floor/);
+  assert.match(said({ bottom: { board: null, step: 2 } }), /cut from the Floor Board/);
   assert.match(said({ magnets: { count: 4, diameter: 8, depth: 3 } }), /Magnets aren.t for a Drop-In Lid/);
   assert.match(said({ lipOn: 'base' }), /needs the lip on the lid/);
-  assert.match(said({ cut: 'lid' }), /cut with Bottom Only/);
+  assert.match(said({ cut: 'lid' }), /cut with Floor and Lid/);
   assert.match(said({ wall: 6, lipWidth: 3 }), /fingertip beside the panel/);
   // Measured inside, with a Height: the inside that high.
   const p = boxPlan(outsideInput(Object.assign({}, base, { measure: 'inside', height: 8, notch: null })));
