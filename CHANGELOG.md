@@ -2,8 +2,10 @@
 
 ## Unreleased
 
+- **Guided Setup** (in the Start card): five questions (the kind of box, its shape, size and board, how it looks from outside, how the lid sits, finishing touches) set the box up with Auto Sizes on, so it fits together; the preview shows each answer. The last screen is the job: the board, each program in order with its zero, bits and minutes (one program with a tool changer or manual tool change set up in ncSender, else Edges Only, Corners Only and Bottom Only after it), then the assembly. Apply keeps the job in the Start card until you change something; Cancel puts your settings back.
+- **Thin in wood:** in wood, a note when the Lip Thickness, or the wall outside the lip, is under 2.5 mm: it cuts, but splits along the grain. Auto Sizes makes the wall at least 6 mm (1/4") in wood, so a small box's lip and rim are each about 3 mm.
+- Fixed: an oval was refused ("Diameter must be more than 0") when the Diameter field was empty.
 - **Inset bottom**, a second kind of Glued-On Bottom: the ring's inside is the lid's opening, cut through, with a rabbet round it on the face that's up. Turned over, a flat panel from the Bottom Board is glued into the rabbet from below, out of sight: no joint shows from the outside. **Rabbet Width** and **Recess** (the panel a little up inside, so the box doesn't rock). The lip goes on the lid; no magnets, notches or sloped lip in the ring.
-- **Lip Thickness follows the wall** (half of it, or what magnets, an inset bottom or a sloped lip need), with Auto Sizes off too, until you type one. The chain link beside it shows it's linked; click it to link it again.
 - **Lip Thickness follows the wall**, with Auto Sizes off too: half of it, or what magnets, an inset bottom or a sloped lip need, until you type your own. A chain link by the field shows it; click it to link or unlink.
 - Fixed: typing a fraction in **Height** or **Lid Height** (3/16", for example) was overwritten by the board's height at the "/".
 - **Plug lid:** the lid left solid, its lip a plug under a flat top, quicker and from a thinner board. With an inset bottom, both are flat panels.

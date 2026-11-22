@@ -1,4 +1,4 @@
-# Guided setup: plan
+# Guided setup: plan (steps 1 and 2 built in 0.3.6; the machine is read from ncSender, not asked)
 
 A short series of questions that sets up Carved Box for the box you want, and then shows the whole job as a list of steps. It's for people who don't yet know which options matter. Everything it sets stays editable in the normal dialog afterwards.
 
