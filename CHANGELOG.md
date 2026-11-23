@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0: Guided Setup, inset and drop-in panels, Measure Inside
 
 - **Clearer names:** the Glued-On Bottom is the **Glued-On Floor** (Floor Board, Floor Only; **Floor and Lid** with a drop-in lid), its kinds **Stepped, under the ring** and **Inset, from below**; the lids **Carved**, **Solid** and **Drop-In**. With a glued-on floor the base is called the **ring** (Ring Only, Lip Stands Up On: Ring). Saved settings load as before.
 - Fixed: with a heart, oval or drawing, a glued-on floor's plug, an inset floor's panel and a drop-in lid were half the bit smaller all round than the opening (3 mm of play with a 1/4" bit), to clear the corners the bit rounds. They now follow the opening as the bit cuts it, the Clearance smaller, with only those corners rounded to match.
@@ -12,7 +12,6 @@
 - **Lip Thickness follows the wall**, with Auto Sizes off too: half of it, or what magnets, an inset floor or a sloped lip need, until you type your own. A chain link by the field shows it; click it to link or unlink.
 - Fixed: typing a fraction in **Height** or **Lid Height** (3/16", for example) was overwritten by the board's height at the "/".
 - **Solid lid:** the lid left solid, its lip a plug under a flat top, quicker and from a thinner board. With an inset floor, both are flat panels.
-
 - **Measure: Outside or Inside.** Inside, a round, rectangular or polygon box's sizes are what it holds, and the Height its inside; the outside follows from the wall, floor and top. Switching shows the same box the other way; the program's header gives the inside size too.
 - **Height** in place of Base Height: the box closed. The **Lid Height** is its share, from the top to the seam where the halves meet; the base is the rest. The lip stands above the seam, from the same board. Settings saved before this come back as the same box, measured the new way.
 - An empty Height or Lid Height shows how high the boards allow; one typed as that follows the stock when it changes, as an empty one does.
