@@ -1680,3 +1680,17 @@ test('compartments: rounded floor corners in each one', () => {
   const said = (o, re) => assert.ok(boxPlan(o).problems.some((p) => re.test(p)), JSON.stringify(o) + ' ' + boxPlan(o).problems);
   said({ shape: 'rect', length: 150, width: 100, cornerRadius: 12, corners: { diameter: 12.7, radius: 6.35 }, compartments: { rows: 2, cols: 2, thickness: 6, height: 5 } }, /too big for the dividers/);
 });
+
+test('under the widened opening, the inside starts at its floor, not in the air above it', () => {
+  for (const lipOn of ['base', 'lid']) for (const extra of [{}, { finish: 0.3 }, { corners: { diameter: 6.35, radius: 3.175 } }, { shape: 'rect', length: 130, width: 90, cornerRadius: 14, compartments: { rows: 1, cols: 2, thickness: 6 } }, { shape: 'rect', length: 130, width: 90, cornerRadius: 14, finish: 0.3, compartments: { rows: 2, cols: 2, thickness: 6 } }]) {
+    const { plan, pts } = check(Object.assign({ lipOn, lipHeight: 6 }, extra));
+    const half = plan.halves.find((h) => h.name === (lipOn === 'lid' ? 'base' : 'lid'));
+    const fin = plan.o.finish || 0, open = half.cuts.find((c) => /^opening widened/.test(c.what));
+    const inside = half.cuts.find((c) => /^(inside|compartment)/.test(c.what));
+    assert.ok(Math.abs(inside.z0 - (open.z0 - open.depth + fin)) < 1e-9, JSON.stringify({ lipOn, extra, z0: inside.z0 }));
+    // No cut of the inside's own above the opening's rough floor.
+    const top = -plan.faces[half.name] - open.depth + fin;
+    const rb = plan.o.bit / 2, near = pts.filter((p) => p.g === 1 && shapeDistance(plan.shape, plan.tInside - rb - 0.5, p.x - half.at.x, p.y - half.at.y) < 0 && p.z < -1e-6);
+    assert.ok(near.every((p) => p.z <= top + 1e-6 || p.z >= -open.depth + fin - 1e-6), 'air pass');
+  }
+});

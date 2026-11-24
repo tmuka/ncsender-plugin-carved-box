@@ -2925,20 +2925,23 @@ function boxPlan(input) {
     // A flat inside's the opening's pocket (a part slope's steps only go
     // round its wall: its middle cleared here, no coves without a wall).
     var inDepth = height[name] - under[name], flat = flush && name === rabbetHalf;
+    // Under the opening widened for the lip, the inside starts at its
+    // (rough) floor: above it, the opening's pocket has cleared it already.
+    var st0 = openSteps[0], pre = name === rabbetHalf && !flat && !ring ? st0.d1 - (openSteps.length === 1 && fin > 0 && st0.d1 > fin + 1e-9 ? fin : 0) : 0;
     if (!ring && !(flat && openSteps.length === 1) && !(plugLid && name === 'lid')) {
       if (comp && name === 'base') {
         // Each compartment: its floor short of the corners for the last
         // of it, with rounded floor corners.
-        if (comp.top > 1e-9) cuts.push({ op: 'pocket', t: tInside, dx: 0, dy: 0, z0: z0, depth: comp.top, finish: fin, what: 'inside, down to the dividers\' top' });
+        if (comp.top - pre > 1e-9) cuts.push({ op: 'pocket', t: tInside, dx: 0, dy: 0, z0: z0 - pre, depth: comp.top - pre, finish: fin, what: 'inside, down to the dividers\' top' });
         comp.cells.forEach(function(c, i) {
           var cd = inDepth - comp.top - rc;
           cuts.push({ op: 'pocket', shape: c.shape, t: 0, dx: c.dx, dy: c.dy, z0: z0 - comp.top, depth: cd, finish: fin, what: 'compartment ' + (i + 1) });
           if (rc > 0) cuts.push({ op: 'pocket', shape: c.shape, t: -rc, dx: c.dx, dy: c.dy, z0: z0 - comp.top - cd, depth: rc, what: 'compartment ' + (i + 1) + ', its floor short of the corners' });
         });
       } else if (rc > 0 && !flat) {
-        cuts.push({ op: 'pocket', t: tInside, dx: 0, dy: 0, z0: z0, depth: inDepth - rc, finish: fin, what: 'inside' });
+        cuts.push({ op: 'pocket', t: tInside, dx: 0, dy: 0, z0: z0 - pre, depth: inDepth - rc - pre, finish: fin, what: 'inside' });
         cuts.push({ op: 'pocket', t: tInside - rc, dx: 0, dy: 0, z0: z0 - (inDepth - rc), depth: rc, what: 'inside, its floor short of the corners' });
-      } else cuts.push({ op: 'pocket', t: tInside, dx: 0, dy: 0, z0: z0, depth: inDepth, finish: fin, what: 'inside' });
+      } else cuts.push({ op: 'pocket', t: tInside, dx: 0, dy: 0, z0: z0 - (flat ? 0 : pre), depth: inDepth - (flat ? 0 : pre), finish: fin, what: 'inside' });
     }
     // The shoulder: the wall top outside the lip, down by the Lip Height
     // less the Clearance,
