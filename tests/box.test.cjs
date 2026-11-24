@@ -84,6 +84,10 @@ function allowed(set, half, p) {
   const rc = o.corners ? o.corners.radius : 0;
   // A plug lid: its inside left solid.
   const solid = o.lidStyle === 'plug' && half.name === 'lid';
+  // Compartments: below the dividers' top, only inside a compartment.
+  const comp = half.name === 'base' && plan.compartments;
+  if (comp && at(plan.tInside - rb) <= eps && d > comp.top + eps)
+    return d <= floor + eps && comp.cells.some((c) => shapeDistance(c.shape, -rb, px - c.dx, py - c.dy) <= eps);
   if (!solid && at(plan.tInside - rb) <= eps && d <= floor + eps && (d <= floor - rc + eps || at(plan.tInside - rc - rb) <= eps)) return true;
   if (withLip && at(plan.tLip + rb) >= -eps && d <= plan.lipUp + eps) return true;
   // The widened opening, by depth: a sloped lip's only to its floor's
@@ -1576,4 +1580,47 @@ test('a heart\'s, oval\'s or drawing\'s plug and panels follow the ring as cut: 
     // Along the walls, the Clearance (was half the bit more all round).
     assert.ok(gaps[150] <= 0.4 + 0.1, sh.shape + ' ' + kind + ': typical gap ' + gaps[150]);
   }
+});
+
+test('compartments: the dividers stay standing, every compartment\'s floor is cleared', () => {
+  const rect = { shape: 'rect', length: 150, width: 100, cornerRadius: 10 };
+  for (const lipOn of ['base', 'lid']) for (const [rows, cols, height] of [[2, 3, null], [1, 2, null], [3, 1, 8], [2, 2, null]]) for (const extra of [{}, { finish: 0.3 }, { layout: 'y', origin: 'center' }]) {
+    const input = Object.assign({}, rect, extra, { lipOn, compartments: { rows, cols, thickness: 6, height } });
+    const { plan, pts } = check(input);
+    const comp = plan.compartments, base = plan.halves.find((h) => h.name === 'base'), rb = plan.o.bit / 2;
+    assert.equal(comp.cells.length, rows * cols);
+    assert.equal(comp.height, height || base.height - plan.o.floor - (lipOn === 'lid' ? plan.rabbetDepth : 0));
+    // Each compartment's floor, cleared all over.
+    const floorZ = -(base.height - plan.o.floor);
+    const deep = pts.filter((p) => Math.abs(p.z - floorZ) < 1e-6);
+    for (const c of comp.cells) for (let qx = -c.shape.hx + 0.5; qx <= c.shape.hx - 0.5; qx += 1.5) for (let qy = -c.shape.hy + 0.5; qy <= c.shape.hy - 0.5; qy += 1.5) {
+      if (shapeDistance(c.shape, 0, qx, qy) > -0.3) continue;
+      const x = base.at.x + c.dx + qx, y = base.at.y + c.dy + qy;
+      assert.ok(deep.some((p) => Math.hypot(p.x - x, p.y - y) <= rb + 0.3), 'compartment floor left at ' + qx + ',' + qy + ' ' + JSON.stringify(input));
+    }
+    // The dividers' middle line: nothing below their top.
+    const top = -comp.top;
+    for (const p of pts) {
+      const px = p.x - base.at.x, py = p.y - base.at.y;
+      if (shapeDistance(plan.shape, plan.tInside, px, py) > 0) continue;
+      const inDivider = comp.cells.every((c) => shapeDistance(c.shape, 0, px - c.dx, py - c.dy) > rb + 0.05);
+      if (inDivider) assert.ok(p.z >= top - 1e-6, 'divider cut at ' + JSON.stringify(p));
+    }
+  }
+});
+
+test('compartments: what doesn\'t fit says why', () => {
+  const rect = { shape: 'rect', length: 150, width: 100, cornerRadius: 10 };
+  const said = (o, re) => assert.ok(boxPlan(o).problems.some((p) => re.test(p)), JSON.stringify(o) + ' ' + boxPlan(o).problems);
+  said(Object.assign({}, rect, { compartments: { rows: 1, cols: 12, thickness: 10 } }), /the bit needs at least/);
+  said(Object.assign({}, rect, { compartments: { rows: 2, cols: 2, thickness: 0.5 } }), /Divider Thickness must be at least 1 mm/);
+  said(Object.assign({}, rect, { compartments: { rows: 2, cols: 2, thickness: 6, height: 40 } }), /Divider Height can be at most/);
+  said(Object.assign({}, rect, { bottom: { board: 6.35, step: 2, oversize: 1.5 }, compartments: { rows: 2, cols: 2, thickness: 6 } }), /need the base's own floor/);
+  said({ compartments: { rows: 2, cols: 2, thickness: 6 } }, /only a rectangle/);
+  said(Object.assign({}, rect, { corners: { diameter: 6.35, radius: 3.175 }, compartments: { rows: 2, cols: 2, thickness: 6 } }), /rounded floor corners/);
+  assert.equal(boxPlan(Object.assign({}, rect, { compartments: { rows: 1, cols: 1, thickness: 6 } })).compartments, null);
+  // An Inside Rim chamfer: full dividers stop below it.
+  const ed = boxPlan(Object.assign({}, rect, { edges: { bit: 'v', angle: 90, diameter: 12.7, outside: 0, inside: 0, pocket: 1 }, compartments: { rows: 1, cols: 2, thickness: 6 } }));
+  assert.deepEqual(ed.problems, []);
+  assert.equal(ed.compartments.top, 1);
 });

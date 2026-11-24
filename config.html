@@ -2203,14 +2203,15 @@ if (typeof module !== 'undefined' && module.exports) {
 // underside: rabbet, its width; recess, how far the panel sits up inside
 // it) }, or null for a base with its own floor; cut 'bottom': only the
 // bottom, on its board. lidStyle: 'plug' for a solid lid (its lip a plug),
-// else carved.
+// else carved. compartments: { rows, cols, thickness, height (the
+// dividers' from the floor; null: full) }, or null for one space.
 var DEFAULTS = {
   shape: 'circle', diameter: 80, length: 120, width: 80, cornerRadius: 10, sides: 6, flats: 80, outline: null,
   stock: 19, lidHeight: null, baseHeight: null, cut: 'both', lidStock: null, grain: false, wall: 6, floor: 4, top: 4,
   lipOn: 'base', lipHeight: 4, lipWidth: 3, clearance: 0.2,
   gap: 12, layout: 'x', origin: 'front-left', margin: 5,
   bit: 3.175, through: 0.5, tabs: { count: 4, width: 6, height: 1.5 },
-  magnets: null, notch: null, edges: null, corners: null, finish: 0, finishDir: 'conventional', bottom: null, lidStyle: null
+  magnets: null, notch: null, edges: null, corners: null, finish: 0, finishDir: 'conventional', bottom: null, lidStyle: null, compartments: null
 };
 
 // What fits in an opening of S moved t that's cut from inside with a bit
@@ -2689,6 +2690,37 @@ function boxPlan(input) {
     });
   }
 
+  // Compartments: dividers left standing in the base's inside, its
+  // pocket down to their top, then each compartment its own pocket down
+  // to the floor. Full: up to where the lid reaches down (the opening's
+  // floor, with the lip on the lid), below any Inside Rim chamfer.
+  var comp = null, cp = o.compartments;
+  if (cp && cp.rows * cp.cols > 1) {
+    var cRows = cp.rows, cCols = cp.cols, cThick = cp.thickness, cDepth = baseH - under.base;
+    var cFull = (rabbetHalf === 'base' ? rabbetDepth : 0) + (ed && ed.pocket > 0 ? ed.pocket : 0);
+    var cTop = cp.height > 0 ? cDepth - cp.height : cFull;
+    need(rect, 'Compartments: only a rectangle can have them so far');
+    need(!bot, 'Compartments need the base\'s own floor: with a Glued-On Floor the ring\'s inside is cut through, so the dividers would come loose');
+    need(!(cn && (cn.radius > 0 || cn.diameter > 0)), 'Compartments: rounded floor corners aren\'t made with them yet: turn Corners off');
+    need(cRows >= 1 && cCols >= 1 && cRows <= 12 && cCols <= 12 && cRows === Math.round(cRows) && cCols === Math.round(cCols), 'Compartments: Rows and Columns must be whole numbers from 1 to 12');
+    need(cThick >= 1, 'Compartments: Divider Thickness must be at least 1 mm');
+    need(cp.height == null || cp.height > 0, 'Compartments: Divider Height must be more than 0, or empty for full height');
+    if (cp.height > 0) need(cTop >= cFull - 1e-9, 'Compartments: Divider Height can be at most ' + down2(cDepth - cFull) + ' mm (' + (rabbetHalf === 'base' ? 'under the lid\'s lip' : 'the base\'s inside') + (ed && ed.pocket > 0 ? ', below the Inside Rim' : '') + ')');
+    need(cDepth - cTop >= 1, 'Compartments: no room for dividers: ' + (rabbetHalf === 'base' ? 'the lid\'s lip reaches the base\'s floor; make the Lip Height lower' : 'the base\'s inside is too shallow'));
+    if (rect) {
+      var cHx = S.hx + tInside, cHy = S.hy + tInside, cCr = Math.max(0, S.cr + tInside);
+      var cW = (2 * cHx - (cCols - 1) * cThick) / cCols, cH = (2 * cHy - (cRows - 1) * cThick) / cRows, cMin = o.bit + 1 + 2 * fin0;
+      need(Math.min(cW, cH) >= cMin, 'Compartments: each is ' + down2(cW) + ' x ' + down2(cH) + ' mm, and the bit needs at least ' + down2(cMin) + ' mm: fewer Rows or Columns, or thinner dividers');
+      // A compartment's corners as round as the inside's (its corner in
+      // the box's corner follows the inside's).
+      need(Math.min(cW, cH) >= 2 * cCr - 1e-9, 'Compartments: each is narrower than the inside\'s corners are round (' + down2(2 * cCr) + ' mm): fewer Rows or Columns, or a smaller Corner Radius');
+      var cells = [];
+      for (var cr0 = 0; cr0 < cRows; cr0++) for (var cc0 = 0; cc0 < cCols; cc0++)
+        cells.push({ dx: -cHx + cW / 2 + cc0 * (cW + cThick), dy: -cHy + cH / 2 + cr0 * (cH + cThick), shape: { kind: 'rect', hx: cW / 2, hy: cH / 2, cr: Math.min(cCr, cW / 2, cH / 2) } });
+      comp = { rows: cRows, cols: cCols, thickness: cThick, top: cTop, height: cDepth - cTop, full: cFull, cells: cells, size: { w: cW, h: cH } };
+    }
+  }
+
   // Where the halves go: side by side along X (base first) or Y (base in front).
   // The margin is from the stock's edges to the cuts' outsides: the
   // outline's whole width, or the waste cleared round a seam.
@@ -2783,6 +2815,11 @@ function boxPlan(input) {
       if (rc > 0 && !flat) {
         cuts.push({ op: 'pocket', t: tInside, dx: 0, dy: 0, z0: z0, depth: inDepth - rc, finish: fin, what: 'inside' });
         cuts.push({ op: 'pocket', t: tInside - rc, dx: 0, dy: 0, z0: z0 - (inDepth - rc), depth: rc, what: 'inside, its floor short of the corners' });
+      } else if (comp && name === 'base') {
+        if (comp.top > 1e-9) cuts.push({ op: 'pocket', t: tInside, dx: 0, dy: 0, z0: z0, depth: comp.top, finish: fin, what: 'inside, down to the dividers\' top' });
+        comp.cells.forEach(function(c, i) {
+          cuts.push({ op: 'pocket', shape: c.shape, t: 0, dx: c.dx, dy: c.dy, z0: z0 - comp.top, depth: inDepth - comp.top, finish: fin, what: 'compartment ' + (i + 1) });
+        });
       } else cuts.push({ op: 'pocket', t: tInside, dx: 0, dy: 0, z0: z0, depth: inDepth, finish: fin, what: 'inside' });
     }
     // The shoulder: the wall top outside the lip, down by the Lip Height
@@ -2836,7 +2873,7 @@ function boxPlan(input) {
   var plan = {
     o: o, problems: problems, notes: notes, shape: S, mirror: mirror, halfX: halfX, halfY: halfY, ext: ext, margin: m,
     tInside: tInside, tRabbet: tRabbet, tLip: tLip, tOpen: tOpen, slope: slope ? slant : 0, slopeUp: slope ? slopeUp : 0, slopeD: slopeD, openSteps: openSteps, rabbetDepth: rabbetDepth, lipUp: lipUp, lidHeight: lidH, baseHeight: baseH, face: face, faces: faces,
-    halves: halves, magnetAt: magnetAt, magnets: magnetCuts, notch: notchCut, notches: notchCuts, edges: edgeAt, corners: cornerAt, boards: B, originSay: originSay,
+    halves: halves, compartments: comp, magnetAt: magnetAt, magnets: magnetCuts, notch: notchCut, notches: notchCuts, edges: edgeAt, corners: cornerAt, boards: B, originSay: originSay,
     // The stock needed: its size and front-left corner.
     // (A drop-in lid's board: the bottom and the panel, about the bottom.)
     stock: drop && o.cut === 'bottom' ? { w: stockW, h: stockH, x0: shift.x + all.minX - m, y0: shift.y + all.minY - m, thick: botH }
