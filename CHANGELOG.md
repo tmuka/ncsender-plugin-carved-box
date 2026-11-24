@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Compartments: uneven sizes.** A grid's **Row Sizes** and **Column Sizes** set each row's and column's share instead of equal: `1 2 1` makes the middle column twice as wide as the two beside it, `2 1` makes the front row twice as deep as the back. One number for each; empty is equal. The note under the card lists each column's width and row's depth.
+
 ## 0.5.1: Faster on the Pi
 
 - **Faster on the Pi:** Auto Sizes and the preview with compartments, a heart or a drawing take a fraction of the time (a drawing with compartments: 35 s to under 2 s on a Pi 5; 8 wedges in a rectangle: about 0.5 s instead of 8). Typing pauses before the preview updates when the last update was slow, so the keys don't lag. The programs are the same.

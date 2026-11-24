@@ -1636,7 +1636,9 @@ test('compartments: wedges and grids in round, oval, polygon and heart boxes', (
     { shape: 'poly', sides: 6, flats: 110, cornerRadius: 6, compartments: { sections: 6, thickness: 5 } },
     { shape: 'heart', length: 120, width: 110, cornerRadius: 8, compartments: { layout: 'grid', rows: 1, cols: 2, thickness: 5 } },
     { shape: 'rect', length: 150, width: 100, cornerRadius: 10, compartments: { layout: 'wedges', sections: 4, thickness: 6 } },
-    { diameter: 110, finish: 0.3, compartments: { layout: 'grid', rows: 2, cols: 2, thickness: 5 } }
+    { diameter: 110, finish: 0.3, compartments: { layout: 'grid', rows: 2, cols: 2, thickness: 5 } },
+    { shape: 'heart', length: 120, width: 110, cornerRadius: 8, compartments: { layout: 'grid', rows: 1, cols: 3, thickness: 5, colSizes: [1, 2, 1] } },
+    { diameter: 110, compartments: { layout: 'grid', rows: 3, cols: 2, thickness: 5, rowSizes: [1, 2, 1], colSizes: [2, 1] } }
   ];
   for (const input of cases) {
     const { plan, pts } = check(input);
@@ -1722,4 +1724,25 @@ test('compartments: the Inside Rim chamfers each one\'s top edge, clear of the w
   }
   const said = (o, re) => assert.ok(boxPlan(o).problems.some((p) => re.test(p)), JSON.stringify(o) + ' ' + boxPlan(o).problems);
   said({ shape: 'rect', length: 150, width: 100, cornerRadius: 12, edges: { bit: 'v', angle: 90, diameter: 12.7, vtip: 0.3, outside: 0, inside: 0, pocket: 2 }, compartments: { rows: 1, cols: 2, thickness: 4 } }, /Inside Rim too big for the dividers/);
+});
+
+test('compartments: uneven sizes, each column and row its share', () => {
+  const said = (o, re) => assert.ok(boxPlan(o).problems.some((p) => re.test(p)), JSON.stringify(o) + ' ' + boxPlan(o).problems);
+  const rect = { shape: 'rect', length: 150, width: 100, cornerRadius: 12 };
+  const { plan } = check(Object.assign({}, rect, { compartments: { rows: 2, cols: 3, thickness: 6, colSizes: [1, 2, 1], rowSizes: [3, 1] } }));
+  const c = plan.compartments, w = (i) => 2 * c.cells[i].shape.hx, h = (i) => 2 * c.cells[i].shape.hy;
+  assert.ok(Math.abs(w(1) - 2 * w(0)) < 1e-9 && Math.abs(w(2) - w(0)) < 1e-9, 'columns 1 2 1');
+  assert.ok(Math.abs(h(0) - 3 * h(3)) < 1e-9, 'rows 3 1, front to back');
+  // They fill the inside with the dividers between: the widths and the
+  // dividers add up to the inside's width, and none overlap.
+  const inX = 150 - 2 * plan.o.wall, inY = 100 - 2 * plan.o.wall;
+  assert.ok(Math.abs(w(0) + w(1) + w(2) + 2 * 6 - inX) < 1e-6 && Math.abs(h(0) + h(3) + 6 - inY) < 1e-6);
+  assert.ok(Math.abs((c.cells[1].dx - c.cells[1].shape.hx) - (c.cells[0].dx + c.cells[0].shape.hx) - 6) < 1e-9, 'a divider 6 mm between');
+  // Equal shares are the same as none.
+  const eq = boxPlan(Object.assign({}, rect, { compartments: { rows: 2, cols: 3, thickness: 6, colSizes: [2, 2, 2], rowSizes: [1, 1] } })).compartments;
+  const none = boxPlan(Object.assign({}, rect, { compartments: { rows: 2, cols: 3, thickness: 6 } })).compartments;
+  assert.deepEqual(eq.cells, none.cells);
+  said(Object.assign({}, rect, { compartments: { rows: 1, cols: 3, thickness: 6, colSizes: [1, 2] } }), /Column Sizes has 2 numbers, and there are 3 Columns/);
+  said(Object.assign({}, rect, { compartments: { rows: 2, cols: 1, thickness: 6, rowSizes: [1, 0] } }), /Row Sizes must be numbers more than 0/);
+  said(Object.assign({}, rect, { compartments: { rows: 1, cols: 3, thickness: 6, colSizes: [1, 30, 1] } }), /the smallest is .* sizes closer to equal/);
 });
