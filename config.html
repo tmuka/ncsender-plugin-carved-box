@@ -500,6 +500,9 @@
           <div class="cb-field"><label for="cb-comp-a">Angle (°)</label><input class="cb-input" id="cb-comp-a" title="Where the first divider points: 0 to the back, turning counterclockwise seen from above."></div>
           <div class="cb-field"><label for="cb-comp-mid">Middle</label><input class="cb-input" id="cb-comp-mid" data-unit="length" placeholder="none" title="A round compartment in the middle, this wide across, with a divider round it. Empty: the wedges meet in the middle."></div>
         </div>
+        <div class="cb-row" id="cb-comp-wsizes">
+          <div class="cb-field"><label for="cb-comp-wsz">Section Sizes</label><input class="cb-input" id="cb-comp-wsz" placeholder="equal" title="Each section's share of the way round, counterclockwise from the first divider: 1 2 1 makes the second section a half and the others a quarter each. One number for each section. Empty: all the same."></div>
+        </div>
         <div class="cb-row">
           <div class="cb-field"><label for="cb-comp-t">Divider Thickness</label><input class="cb-input" id="cb-comp-t" data-unit="length" title="How thick each divider is. In wood, 1/4&quot; (6 mm) is sturdy; under 2.5 mm can split along the grain."></div>
           <div class="cb-field"><label for="cb-comp-h">Divider Height</label><input class="cb-input" id="cb-comp-h" data-unit="length" placeholder="full" title="From the floor. Empty: full, as high as they can go under the lid. Lower makes small compartments easier to reach into."></div>
@@ -685,7 +688,7 @@
       <ul>
         <li>A <b>finishing pass</b> always goes round the walls once more after the roughing, for cleaner walls; how much it takes and which way it goes are set by the <b>Material</b>.</li>
         <li><b>Enlarge a picture</b>: click a blank spot on the top or side view (or ⤢ by its title) to see it over the whole window. There the mouse wheel zooms at the pointer, two fingers pinch, and zoomed in a drag moves it; or use <b>&minus;</b>, <b>+</b> and <b>Fit</b> at the top. Click a blank spot, &times;, or press Esc to go back. A tap on a label still goes to its setting.</li>
-        <li><b>Compartments</b> are dividers carved into the base: a <b>Grid</b> of Rows and Columns (<b>Row Sizes</b> and <b>Column Sizes</b> make them uneven: <b>1 2 1</b> is a middle column twice as wide), or <b>Wedges</b> out from the middle (Sections, an Angle for the first one, 0 to the back, and a round <b>Middle</b> if you like). Full height stops under the lid's lip; a lower <b>Divider Height</b> makes small compartments easier to reach into. They need the base's own floor, not a Glued-On Floor. With <b>Corners</b> on, each compartment's floor is rounded.</li>
+        <li><b>Compartments</b> are dividers carved into the base: a <b>Grid</b> of Rows and Columns (<b>Row Sizes</b> and <b>Column Sizes</b> make them uneven: <b>1 2 1</b> is a middle column twice as wide), or <b>Wedges</b> out from the middle (Sections, an Angle for the first one, 0 to the back, a round <b>Middle</b> if you like, and <b>Section Sizes</b> for uneven ones). Full height stops under the lid's lip; a lower <b>Divider Height</b> makes small compartments easier to reach into. They need the base's own floor, not a Glued-On Floor. With <b>Corners</b> on, each compartment's floor is rounded.</li>
         <li>A tight lid: two <b>Finger Notches</b> opposite each other (front and back, or a Start Angle of 90 for the sides) lift it straight up with both hands. From one it tips and binds.</li>
         <li>Keep the <b>Holding Tabs</b> on: they hold the halves while the outlines, corners and edges are cut.</li>
         <li>Tap a label on the pictures (Wall, Lip Height, Clearance, Gap&hellip;) to go to its field; tap a problem under the settings to go to the field it's about.</li>
@@ -2322,7 +2325,9 @@ if (typeof module !== 'undefined' && module.exports) {
 // else carved. compartments: { rows, cols, thickness, height (the
 // dividers' from the floor; null: full), rowSizes, colSizes (a grid's
 // rows front to back and columns left to right as shares, [1, 2, 1]:
-// the middle twice as wide; null: equal) }, or null for one space.
+// the middle twice as wide; null: equal); wedges: { layout: 'wedges',
+// sections, angle, middle, thickness, height, sizes (each section's
+// share, counterclockwise from the first divider) }; or null for one space.
 var DEFAULTS = {
   shape: 'circle', diameter: 80, length: 120, width: 80, cornerRadius: 10, sides: 6, flats: 80, outline: null,
   stock: 19, lidHeight: null, baseHeight: null, cut: 'both', lidStock: null, grain: false, wall: 6, floor: 4, top: 4,
@@ -2827,19 +2832,20 @@ function boxPlan(input) {
     need(cp.height == null || cp.height > 0, 'Compartments: Divider Height must be more than 0, or empty for full height');
     if (cp.height > 0) need(cTop >= cFull - 1e-9, 'Compartments: Divider Height can be at most ' + down2(cDepth - cFull) + ' mm (' + (rabbetHalf === 'base' ? 'under the lid\'s lip' : 'the base\'s inside') + (ed && ed.pocket > 0 ? ', below the Inside Rim' : '') + ')');
     need(cDepth - cTop >= 1, 'Compartments: no room for dividers: ' + (rabbetHalf === 'base' ? 'the lid\'s lip reaches the base\'s floor; make the Lip Height lower' : 'the base\'s inside is too shallow'));
+    // Sizes as shares, one for each (null: equal).
+    var cShares = function(list, n, what, many) {
+      if (list == null) return null;
+      var ok = Array.isArray(list) && list.every(function(x) { return typeof x === 'number' && x > 0 && isFinite(x); });
+      need(ok, 'Compartments: ' + what + ' must be numbers more than 0, such as 1 2 1');
+      need(!ok || list.length === n, 'Compartments: ' + what + ' has ' + (ok ? list.length : 0) + (ok && list.length === 1 ? ' number' : ' numbers') + ', and there ' + (n === 1 ? 'is 1 ' + many.replace(/s$/, '') : 'are ' + n + ' ' + many) + ': give one for each, or leave it empty for equal');
+      return ok && list.length === n ? list : null;
+    };
     var cIn = shapeLoop(S, tInside), cExt = cIn ? loopExtent(cIn) : { minX: 0, maxX: 0, minY: 0, maxY: 0 };
     if (!cWedge) {
       var cRows = cp.rows, cCols = cp.cols;
       need(cRows >= 1 && cCols >= 1 && cRows <= 12 && cCols <= 12 && cRows === Math.round(cRows) && cCols === Math.round(cCols), 'Compartments: Rows and Columns must be whole numbers from 1 to 12');
       // Each column's width and row's depth: its share of the room left
       // by the dividers (equal without sizes), and where each starts.
-      var cShares = function(list, n, what, many) {
-        if (list == null) return null;
-        var ok = Array.isArray(list) && list.every(function(x) { return typeof x === 'number' && x > 0 && isFinite(x); });
-        need(ok, 'Compartments: ' + what + ' must be numbers more than 0, such as 1 2 1');
-        need(!ok || list.length === n, 'Compartments: ' + what + ' has ' + (ok ? list.length : 0) + (ok && list.length === 1 ? ' number' : ' numbers') + ', and there ' + (n === 1 ? 'is 1 ' + many.replace(/s$/, '') : 'are ' + n + ' ' + many) + ': give one for each, or leave it empty for equal');
-        return ok && list.length === n ? list : null;
-      };
       var cSpans = function(room, n, list) {
         var sum = list ? list.reduce(function(a, b) { return a + b; }, 0) : n;
         return Array.from({ length: n }, function(_, i) { return room * (list ? list[i] : 1) / sum; });
@@ -2875,17 +2881,24 @@ function boxPlan(input) {
         need(cMid >= cMinW / 2, 'Compartments: the Middle compartment must be at least ' + down2(cMinW) + ' mm across, for the bit');
         need(shapeDistance(S, tInside, 0, 0) <= -(cMid + cThick + cMinW), 'Compartments: the Middle compartment is too big for the inside: it needs its dividers and room for the bit round it');
       }
-      if (cN >= 2 && cN <= 12) for (var wk = 0; wk < cN; wk++) {
-        var wa = cA0 + wk * 2 * Math.PI / cN, wb = cA0 + (wk + 1) * 2 * Math.PI / cN;
+      // Each section's angle, its share of the way round, counterclockwise
+      // from the first divider; where each divider points.
+      var cOk = cN >= 2 && cN <= 12 && cN === Math.round(cN), cL = cOk ? cShares(cp.sizes, cN, 'Section Sizes', 'Sections') : null;
+      var cSum = cL ? cL.reduce(function(a, b) { return a + b; }, 0) : cN, cAs = [], cDirs = [cA0];
+      if (cOk) for (var wi = 0; wi < cN; wi++) { cAs.push(2 * Math.PI * (cL ? cL[wi] : 1) / cSum); cDirs.push(cDirs[wi] + cAs[wi]); }
+      if (cOk) for (var wk = 0; wk < cN; wk++) {
+        var wa = cDirs[wk], wb = cDirs[wk + 1];
         var wd = { x: Math.cos(wa), y: Math.sin(wa) }, we = { x: Math.cos(wb), y: Math.sin(wb) };
-        cells.push({ dx: 0, dy: 0, shape: cellShape(S, tInside, [{ nx: wd.y, ny: -wd.x, c: -cThick / 2 }, { nx: -we.y, ny: we.x, c: -cThick / 2 }], cMid > 0 ? cMid + cThick : 0, 'wedge' + wk + '/' + cN) });
+        var p1 = { nx: wd.y, ny: -wd.x, c: -cThick / 2 }, p2 = { nx: -we.y, ny: we.x, c: -cThick / 2 };
+        // More than half way round: either side of the two dividers.
+        cells.push({ dx: 0, dy: 0, shape: cellShape(S, tInside, cAs[wk] > Math.PI + 1e-9 ? [{ any: [p1, p2] }] : [p1, p2], cMid > 0 ? cMid + cThick : 0, 'wedge' + wk + '/' + cN) });
       }
       if (cMid > 0) cells.push({ dx: 0, dy: 0, shape: { kind: 'circle', r: cMid }, middle: true });
-      cSize = { angle: 360 / cN, middle: cMid * 2 };
+      cSize = { angle: 360 / cN, angles: cAs.map(function(a) { return a * 180 / Math.PI; }), dirs: cDirs.slice(0, -1), middle: cMid * 2 };
     }
     // Each compartment: room for the bit (and its finishing pass).
     var cSmall = cells.filter(function(c) { return c.shape.kind === 'outline' && !(c.shape.deep >= cMinW / 2); }).length;
-    need(!cSmall, 'Compartments: ' + (cSmall === 1 ? 'one is' : cSmall + ' are') + ' too narrow for the bit (it needs ' + down2(cMinW) + ' mm across): fewer ' + (cWedge ? 'Sections' : 'Rows or Columns') + ', thinner dividers' + (cWedge && cMid > 0 ? ' or a smaller Middle' : ''));
+    need(!cSmall, 'Compartments: ' + (cSmall === 1 ? 'one is' : cSmall + ' are') + ' too narrow for the bit (it needs ' + down2(cMinW) + ' mm across): fewer ' + (cWedge ? 'Sections' : 'Rows or Columns') + ', thinner dividers' + (cWedge && cMid > 0 ? ', a smaller Middle' : '') + ((cWedge ? cp.sizes : cp.rowSizes || cp.colSizes) ? ', or sizes closer to equal' : ''));
     // The dividers' middle lines, for a picture: across a grid, out from
     // the middle (or the Middle's ring) for wedges.
     var cLines = [], cRing = 0, cFar = 2 * Math.max(cExt.maxX - cExt.minX, cExt.maxY - cExt.minY);
@@ -2894,7 +2907,7 @@ function boxPlan(input) {
       for (var lr = 1; lr < cp.rows; lr++) { var ly = cSize.ys[lr] - cThick / 2; cLines.push({ x0: cExt.minX - 1, y0: ly, x1: cExt.maxX + 1, y1: ly }); }
     } else {
       cRing = cMid > 0 ? cMid + cThick / 2 : 0;
-      for (var lk = 0; lk < cp.sections; lk++) { var la = cA0 + lk * 2 * Math.PI / cp.sections; cLines.push({ x0: cRing * Math.cos(la), y0: cRing * Math.sin(la), x1: cFar * Math.cos(la), y1: cFar * Math.sin(la) }); }
+      for (var lk = 0; lk < cSize.dirs.length; lk++) { var la = cSize.dirs[lk]; cLines.push({ x0: cRing * Math.cos(la), y0: cRing * Math.sin(la), x1: cFar * Math.cos(la), y1: cFar * Math.sin(la) }); }
     }
     comp = { layout: cWedge ? 'wedges' : 'grid', thickness: cThick, top: cTop, height: cDepth - cTop, full: cFull, cells: cells, size: cSize, lines: cLines, ring: cRing };
     // The Inside Rim on the dividers: each compartment's top edge (as the
@@ -2982,7 +2995,10 @@ function boxPlan(input) {
     var g0 = S0.kind === 'outline' ? S0 : null;
     var sdf = function(x, y) {
       var d = g0 ? gridDistance(g0, x, y) - t : shapeDistance(S0, t, x, y);
-      for (var i = 0; i < planes.length; i++) d = Math.max(d, planes[i].nx * x + planes[i].ny * y - planes[i].c);
+      for (var i = 0; i < planes.length; i++) {
+        var pl = planes[i], pa = pl.any;
+        d = Math.max(d, pa ? Math.min(pa[0].nx * x + pa[0].ny * y - pa[0].c, pa[1].nx * x + pa[1].ny * y - pa[1].c) : pl.nx * x + pl.ny * y - pl.c);
+      }
       return hole > 0 ? Math.max(d, hole - Math.hypot(x, y)) : d;
     };
     var e = cExt, bx = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity }, lo = Infinity, at = null;
@@ -4198,7 +4214,7 @@ function guidedSettings(answers) {
   var round = a.shape === 'circle' || a.shape === 'poly', big = a.kind === 'big' || a.kind === 'keepsake';
   v.compOn = false; v.compLayout = round ? 'wedges' : 'grid'; v.compRows = 1; v.compCols = 2; v.compSections = 2; v.compAngle = 0;
   // (3/16" in a ring box: its compartments are small.)
-  v.compThick = a.kind === 'ring' ? 4.7625 : 6.35; v.compHeight = null; v.compMiddle = null; v.compRowSizes = null; v.compColSizes = null;
+  v.compThick = a.kind === 'ring' ? 4.7625 : 6.35; v.compHeight = null; v.compMiddle = null; v.compRowSizes = null; v.compColSizes = null; v.compSizes = null;
   if (a.inside && a.inside !== 'one') {
     if (glued) said.push('No compartments: they\u2019re carved from the base\u2019s own floor, and a glued-on floor\u2019s ring is cut through. Pick the carved floor for them.');
     else {
@@ -4289,7 +4305,7 @@ if (typeof module !== 'undefined' && module.exports) {
     ['cb-notch-w', 'notchWidth', 'length', 16], ['cb-notch-d', 'notchDepth', 'length', 4], ['cb-notch-n', 'notchCount', 'count', 2], ['cb-notch-a', 'notchAngle', 'count', 0],
     ['cb-comp-rows', 'compRows', 'count', 1], ['cb-comp-cols', 'compCols', 'count', 2], ['cb-comp-n', 'compSections', 'count', 4], ['cb-comp-a', 'compAngle', 'count', 0],
     ['cb-comp-mid', 'compMiddle', 'length', null, true], ['cb-comp-t', 'compThick', 'length', 6.35], ['cb-comp-h', 'compHeight', 'length', null, true],
-    ['cb-comp-rsz', 'compRowSizes', 'shares', null, true], ['cb-comp-csz', 'compColSizes', 'shares', null, true],
+    ['cb-comp-rsz', 'compRowSizes', 'shares', null, true], ['cb-comp-csz', 'compColSizes', 'shares', null, true], ['cb-comp-wsz', 'compSizes', 'shares', null, true],
     ['cb-bot-t', 'bottomBoard', 'length', null, true], ['cb-bot-step', 'bottomStep', 'length', 2], ['cb-bot-over', 'bottomOversize', 'length', 0],
     ['cb-bot-rab', 'bottomRabbet', 'length', 4], ['cb-bot-rec', 'bottomRecess', 'length', 0.5],
     ['cb-bit', 'bit', 'length', 3.175], ['cb-feed', 'feed', 'feed', 1500], ['cb-plunge', 'plunge', 'feed', 400],
@@ -4402,7 +4418,7 @@ if (typeof module !== 'undefined' && module.exports) {
       .concat(seg('cb-bot-style') === 'inset' ? ['cb-bot-step', 'cb-bot-over'] : ['cb-bot-rab', 'cb-bot-rec'])
       .concat(seg('cb-lid-style') === 'plug' ? ['cb-top-t'] : seg('cb-lid-style') === 'drop' ? ['cb-top-t', 'cb-lip-h', 'cb-lid-h'] : [])
       .concat(seg('cb-ebit') !== 'round' && $('cb-slope').checked ? ['cb-ein'] : ['cb-eslope'])
-      .concat(seg('cb-comp-layout') === 'wedges' ? ['cb-comp-rsz', 'cb-comp-csz'] : []);
+      .concat(seg('cb-comp-layout') === 'wedges' ? ['cb-comp-rsz', 'cb-comp-csz'] : ['cb-comp-wsz']);
     var off = function (id) {
       return unused.indexOf(id) >= 0 || GROUPS.some(function (g) { return !$(g[1]).checked && $(g[0]).contains($(id)); });
     };
@@ -4483,7 +4499,7 @@ if (typeof module !== 'undefined' && module.exports) {
       shape: v.shape, diameter: v.diameter, length: v.length, width: v.width, sides: v.sides, flats: v.flats, cornerRadius: v.cornerRadius, outline: v.outline, stock: v.stock, measure: v.measure, height: v.nestOn ? null : v.height, lidHeight: v.lidHeight, wall: v.wall, floor: v.floor, top: v.top,
       magnets: v.magOn ? { count: Math.round(v.magCount), diameter: v.magDiameter, depth: v.magDepth, bit: magnetsInBox(v) ? toolEntry(v.magTool).mm : null, drill: magnetsInBox(v) && toolEntry(v.magTool).type === 'drill' } : null,
       notch: v.notchOn ? { width: v.notchWidth, depth: v.notchDepth, count: v.notchCount, angle: v.notchAngle } : null,
-      compartments: v.compOn && !v.nestOn ? { layout: v.compLayout, rows: Math.round(v.compRows), cols: Math.round(v.compCols), sections: Math.round(v.compSections), angle: v.compAngle, middle: v.compMiddle, thickness: v.compThick, height: v.compHeight, rowSizes: v.compRowSizes, colSizes: v.compColSizes } : null,
+      compartments: v.compOn && !v.nestOn ? { layout: v.compLayout, rows: Math.round(v.compRows), cols: Math.round(v.compCols), sections: Math.round(v.compSections), angle: v.compAngle, middle: v.compMiddle, thickness: v.compThick, height: v.compHeight, rowSizes: v.compRowSizes, colSizes: v.compColSizes, sizes: v.compSizes } : null,
       lipOn: v.lipOn, lipHeight: v.lipHeight, lipWidth: v.lipWidth, clearance: v.clearance,
       gap: v.gap, layout: v.layout, origin: v.origin, margin: v.margin, bit: v.bit,
       tabs: v.tabsOn ? { count: Math.round(v.tabCount), width: v.tabWidth, height: v.tabHeight } : null,
@@ -5156,12 +5172,12 @@ if (typeof module !== 'undefined' && module.exports) {
       : 'No tool changer is set up in ncSender: cut the box, put the corner bit in, zero Z on the stock top (keep X Y), and run Corners Only.';
     $('cb-corners-only').disabled = !!(errKeys.length || plan.problems.length || !plan.halves.some(function (h) { return h.plan.corners[h.name].length > 0; }));
     $('cb-ev-fields').hidden = $('cb-slope-row').hidden = v.edgeBit === 'round'; $('cb-eround-fields').hidden = v.edgeBit !== 'round';
-    $('cb-comp-grid').hidden = $('cb-comp-sizes').hidden = v.compLayout === 'wedges'; $('cb-comp-wedge').hidden = v.compLayout !== 'wedges';
+    $('cb-comp-grid').hidden = $('cb-comp-sizes').hidden = v.compLayout === 'wedges'; $('cb-comp-wedge').hidden = $('cb-comp-wsizes').hidden = v.compLayout !== 'wedges';
     var pc = plan.compartments;
     $('cb-comp-note').textContent = !v.compOn ? 'Dividers left standing in the base, carved from the same wood: nothing to glue. Not with a Glued-On Floor.'
       : v.nestOn ? 'Not for a nested set: the boxes inside are its compartments.'
       : !pc ? (v.compLayout === 'wedges' ? 'Two or more Sections make compartments.' : 'More than one Row or Column makes compartments.')
-      : pc.cells.length + ' compartments' + (pc.layout === 'grid' ? compSizes(pc.size) : '') + '; dividers ' + fmt(pc.height) + ' ' + unit() + ' high' + (v.compHeight > 0 ? '' : ' (full: ' + (pc.full > 0 ? 'their top ' + fmt(pc.full) + ' ' + unit() + ' under the ' + (v.lipOn === 'lid' ? 'rim, for the lid\u2019s lip' : 'lip\u2019s top') + ')' : 'up to the lip\u2019s top)')) + '.';
+      : pc.cells.length + ' compartments' + (pc.layout === 'grid' ? compSizes(pc.size) : pc.size.angles.some(function (a) { return Math.abs(a - pc.size.angle) > 0.05; }) ? ': sections ' + pc.size.angles.map(function (a) { return +a.toFixed(1) + '\u00b0'; }).join(', ') + ' round, counterclockwise from the first divider' : '') + '; dividers ' + fmt(pc.height) + ' ' + unit() + ' high' + (v.compHeight > 0 ? '' : ' (full: ' + (pc.full > 0 ? 'their top ' + fmt(pc.full) + ' ' + unit() + ' under the ' + (v.lipOn === 'lid' ? 'rim, for the lid\u2019s lip' : 'lip\u2019s top') + ')' : 'up to the lip\u2019s top)')) + '.';
     $('cb-ein').closest('.cb-field').hidden = v.slope && v.edgeBit !== 'round';
     $('cb-eslope').closest('.cb-field').hidden = !(v.slope && v.edgeBit !== 'round');
     $('cb-generate').disabled = !!(errKeys.length || probs.length || tooBig);
@@ -5532,7 +5548,7 @@ if (typeof module !== 'undefined' && module.exports) {
   // ---------- Start: presets, and your own saved settings ----------
   // A preset sets the box and its options (Auto Sizes fills in the rest
   // for your stock, bit and material); saved settings bring back all.
-  var PRESET_BASE = { autoSizes: true, lipOn: 'base', cut: 'both', grain: false, nestOn: false, tabsOn: true, magOn: false, notchOn: false, compOn: false, compHeight: null, compMiddle: null, compRowSizes: null, compColSizes: null, edgesOn: false, slope: false, cornersOn: false, botOn: false, measure: 'outside', height: null, lidHeight: null,
+  var PRESET_BASE = { autoSizes: true, lipOn: 'base', cut: 'both', grain: false, nestOn: false, tabsOn: true, magOn: false, notchOn: false, compOn: false, compHeight: null, compMiddle: null, compRowSizes: null, compColSizes: null, compSizes: null, edgesOn: false, slope: false, cornersOn: false, botOn: false, measure: 'outside', height: null, lidHeight: null,
     notchCount: 1, notchAngle: 0, slopeHeight: null, bottomBoard: null, bottomStep: null, bottomOversize: null, lidStyle: 'carved', bottomStyle: 'plug', bottomRabbet: null, bottomRecess: null };
   // Each shows off an option or two.
   var PRESETS = [
@@ -5972,7 +5988,7 @@ if (typeof module !== 'undefined' && module.exports) {
     inp.classList.remove('cb-flash'); void inp.offsetWidth; inp.classList.add('cb-flash');
   }
   // The field a problem is about, from the names it uses.
-  var PROBLEM_FIELDS = [[/^The drawing|^Open a drawing/, 'cb-drawing-btn'], [/^Compartments: Rows/, 'cb-comp-rows'], [/^Compartments: Row Sizes|^Compartments: the smallest[^,]*deep/, 'cb-comp-rsz'], [/^Compartments: Column Sizes|^Compartments: the smallest/, 'cb-comp-csz'], [/^Compartments: Sections/, 'cb-comp-n'], [/^Compartments: the Middle/, 'cb-comp-mid'], [/^Compartments: Divider Height|^Compartments: no room/, 'cb-comp-h'], [/^Compartments need/, 'cb-comp-on'], [/^Compartments/, 'cb-comp-t'], [/^Sloped lip/, 'cb-lip-w'], [/^Slope Height/, 'cb-eslope'], [/^Edges: the V-bit.s angle/, 'cb-eangle'], [/^Edges: (give the V-bit.s diameter|the V-bit is too small)/, 'cb-ediam'],
+  var PROBLEM_FIELDS = [[/^The drawing|^Open a drawing/, 'cb-drawing-btn'], [/^Compartments: Rows/, 'cb-comp-rows'], [/^Compartments: Section Sizes/, 'cb-comp-wsz'], [/^Compartments: Row Sizes|^Compartments: the smallest[^,]*deep/, 'cb-comp-rsz'], [/^Compartments: Column Sizes|^Compartments: the smallest/, 'cb-comp-csz'], [/^Compartments: Sections/, 'cb-comp-n'], [/^Compartments: the Middle/, 'cb-comp-mid'], [/^Compartments: Divider Height|^Compartments: no room/, 'cb-comp-h'], [/^Compartments need/, 'cb-comp-on'], [/^Compartments/, 'cb-comp-t'], [/^Sloped lip/, 'cb-lip-w'], [/^Slope Height/, 'cb-eslope'], [/^Edges: the V-bit.s angle/, 'cb-eangle'], [/^Edges: (give the V-bit.s diameter|the V-bit is too small)/, 'cb-ediam'],
     [/^Edges: the tip diameter/, 'cb-evtip'], [/^Edges: (give the roundover|a roundover)/, 'cb-erad'], [/^Edges:|^T\d+ is(n\u2019t)? a V-bit/, 'cb-etool-row'],
     [/^Finger notch depth/, 'cb-notch-d'], [/^Only \d+ boxes fit|^No box fits/, 'cb-nest-n'],
     [/^Magnets: the count|even number of magnets|^Too many magnets/, 'cb-mag-n'], [/^Magnet hole depth|^Magnet holes too deep/, 'cb-mag-depth'],

@@ -1638,7 +1638,10 @@ test('compartments: wedges and grids in round, oval, polygon and heart boxes', (
     { shape: 'rect', length: 150, width: 100, cornerRadius: 10, compartments: { layout: 'wedges', sections: 4, thickness: 6 } },
     { diameter: 110, finish: 0.3, compartments: { layout: 'grid', rows: 2, cols: 2, thickness: 5 } },
     { shape: 'heart', length: 120, width: 110, cornerRadius: 8, compartments: { layout: 'grid', rows: 1, cols: 3, thickness: 5, colSizes: [1, 2, 1] } },
-    { diameter: 110, compartments: { layout: 'grid', rows: 3, cols: 2, thickness: 5, rowSizes: [1, 2, 1], colSizes: [2, 1] } }
+    { diameter: 110, compartments: { layout: 'grid', rows: 3, cols: 2, thickness: 5, rowSizes: [1, 2, 1], colSizes: [2, 1] } },
+    { diameter: 110, compartments: { sections: 2, thickness: 5, angle: 20, sizes: [3, 1] } },
+    { diameter: 110, lipOn: 'lid', compartments: { sections: 3, thickness: 5, middle: 30, sizes: [2, 1, 1] } },
+    { shape: 'heart', length: 120, width: 110, cornerRadius: 8, compartments: { sections: 3, thickness: 5, sizes: [1, 2, 1] } }
   ];
   for (const input of cases) {
     const { plan, pts } = check(input);
@@ -1745,4 +1748,20 @@ test('compartments: uneven sizes, each column and row its share', () => {
   said(Object.assign({}, rect, { compartments: { rows: 1, cols: 3, thickness: 6, colSizes: [1, 2] } }), /Column Sizes has 2 numbers, and there are 3 Columns/);
   said(Object.assign({}, rect, { compartments: { rows: 2, cols: 1, thickness: 6, rowSizes: [1, 0] } }), /Row Sizes must be numbers more than 0/);
   said(Object.assign({}, rect, { compartments: { rows: 1, cols: 3, thickness: 6, colSizes: [1, 30, 1] } }), /the smallest is .* sizes closer to equal/);
+});
+
+test('compartments: uneven wedges, each section its share of the way round', () => {
+  const said = (o, re) => assert.ok(boxPlan(o).problems.some((p) => re.test(p)), JSON.stringify(o) + ' ' + boxPlan(o).problems);
+  const z = boxPlan({ diameter: 110, compartments: { sections: 3, thickness: 5, sizes: [1, 2, 1] } }).compartments.size;
+  assert.deepEqual(z.angles.map((a) => Math.round(a)), [90, 180, 90]);
+  // The dividers: the first to the back (Angle 0), then 90 and 270 degrees on, counterclockwise.
+  assert.deepEqual(z.dirs.map((a) => Math.round(a * 180 / Math.PI)), [90, 180, 360]);
+  // Past half way round: the big section is everything but the small one.
+  const big = boxPlan({ diameter: 110, compartments: { sections: 2, thickness: 5, sizes: [3, 1] } }).compartments.cells[0].shape;
+  assert.ok(shapeDistance(big, 0, -30, 0) < 0 && shapeDistance(big, 0, 0, -30) < 0 && shapeDistance(big, 0, 30, -30) < 0 && shapeDistance(big, 0, 30, 30) > 0, 'the 270 degree section: all but the back right');
+  // Equal shares are the same as none.
+  const eq = boxPlan({ diameter: 110, compartments: { sections: 3, thickness: 5, sizes: [2, 2, 2] } }).compartments.cells.map((c) => c.shape.deep);
+  assert.deepEqual(eq, boxPlan({ diameter: 110, compartments: { sections: 3, thickness: 5 } }).compartments.cells.map((c) => c.shape.deep));
+  said({ diameter: 110, compartments: { sections: 3, thickness: 5, sizes: [1, 2] } }, /Section Sizes has 2 numbers, and there are 3 Sections/);
+  said({ diameter: 60, compartments: { sections: 3, thickness: 5, sizes: [1, 60, 1] } }, /too narrow for the bit.*sizes closer to equal/);
 });

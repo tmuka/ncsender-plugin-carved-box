@@ -1,4 +1,4 @@
-# Compartments: plan (built: steps 1 to 5 and uneven sizes; a glued-on floor and a lid tray are later)
+# Compartments: plan (built: steps 1 to 5, uneven grids and wedges; a glued-on floor and a lid tray are later)
 
 Dividers carved into the base, so the inside is split into separate spaces: a ring box with a slot section, a keepsake box with a grid, a round box cut into wedges. The dividers are left standing in the solid wood, the same way the walls are, so there's nothing to glue.
 
@@ -12,7 +12,8 @@ A **Compartments** card, after Magnets and Finger Notch, off by default.
 | **Sections**, **Middle** | Wedges: how many, and an optional round middle compartment (its diameter) | 4, none |
 | **Divider Thickness** | the dividers' width | the wall's, at least 6 mm in wood |
 | **Divider Height** | from the floor; **Full** stops just under where the lid reaches down | Full |
-| **Row Sizes** / **Column Sizes** | Grid only: each row's (front to back) and column's (left to right) share, "1 2 1", instead of equal | equal |
+| **Row Sizes** / **Column Sizes** | Grid: each row's (front to back) and column's (left to right) share, "1 2 1", instead of equal | equal |
+| **Section Sizes** | Wedges: each section's share of the way round, counterclockwise from the first divider; one can be more than half | equal |
 
 The top view draws the dividers. The side view shows their height against the lid's lip. The note under the card gives a grid's compartment size (not built: each compartment's size in the header and the Start card).
 
@@ -48,8 +49,8 @@ After the look question: **"Inside: one space, or compartments?"** with *one spa
 3. **Dialog:** the Compartments card, the top and side views, presets, saved settings.
 4. **Rounded floor corners per compartment,** the edge checks, the time estimate.
 5. **Guided Setup** question and recipe line. Help and README.
-6. **Uneven sizes** ("1 2 1"): built.
-7. **Later:** dividers on a glued-on floor, a lid tray, uneven wedges.
+6. **Uneven sizes** ("1 2 1") for grids and wedges: built.
+7. **Later:** dividers on a glued-on floor, a lid tray.
 
 ## Decided
 1. Round, oval and polygon boxes get **Wedges**; a rectangle gets a **Grid**.
