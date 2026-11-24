@@ -14,7 +14,8 @@ function inputOf(v, stock, bit) {
     edges: v.edgesOn ? { bit: v.edgeBit, angle: 60, diameter: 12.7, radius: 3.175, tip: 3.175, slope: v.slope } : null,
     corners: v.cornersOn ? { diameter: 6.35, radius: 3.175 } : null,
     bottom: v.botOn ? (v.bottomStyle === 'inset' ? { style: 'inset', board: v.bottomBoard, rabbet: v.bottomRabbet, recess: v.bottomRecess } : { board: v.bottomBoard, step: v.bottomStep, oversize: v.bottomOversize }) : null,
-    lidStyle: v.lidStyle === 'carved' ? null : v.lidStyle
+    lidStyle: v.lidStyle === 'carved' ? null : v.lidStyle,
+    compartments: v.compOn ? { layout: v.compLayout, rows: v.compRows, cols: v.compCols, sections: v.compSections, angle: v.compAngle, middle: v.compMiddle, thickness: v.compThick, height: v.compHeight } : null
   });
 }
 
@@ -68,4 +69,27 @@ test('guided recipe: the programs by machine', () => {
   assert.ok(none.some((s) => /trim the floor flush/.test(s.text)));
   const bad = guidedRecipe(Object.assign({ problems: ['Wall too thick'] }, base));
   assert.equal(bad.length, 1);
+});
+
+test('guided setup: compartments for every kind and shape, and none with a glued-on floor', () => {
+  for (const kind of Object.keys(GUIDE_KINDS)) for (const inside of ['two', 'grid', 'wedges']) for (const lid of ['lift', 'plug', 'slope']) for (const corners of [false, true]) {
+    const g = guidedSettings({ kind, look: 'carved', inside, lid, corners });
+    assert.equal(g.v.compOn, true);
+    const input = inputOf(g.v, 19, 3.175), a = autoSizes(input, 'hardwood', false);
+    delete a.problems;
+    const plan = boxPlan(Object.assign({}, input, a));
+    assert.deepEqual(plan.problems, [], JSON.stringify({ kind, inside, lid, corners }));
+    assert.ok(plan.compartments.cells.length >= 2);
+  }
+  for (const shape of ['circle', 'poly', 'oval', 'heart']) for (const inside of ['two', 'grid', 'wedges']) {
+    const g = guidedSettings({ kind: 'keepsake', shape, diameter: 101.6, length: 152.4, width: 120, flats: 101.6, look: 'carved', inside });
+    const input = inputOf(g.v, 19, 3.175), a = autoSizes(input, 'hardwood', false);
+    delete a.problems;
+    assert.deepEqual(boxPlan(Object.assign({}, input, a)).problems, [], JSON.stringify({ shape, inside }));
+  }
+  const glued = guidedSettings({ kind: 'big', look: 'plug', inside: 'grid' });
+  assert.equal(glued.v.compOn, false);
+  assert.ok(glued.said.some((x) => /No compartments/.test(x)));
+  assert.equal(guidedSettings({ kind: 'trinket', inside: 'two' }).v.compLayout, 'wedges');
+  assert.equal(guidedSettings({ kind: 'keepsake', inside: 'two' }).v.compCols, 2);
 });

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- **Compartments** (a card after Finger Notch): dividers carved into the base, left standing in the same wood, so there's nothing to glue. A **Grid** of Rows and Columns, or **Wedges** out from the middle (Sections, an Angle, and a round Middle compartment if you like), in any shape of box. **Divider Thickness**, and **Divider Height** from the floor (empty: full, under the lid's lip and below an Inside Rim). The top and side views show the dividers; the note under the card gives the count, each one's size and the dividers' height. With rounded floor Corners, each compartment's floor is rounded. Not with a Glued-On Floor.
+- **Guided Setup** asks what goes inside: one open space, two compartments, a grid, or wedges.
+
 ## 0.4.0: Guided Setup, inset and drop-in panels, Measure Inside
 
 - **Clearer names:** the Glued-On Bottom is the **Glued-On Floor** (Floor Board, Floor Only; **Floor and Lid** with a drop-in lid), its kinds **Stepped, under the ring** and **Inset, from below**; the lids **Carved**, **Solid** and **Drop-In**. With a glued-on floor the base is called the **ring** (Ring Only, Lip Stands Up On: Ring). Saved settings load as before.

@@ -87,7 +87,7 @@ function allowed(set, half, p) {
   // Compartments: below the dividers' top, only inside a compartment.
   const comp = half.name === 'base' && plan.compartments;
   if (comp && at(plan.tInside - rb) <= eps && d > comp.top + eps)
-    return d <= floor + eps && comp.cells.some((c) => shapeDistance(c.shape, -rb, px - c.dx, py - c.dy) <= (c.shape.kind === 'outline' ? 0.03 : eps));
+    return d <= floor + eps && comp.cells.some((c) => { const e2 = c.shape.kind === 'outline' ? 0.03 : eps; return shapeDistance(c.shape, -rb, px - c.dx, py - c.dy) <= e2 && (d <= floor - rc + e2 || shapeDistance(c.shape, -rc - rb, px - c.dx, py - c.dy) <= e2); });
   if (!solid && at(plan.tInside - rb) <= eps && d <= floor + eps && (d <= floor - rc + eps || at(plan.tInside - rc - rb) <= eps)) return true;
   if (withLip && at(plan.tLip + rb) >= -eps && d <= plan.lipUp + eps) return true;
   // The widened opening, by depth: a sloped lip's only to its floor's
@@ -1619,7 +1619,6 @@ test('compartments: what doesn\'t fit says why', () => {
   said({ compartments: { sections: 4, thickness: 6, middle: 50 } }, /too big for the inside/);
   said({ diameter: 50, compartments: { sections: 12, thickness: 6 } }, /too narrow for the bit/);
   said({ compartments: { sections: 4, thickness: 6, middle: 2 } }, /Middle compartment must be at least/);
-  said(Object.assign({}, rect, { corners: { diameter: 6.35, radius: 3.175 }, compartments: { rows: 2, cols: 2, thickness: 6 } }), /rounded floor corners/);
   assert.equal(boxPlan(Object.assign({}, rect, { compartments: { rows: 1, cols: 1, thickness: 6 } })).compartments, null);
   // An Inside Rim chamfer: full dividers stop below it.
   const ed = boxPlan(Object.assign({}, rect, { edges: { bit: 'v', angle: 90, diameter: 12.7, outside: 0, inside: 0, pocket: 1 }, compartments: { rows: 1, cols: 2, thickness: 6 } }));
@@ -1658,4 +1657,26 @@ test('compartments: wedges and grids in round, oval, polygon and heart boxes', (
       if (comp.cells.every((c) => shapeDistance(c.shape, 0, px - c.dx, py - c.dy) > rb + 0.05)) assert.ok(p.z >= -comp.top - 1e-6, 'divider cut at ' + JSON.stringify(p) + ' ' + JSON.stringify(input));
     }
   }
+});
+
+test('compartments: rounded floor corners in each one', () => {
+  const CF = { toolNumber: 8, feed: 1200, plunge: 300, rpm: 16000, doc: 1.5 };
+  for (const input of [
+    { shape: 'rect', length: 150, width: 100, cornerRadius: 12, compartments: { rows: 2, cols: 3, thickness: 6 } },
+    { diameter: 110, lipOn: 'lid', compartments: { sections: 3, thickness: 6, middle: 34 } }]) {
+    for (const corners of [{ diameter: 6.35, radius: 3.175 }, { diameter: 12.7, radius: 3.175 }]) {
+      const { plan } = check(Object.assign({ corners }, input));
+      const base = plan.halves.find((h) => h.name === 'base');
+      assert.equal(plan.corners.base.length, plan.compartments.cells.length);
+      const g = boxProgram(plan, Object.assign({}, FEEDS, { corners: CF }), 'corners').gcode;
+      const pts = simulate(g).filter((p) => p.z < 0);
+      for (const p of pts) {
+        const ok = plan.halves.some((h) => plan.corners[h.name].some((k) => Math.abs(shapeDistance(k.shape, k.t, p.x - h.at.x - (k.dx || 0), p.y - h.at.y - (k.dy || 0))) < 0.03 && p.z >= k.z0 - k.depth - 1e-6));
+        assert.ok(ok, 'corner bit off its loop: ' + JSON.stringify(p));
+      }
+      for (const k of plan.corners.base) assert.ok(pts.some((p) => Math.abs(p.z - (k.z0 - k.depth)) < 1e-6 && Math.abs(shapeDistance(k.shape, k.t, p.x - base.at.x - k.dx, p.y - base.at.y - k.dy)) < 0.03), k.what + ' not down to the floor');
+    }
+  }
+  const said = (o, re) => assert.ok(boxPlan(o).problems.some((p) => re.test(p)), JSON.stringify(o) + ' ' + boxPlan(o).problems);
+  said({ shape: 'rect', length: 150, width: 100, cornerRadius: 12, corners: { diameter: 12.7, radius: 6.35 }, compartments: { rows: 2, cols: 2, thickness: 6, height: 5 } }, /too big for the dividers/);
 });

@@ -144,6 +144,7 @@
   .cb-wood-dark { fill: #b9955f; }
   .cb-cut { fill: #3b2f20; }
   .cb-divider line, .cb-divider circle { stroke: #b9955f; fill: none; }
+  .cb-divider-far { fill: #b9955f; opacity: 0.45; }
   .cb-line { fill: none; stroke: var(--color-text-primary); stroke-width: 0.5; opacity: 0.55; }
   .cb-label { fill: #fff; font-size: 4px; font-weight: 700; text-anchor: middle; }
   .cb-dim { fill: var(--color-text-secondary); font-size: 3.2px; text-anchor: middle; }
@@ -252,6 +253,16 @@
           <button type="button" class="cb-choice" data-v="plug"><b>A glued-on floor is fine</b><span>The base is a ring glued onto a floor board; quickest for a big box. The floor can be plywood or a contrasting wood.</span></button>
         </div>
         <div class="cb-row" id="cb-g-bot-row"><div class="cb-field"><label for="cb-g-bot">Floor Board</label><input class="cb-input" id="cb-g-bot" data-unit="length" title="The Floor Board, such as 1/4&quot; plywood."></div></div>
+      </div>
+      <div class="cb-guide-q" data-q="inside">
+        <h4>What goes inside?</h4>
+        <div class="cb-choices" data-a="inside">
+          <button type="button" class="cb-choice" data-v="one"><b>One open space</b><span>No dividers.</span></button>
+          <button type="button" class="cb-choice" data-v="two"><b>Two compartments</b><span>One divider across the middle.</span></button>
+          <button type="button" class="cb-choice" data-v="grid"><b>A grid</b><span>Rows and columns of small compartments, for rings, earrings or bits.</span></button>
+          <button type="button" class="cb-choice" data-v="wedges"><b>Wedges</b><span>Dividers out from the middle, like slices. Best in a round box.</span></button>
+        </div>
+        <p class="cb-hint" id="cb-g-inside-note">The dividers are carved from the same wood as the box, so there's nothing to glue.</p>
       </div>
       <div class="cb-guide-q" data-q="lid">
         <h4>How should the lid sit?</h4>
@@ -670,6 +681,7 @@
       <ul>
         <li>A <b>finishing pass</b> always goes round the walls once more after the roughing, for cleaner walls; how much it takes and which way it goes are set by the <b>Material</b>.</li>
         <li><b>Enlarge a picture</b>: click a blank spot on the top or side view (or ⤢ by its title) to see it over the whole window. There the mouse wheel zooms at the pointer, two fingers pinch, and zoomed in a drag moves it; or use <b>&minus;</b>, <b>+</b> and <b>Fit</b> at the top. Click a blank spot, &times;, or press Esc to go back. A tap on a label still goes to its setting.</li>
+        <li><b>Compartments</b> are dividers carved into the base: a <b>Grid</b> of Rows and Columns, or <b>Wedges</b> out from the middle (Sections, an Angle for the first one, 0 to the back, and a round <b>Middle</b> if you like). Full height stops under the lid's lip; a lower <b>Divider Height</b> makes small compartments easier to reach into. They need the base's own floor, not a Glued-On Floor. With <b>Corners</b> on, each compartment's floor is rounded.</li>
         <li>A tight lid: two <b>Finger Notches</b> opposite each other (front and back, or a Start Angle of 90 for the sides) lift it straight up with both hands. From one it tips and binds.</li>
         <li>Keep the <b>Holding Tabs</b> on: they hold the halves while the outlines, corners and edges are cut.</li>
         <li>Tap a label on the pictures (Wall, Lip Height, Clearance, Gap&hellip;) to go to its field; tap a problem under the settings to go to the field it's about.</li>
@@ -2730,7 +2742,6 @@ function boxPlan(input) {
     var cFull = (rabbetHalf === 'base' ? rabbetDepth : 0) + (ed && ed.pocket > 0 ? ed.pocket : 0);
     var cTop = cp.height > 0 ? cDepth - cp.height : cFull, cells = [], cSize = null;
     need(!bot, 'Compartments need the base\'s own floor: with a Glued-On Floor the ring\'s inside is cut through, so the dividers would come loose');
-    need(!(cn && (cn.radius > 0 || cn.diameter > 0)), 'Compartments: rounded floor corners aren\'t made with them yet: turn Corners off');
     need(cThick >= 1, 'Compartments: Divider Thickness must be at least 1 mm');
     need(cp.height == null || cp.height > 0, 'Compartments: Divider Height must be more than 0, or empty for full height');
     if (cp.height > 0) need(cTop >= cFull - 1e-9, 'Compartments: Divider Height can be at most ' + down2(cDepth - cFull) + ' mm (' + (rabbetHalf === 'base' ? 'under the lid\'s lip' : 'the base\'s inside') + (ed && ed.pocket > 0 ? ', below the Inside Rim' : '') + ')');
@@ -2786,6 +2797,19 @@ function boxPlan(input) {
       for (var lk = 0; lk < cp.sections; lk++) { var la = cA0 + lk * 2 * Math.PI / cp.sections; cLines.push({ x0: cRing * Math.cos(la), y0: cRing * Math.sin(la), x1: cFar * Math.cos(la), y1: cFar * Math.sin(la) }); }
     }
     comp = { layout: cWedge ? 'wedges' : 'grid', thickness: cThick, top: cTop, height: cDepth - cTop, full: cFull, cells: cells, size: cSize, lines: cLines, ring: cRing };
+    // Rounded floor corners: round each compartment's floor, not the
+    // inside's (its corner bit's loop in each, as the box's bit leaves it).
+    if (rc > 0) {
+      need(rc <= comp.height - 0.5, 'Corners: the radius is too big for the dividers: they\'re ' + down2(comp.height) + ' mm high, and the cove needs its radius + 0.5 mm. Make the Cove Radius smaller, or the dividers taller');
+      var cDeep = function(c) { var k = c.shape; return k.kind === 'outline' ? k.deep : k.kind === 'circle' ? k.r : Math.min(k.hx, k.hy); };
+      var cTight = cells.filter(function(c) { return !(cDeep(c) > cn.diameter / 2 + 0.5 && cDeep(c) - rc > rb + 0.1); }).length;
+      need(!cTight, 'Corners: ' + (cTight === 1 ? 'a compartment is' : cTight + ' compartments are') + ' too small for the corner bit, or for the box\'s bit to clear the floor inside the rounded corners');
+      var cFloorZ = -faces.base - cDepth;
+      cornerAt.base = cells.map(function(c, i) {
+        return { op: 'corner', shape: c.shape.kind === 'rect' ? Object.assign({}, c.shape, { cr: Math.max(c.shape.cr, rb) }) : c.shape, t: -cn.diameter / 2, dx: c.dx, dy: c.dy,
+          z0: cFloorZ + rc, depth: rc, what: 'floor corners rounded, compartment ' + (i + 1) };
+      });
+    }
   }
   // A compartment: the inside (S moved t) cut by the dividers' lines
   // (planes: n.p <= c inside, n a unit normal) and out of the middle
@@ -2798,13 +2822,15 @@ function boxPlan(input) {
       for (var i = 0; i < planes.length; i++) d = Math.max(d, planes[i].nx * x + planes[i].ny * y - planes[i].c);
       return hole > 0 ? Math.max(d, hole - Math.hypot(x, y)) : d;
     };
-    var e = cExt, bx = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity }, lo = Infinity;
+    var e = cExt, bx = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity }, lo = Infinity, at = null;
     for (var x = e.minX; x <= e.maxX + 1e-9; x += 1) for (var y = e.minY; y <= e.maxY + 1e-9; y += 1) {
       var v = sdf(x, y);
-      if (v < lo) lo = v;
+      if (v < lo) { lo = v; at = [x, y]; }
       if (v <= 1) { bx.minX = Math.min(bx.minX, x - 1); bx.maxX = Math.max(bx.maxX, x + 1); bx.minY = Math.min(bx.minY, y - 1); bx.maxY = Math.max(bx.maxY, y + 1); }
     }
     if (!(bx.maxX > bx.minX)) bx = { minX: -1, maxX: 1, minY: -1, maxY: 1 };
+    // Its deepest point, finer round the best of those.
+    if (at) for (var fx = -1; fx <= 1 + 1e-9; fx += 0.1) for (var fy = -1; fy <= 1 + 1e-9; fy += 0.1) lo = Math.min(lo, sdf(at[0] + fx, at[1] + fy));
     return { kind: 'outline', sdf: sdf, box: bx, deep: -lo, cr: 0, step: gridStep(Math.max(e.maxX - e.minX, e.maxY - e.minY)),
       key: 'comp:' + (S0.key || JSON.stringify(S0)) + ':' + t.toFixed(4) + ':' + name + ':' + JSON.stringify(planes) + ':' + hole.toFixed(4) };
   }
@@ -2900,14 +2926,18 @@ function boxPlan(input) {
     // round its wall: its middle cleared here, no coves without a wall).
     var inDepth = height[name] - under[name], flat = flush && name === rabbetHalf;
     if (!ring && !(flat && openSteps.length === 1) && !(plugLid && name === 'lid')) {
-      if (rc > 0 && !flat) {
-        cuts.push({ op: 'pocket', t: tInside, dx: 0, dy: 0, z0: z0, depth: inDepth - rc, finish: fin, what: 'inside' });
-        cuts.push({ op: 'pocket', t: tInside - rc, dx: 0, dy: 0, z0: z0 - (inDepth - rc), depth: rc, what: 'inside, its floor short of the corners' });
-      } else if (comp && name === 'base') {
+      if (comp && name === 'base') {
+        // Each compartment: its floor short of the corners for the last
+        // of it, with rounded floor corners.
         if (comp.top > 1e-9) cuts.push({ op: 'pocket', t: tInside, dx: 0, dy: 0, z0: z0, depth: comp.top, finish: fin, what: 'inside, down to the dividers\' top' });
         comp.cells.forEach(function(c, i) {
-          cuts.push({ op: 'pocket', shape: c.shape, t: 0, dx: c.dx, dy: c.dy, z0: z0 - comp.top, depth: inDepth - comp.top, finish: fin, what: 'compartment ' + (i + 1) });
+          var cd = inDepth - comp.top - rc;
+          cuts.push({ op: 'pocket', shape: c.shape, t: 0, dx: c.dx, dy: c.dy, z0: z0 - comp.top, depth: cd, finish: fin, what: 'compartment ' + (i + 1) });
+          if (rc > 0) cuts.push({ op: 'pocket', shape: c.shape, t: -rc, dx: c.dx, dy: c.dy, z0: z0 - comp.top - cd, depth: rc, what: 'compartment ' + (i + 1) + ', its floor short of the corners' });
         });
+      } else if (rc > 0 && !flat) {
+        cuts.push({ op: 'pocket', t: tInside, dx: 0, dy: 0, z0: z0, depth: inDepth - rc, finish: fin, what: 'inside' });
+        cuts.push({ op: 'pocket', t: tInside - rc, dx: 0, dy: 0, z0: z0 - (inDepth - rc), depth: rc, what: 'inside, its floor short of the corners' });
       } else cuts.push({ op: 'pocket', t: tInside, dx: 0, dy: 0, z0: z0, depth: inDepth, finish: fin, what: 'inside' });
     }
     // The shoulder: the wall top outside the lip, down by the Lip Height
@@ -3886,7 +3916,7 @@ function boxProgram(plan, f, only) {
         comment(cap(h.label) + ': ' + e.what);
         if (e.op === 'pocket') return pocket(h.at.x + e.dx, h.at.y + e.dy, e);
         var loop = shapeLoop(e.shape, e.t), air = e.air || 0;
-        cutLoops(h.at.x, h.at.y, [loop], e.z0 - air, e.depth - air, Math.max(0.2, loopLength(loop) * 0.05));
+        cutLoops(h.at.x + (e.dx || 0), h.at.y + (e.dy || 0), [loop], e.z0 - air, e.depth - air, Math.max(0.2, loopLength(loop) * 0.05));
       });
     });
   });
@@ -3934,7 +3964,7 @@ if (typeof module !== 'undefined' && module.exports) {
 
 // What each kind of box starts from; the answers change it.
 var GUIDE_KINDS = {
-  ring: { name: 'Ring box', shape: 'circle', diameter: 50.8, look: 'carved', lid: 'lift', magnets: false, notch: true },
+  ring: { name: 'Ring box', shape: 'circle', diameter: 50.8, look: 'carved', lid: 'lift', magnets: false, notch: true, sections: 3 },
   trinket: { name: 'Trinket box', shape: 'circle', diameter: 76.2, look: 'carved', lid: 'lift', magnets: false, notch: true },
   keepsake: { name: 'Keepsake box', shape: 'rect', length: 152.4, width: 101.6, cornerRadius: 12.7, look: 'carved', lid: 'lift', magnets: true, notch: true },
   big: { name: 'Big box', shape: 'rect', length: 254, width: 177.8, cornerRadius: 19.05, look: 'plug', lid: 'lift', magnets: true, notch: false }
@@ -3946,7 +3976,7 @@ function guidedDefaults(kind) {
   return {
     kind: kind in GUIDE_KINDS ? kind : 'trinket', shape: k.shape, diameter: k.diameter || 76.2, length: k.length || 152.4, width: k.width || 101.6,
     sides: 6, flats: k.diameter || k.width || 101.6, cornerRadius: k.cornerRadius || null, stock: null,
-    look: k.look, bottomBoard: 6.35, lid: k.lid, magnets: k.magnets, notch: k.notch, edges: 'none', corners: false
+    look: k.look, bottomBoard: 6.35, lid: k.lid, magnets: k.magnets, notch: k.notch, edges: 'none', corners: false, inside: 'one'
   };
 }
 
@@ -3989,6 +4019,23 @@ function guidedSettings(answers) {
     if (v.magOn) { v.magOn = false; said.push('No magnets: with an inset floor, the ring’s rim is underneath while it’s cut.'); }
     if (v.notchOn) { v.notchOn = false; said.push('No finger notch: with an inset floor, the ring’s rim is underneath while it’s cut.'); }
   }
+  // Compartments: two side by side (wedges in a round or polygon box), a
+  // grid, or wedges; carved from the base, so not with a glued-on floor.
+  var round = a.shape === 'circle' || a.shape === 'poly', big = a.kind === 'big' || a.kind === 'keepsake';
+  v.compOn = false; v.compLayout = round ? 'wedges' : 'grid'; v.compRows = 1; v.compCols = 2; v.compSections = 2; v.compAngle = 0;
+  // (3/16" in a ring box: its compartments are small.)
+  v.compThick = a.kind === 'ring' ? 4.7625 : 6.35; v.compHeight = null; v.compMiddle = null;
+  if (a.inside && a.inside !== 'one') {
+    if (glued) said.push('No compartments: they\u2019re carved from the base\u2019s own floor, and a glued-on floor\u2019s ring is cut through. Pick the carved floor for them.');
+    else {
+      v.compOn = true;
+      if (a.inside === 'grid') { v.compLayout = 'grid'; v.compRows = 2; v.compCols = big ? 3 : 2; }
+      else if (a.inside === 'wedges') { v.compLayout = 'wedges'; v.compSections = GUIDE_KINDS[a.kind] && GUIDE_KINDS[a.kind].sections || 4; }
+      else if (!round) { v.compLayout = 'grid'; v.compRows = 1; v.compCols = 2; }
+    }
+  }
+  // A ring box's compartments are too small to round their floors.
+  if (v.compOn && a.kind === 'ring' && v.cornersOn) { v.cornersOn = false; said.push('No rounded floor corners: a ring box\u2019s compartments are too small for the corner bit.'); }
   if (glued && v.cornersOn) { v.cornersOn = false; said.push('No rounded floor corners: a glued-on floor is flat, with no carved floor to round.'); }
   if (v.slope && v.edgeBit === 'round') v.edgeBit = 'v';
   return { v: v, said: said, answers: a };
@@ -4370,7 +4417,7 @@ if (typeof module !== 'undefined' && module.exports) {
       }
       // Rounded floor corners: a band as wide as the cove.
       plan.corners[h.name].forEach(function (k) {
-        out += '<path class="cb-edge" stroke-width="' + Math.max(0.4, o.corners.radius * s).toFixed(2) + '" d="' + shapePath(k.shape, plan.tInside - o.corners.radius / 2, cx, cy, s) + '"/>';
+        out += '<path class="cb-edge" stroke-width="' + Math.max(0.4, o.corners.radius * s).toFixed(2) + '" d="' + shapePath(k.shape, k.t + o.corners.diameter / 2 - o.corners.radius / 2, cx + (k.dx || 0) * s, cy - (k.dy || 0) * s, s) + '"/>';
       });
       // Chamfers and roundovers: a band as wide as each takes off the top.
       plan.edges[h.name].forEach(function (e) {
@@ -4515,6 +4562,16 @@ if (typeof module !== 'undefined' && module.exports) {
         b0 = b1;
       }
     });
+    // Compartments: the dividers beyond the cut, and those it cuts through.
+    var pc = plan.compartments;
+    if (pc) {
+      var dy0 = o.floor, dy1 = o.floor + pc.height, band = function (x0, x1, cls) { return '<rect class="' + cls + '" data-field="cb-comp-t" x="' + X(x0).toFixed(2) + '" y="' + Y(dy1).toFixed(2) + '" width="' + ((x1 - x0) * s).toFixed(2) + '" height="' + ((dy1 - dy0) * s).toFixed(2) + '"/>'; };
+      out += band(-Ri, Ri, 'cb-divider-far');
+      var cuts = [];
+      pc.lines.forEach(function (l) { if ((l.y0 > 0) !== (l.y1 > 0) && l.y1 !== l.y0) cuts.push(l.x0 + (l.x1 - l.x0) * (0 - l.y0) / (l.y1 - l.y0)); });
+      if (pc.ring > 0) cuts.push(pc.ring, -pc.ring);
+      cuts.forEach(function (x) { if (Math.abs(x) < Ri) out += band(Math.max(-Ri, x - pc.thickness / 2), Math.min(Ri, x + pc.thickness / 2), 'cb-wood'); });
+    }
     return out;
     }
     // Height and inside height.
@@ -4911,6 +4968,7 @@ if (typeof module !== 'undefined' && module.exports) {
     $('cb-comp-grid').hidden = v.compLayout === 'wedges'; $('cb-comp-wedge').hidden = v.compLayout !== 'wedges';
     var pc = plan.compartments;
     $('cb-comp-note').textContent = !v.compOn ? 'Dividers left standing in the base, carved from the same wood: nothing to glue. Not with a Glued-On Floor.'
+      : v.nestOn ? 'Not for a nested set: the boxes inside are its compartments.'
       : !pc ? (v.compLayout === 'wedges' ? 'Two or more Sections make compartments.' : 'More than one Row or Column makes compartments.')
       : pc.cells.length + ' compartments' + (pc.layout === 'grid' ? ', each ' + fmt(pc.size.w) + ' \u00d7 ' + fmt(pc.size.h) + ' ' + unit() : '') + '; dividers ' + fmt(pc.height) + ' ' + unit() + ' high' + (v.compHeight > 0 ? '' : ' (full: ' + (pc.full > 0 ? 'their top ' + fmt(pc.full) + ' ' + unit() + ' under the ' + (v.lipOn === 'lid' ? 'rim, for the lid\u2019s lip' : 'lip\u2019s top') + ')' : 'up to the lip\u2019s top)')) + '.';
     $('cb-ein').closest('.cb-field').hidden = v.slope && v.edgeBit !== 'round';
@@ -5090,7 +5148,7 @@ if (typeof module !== 'undefined' && module.exports) {
   // ---------- Guided Setup ----------
   // Questions in place of the settings; each answer is shown in the
   // preview as it's given (Auto Sizes on), Cancel puts the settings back.
-  var GUIDE_QS = ['kind', 'size', 'look', 'lid', 'finish', 'recipe'];
+  var GUIDE_QS = ['kind', 'size', 'look', 'inside', 'lid', 'finish', 'recipe'];
   var guide = { at: 0, answers: null, before: null, said: [], timer: null };
   var TOOL_KEYS = [['cb-tool', 'tool'], ['cb-etool', 'edgeTool'], ['cb-ctool', 'cornerTool'], ['cb-mtool', 'magTool']];
   function machineOf() { return state.atc ? 'atc' : state.changer ? 'manual' : 'none'; }
@@ -5194,6 +5252,9 @@ if (typeof module !== 'undefined' && module.exports) {
     ROOT.querySelector('#cb-guide [data-a="lid"] [data-v="panel"]').disabled = a.look !== 'plug';
     $('cb-g-mag').disabled = inset || a.lid === 'panel';
     $('cb-g-corners-row').hidden = glued;
+    ROOT.querySelectorAll('#cb-guide [data-a="inside"] .cb-choice').forEach(function (b) { b.disabled = glued && b.dataset.v !== 'one'; });
+    $('cb-g-inside-note').textContent = glued ? 'Compartments need the carved floor: with a glued-on floor the ring is cut through, so dividers would come loose. Go back and pick the carved floor for them.'
+      : 'The dividers are carved from the same wood as the box, so there\u2019s nothing to glue.';
     $('cb-g-corners').checked = !!a.corners;
     if (fill && guide.answers) {
       show('cb-g-diameter', a.diameter, 'length'); show('cb-g-length', a.length, 'length'); show('cb-g-width', a.width, 'length');
