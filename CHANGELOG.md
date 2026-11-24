@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.1: Faster on the Pi
 
 - **Faster on the Pi:** Auto Sizes and the preview with compartments, a heart or a drawing take a fraction of the time (a drawing with compartments: 35 s to under 2 s on a Pi 5; 8 wedges in a rectangle: about 0.5 s instead of 8). Typing pauses before the preview updates when the last update was slow, so the keys don't lag. The programs are the same.
 
