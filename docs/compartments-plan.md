@@ -14,7 +14,7 @@ A **Compartments** card, after Magnets and Finger Notch, off by default.
 | **Divider Height** | from the floor; **Full** stops just under where the lid reaches down | Full |
 | **Sizes** | Grid only, later: each column's and row's share ("1 2 1") instead of equal | equal |
 
-The top view draws the dividers. The side view shows their height against the lid's lip. With Measure: Inside, the header and the Start card give each compartment's inside size.
+The top view draws the dividers. The side view shows their height against the lid's lip. The note under the card gives a grid's compartment size (not built: each compartment's size in the header and the Start card).
 
 ## How it's cut
 Today the base's inside is one pocket (`op: 'pocket', t: tInside`, from the floor's top down). With compartments it's two:
@@ -28,7 +28,7 @@ Compartment shapes:
 Finishing passes, floor skims and the cut order work per compartment as they do for the inside now. Rounded floor corners (the ball or bowl bit) go round each compartment's floor; that comes second (below).
 
 ## The checks (problems, in red)
-- **Divider Thickness:** at least 2.5 mm in wood (the thin-in-wood rule), with the 6 mm suggestion as a note.
+- **Divider Thickness:** at least 1 mm; in wood, under 2.5 mm gets the thin-in-wood note (a warning, not a problem), with 6 mm as the default.
 - **Each compartment** at least the bit's diameter + 1 mm across, so the bit gets in. The message names the smallest and how many fit.
 - **Full height and the lid:** with the lip on the lid (a Solid or plug lid), the lid's lip reaches down into the base by the Lip Height. Dividers stop the Clearance below that. With the lip on the base, they can go up to the seam.
 - **Edges:** the Inside Rim chamfer runs round the opening's edge. Where a Full divider meets the wall, the V-bit would nick the divider's end. Either stop Full dividers below the chamfer's depth, or leave that chamfer off with a note. I'd stop them below.
@@ -40,7 +40,7 @@ Finishing passes, floor skims and the cut order work per compartment as they do 
 - **Nested sets:** the inner boxes are the compartments; off for those.
 
 ## Guided Setup
-After the look question: **"Inside: one space, or compartments?"** with *one space*, *2 side by side*, *a grid of 4 or 6*, *wedges*. Choosing compartments with a glued-on look says that it changes the floor to carved, and asks first.
+After the look question: **"Inside: one space, or compartments?"** with *one space*, *2 side by side*, *a grid of 4 or 6*, *wedges*. With a glued-on look the compartment choices are greyed out, and the question says why.
 
 ## Steps
 1. **Plan:** `o.compartments` input, the checks, and the base's inside split into the two cuts above, for rectangles (exact rounded rectangles). Tests in the simulator: dividers left standing at their height, every compartment's floor cleared, nothing cut where a divider is.

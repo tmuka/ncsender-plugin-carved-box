@@ -1662,7 +1662,7 @@ function sweep(segs, x0, y0, h, nx, ny) {
 // The distance on a grid round the outline, pad past it (PAD, or more for
 // an offset further out): made once for
 // each outline (by its key), the inside found a row at a time.
-var PAD = 25, GRIDS = {}, GRID_KEYS = [];
+var PAD = 25, GRIDS = {}, GRID_KEYS = [], GRID_CELLS = 0;
 function outlineGrid(S, pad) {
   pad = Math.max(PAD, pad || 0);
   var key = S.key && S.key + '|' + pad;
@@ -1698,8 +1698,12 @@ function outlineGrid(S, pad) {
   var grid = { x0: x0, y0: y0, h: h, nx: nx, ny: ny, v: v, deepest: -lo };
   grid.pad = pad; grid.key = key;
   if (key) {
-    GRIDS[key] = grid; GRID_KEYS.push(key);
-    if (GRID_KEYS.length > 6) { var old = GRID_KEYS.shift(); delete GRIDS[old]; delete MEMO[old]; }
+    GRIDS[key] = grid; GRID_KEYS.push(key); GRID_CELLS += v.length;
+    // Kept: at least 6, more while they're small (a compartment's each,
+    // and its edge as cut), up to about 48 MB in all.
+    while (GRID_KEYS.length > 6 && (GRID_CELLS > 6e6 || GRID_KEYS.length > 40)) {
+      var old = GRID_KEYS.shift(); GRID_CELLS -= GRIDS[old].v.length; delete GRIDS[old]; delete MEMO[old];
+    }
   }
   return grid;
 }
@@ -4648,7 +4652,11 @@ if (typeof module !== 'undefined' && module.exports) {
       var dy0 = o.floor, dy1 = o.floor + pc.height, band = function (x0, x1, cls) { return '<rect class="' + cls + '" data-field="cb-comp-t" x="' + X(x0).toFixed(2) + '" y="' + Y(dy1).toFixed(2) + '" width="' + ((x1 - x0) * s).toFixed(2) + '" height="' + ((dy1 - dy0) * s).toFixed(2) + '"/>'; };
       out += band(-Ri, Ri, 'cb-divider-far');
       var cuts = [];
-      pc.lines.forEach(function (l) { if ((l.y0 > 0) !== (l.y1 > 0) && l.y1 !== l.y0) cuts.push(l.x0 + (l.x1 - l.x0) * (0 - l.y0) / (l.y1 - l.y0)); });
+      pc.lines.forEach(function (l) {
+        // One lying along the section: solid from end to end.
+        if (Math.abs(l.y0) < 1e-6 && Math.abs(l.y1) < 1e-6) { var a = Math.max(-Ri, Math.min(l.x0, l.x1)), b = Math.min(Ri, Math.max(l.x0, l.x1)); if (b > a) out += band(a, b, 'cb-wood'); }
+        else if ((l.y0 > 0) !== (l.y1 > 0) && l.y1 !== l.y0) cuts.push(l.x0 + (l.x1 - l.x0) * (0 - l.y0) / (l.y1 - l.y0));
+      });
       if (pc.ring > 0) cuts.push(pc.ring, -pc.ring);
       cuts.forEach(function (x) { if (Math.abs(x) < Ri) out += band(Math.max(-Ri, x - pc.thickness / 2), Math.min(Ri, x + pc.thickness / 2), 'cb-wood'); });
     }
@@ -4718,7 +4726,7 @@ if (typeof module !== 'undefined' && module.exports) {
     show('cb-stepover', f.stepoverPct, 'count'); show('cb-rpm', f.rpm, 'count');
     $('cb-feeds-note').textContent = 'Starting feeds for a ' + v.flutes + '-flute ' + fmt(v.bit) + ' ' + unit() + ' bit in ' +
       $('cb-material').options[$('cb-material').selectedIndex].textContent + ': a start; listen and adjust.' +
-      (f.rpmLowered ? ' The RPM is lowered to ' + f.rpm + ' so each tooth still takes a full chip at the ' + fmt(f.maxFeedMm) + ' ' + unit() + '/min starting feed; a thinner chip rubs and burns.' : '');
+      (f.rpmLowered ? ' The RPM is lowered to ' + f.rpm + ' so each tooth still takes a full chip at the ' + fmt(f.feedMm) + ' ' + unit() + '/min feed' + (f.capped ? ' (as near as the machine\u2019s max feed allows)' : '') + '; a thinner chip rubs and burns.' : '');
     state.feedsAuto = true;
   }
 
@@ -5223,6 +5231,7 @@ if (typeof module !== 'undefined' && module.exports) {
     var out = [], rim = v.wall - v.lipWidth - v.clearance;
     if (v.lidStyle !== 'drop' && v.lipWidth > 0 && v.lipWidth < WOOD_THIN - 1e-6) out.push('Lip Thickness ' + fmt(v.lipWidth) + ' ' + unit() + ': in wood, a lip under ' + fmt(WOOD_THIN) + ' ' + unit() + ' can snap off along the grain.');
     if (rim > 0 && rim < WOOD_THIN - 1e-6) out.push('The wall outside the ' + (v.lipOn === 'lid' ? 'opening' : 'lip') + ' is ' + fmt(rim) + ' ' + unit() + ': in wood, under ' + fmt(WOOD_THIN) + ' ' + unit() + ' it can split along the grain: make the Wall thicker.');
+    if (v.compOn && v.compThick > 0 && v.compThick < WOOD_THIN - 1e-6) out.push('Divider Thickness ' + fmt(v.compThick) + ' ' + unit() + ': in wood, a divider under ' + fmt(WOOD_THIN) + ' ' + unit() + ' can split along the grain.');
     return out;
   }
 
@@ -5651,9 +5660,10 @@ if (typeof module !== 'undefined' && module.exports) {
     ['cb-tabs-on', 'cb-mag-on', 'cb-notch-on', 'cb-corners-on', 'cb-edges-on', 'cb-nest-on', 'cb-bot-on'].forEach(function (id) { $(id).addEventListener('change', function () { fitSwitched(id); update(true); }); });
     // Turned on: a grid in a rectangle, wedges in the rest.
     $('cb-comp-on').addEventListener('change', function () {
-      if (!$('cb-comp-on').checked) return;
-      var want = collect().v.shape === 'rect' ? 'grid' : 'wedges';
-      ROOT.querySelectorAll('#cb-comp-layout button').forEach(function (b) { var on = b.dataset.v === want; b.classList.toggle('on', on); b.setAttribute('aria-checked', String(on)); });
+      if ($('cb-comp-on').checked) {
+        var want = collect().v.shape === 'rect' ? 'grid' : 'wedges';
+        ROOT.querySelectorAll('#cb-comp-layout button').forEach(function (b) { var on = b.dataset.v === want; b.classList.toggle('on', on); b.setAttribute('aria-checked', String(on)); });
+      }
       update(true);
     });
     $('cb-testfit').addEventListener('click', function () { generate('test'); });
@@ -5848,7 +5858,7 @@ if (typeof module !== 'undefined' && module.exports) {
     inp.classList.remove('cb-flash'); void inp.offsetWidth; inp.classList.add('cb-flash');
   }
   // The field a problem is about, from the names it uses.
-  var PROBLEM_FIELDS = [[/^The drawing|^Open a drawing/, 'cb-drawing-btn'], [/^Compartments: Rows/, 'cb-comp-rows'], [/^Compartments: Sections/, 'cb-comp-n'], [/^Compartments: the Middle/, 'cb-comp-mid'], [/^Compartments: Divider Height|^Compartments: no room/, 'cb-comp-h'], [/^Compartments: rounded/, 'cb-corners-on'], [/^Compartments need/, 'cb-comp-on'], [/^Compartments/, 'cb-comp-t'], [/^Sloped lip/, 'cb-lip-w'], [/^Slope Height/, 'cb-eslope'], [/^Edges: the V-bit.s angle/, 'cb-eangle'], [/^Edges: (give the V-bit.s diameter|the V-bit is too small)/, 'cb-ediam'],
+  var PROBLEM_FIELDS = [[/^The drawing|^Open a drawing/, 'cb-drawing-btn'], [/^Compartments: Rows/, 'cb-comp-rows'], [/^Compartments: Sections/, 'cb-comp-n'], [/^Compartments: the Middle/, 'cb-comp-mid'], [/^Compartments: Divider Height|^Compartments: no room/, 'cb-comp-h'], [/^Compartments need/, 'cb-comp-on'], [/^Compartments/, 'cb-comp-t'], [/^Sloped lip/, 'cb-lip-w'], [/^Slope Height/, 'cb-eslope'], [/^Edges: the V-bit.s angle/, 'cb-eangle'], [/^Edges: (give the V-bit.s diameter|the V-bit is too small)/, 'cb-ediam'],
     [/^Edges: the tip diameter/, 'cb-evtip'], [/^Edges: (give the roundover|a roundover)/, 'cb-erad'], [/^Edges:|^T\d+ is(n\u2019t)? a V-bit/, 'cb-etool-row'],
     [/^Finger notch depth/, 'cb-notch-d'], [/^Only \d+ boxes fit|^No box fits/, 'cb-nest-n'],
     [/^Magnets: the count|even number of magnets|^Too many magnets/, 'cb-mag-n'], [/^Magnet hole depth|^Magnet holes too deep/, 'cb-mag-depth'],
