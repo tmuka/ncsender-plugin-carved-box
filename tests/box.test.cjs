@@ -87,7 +87,7 @@ function allowed(set, half, p) {
   // Compartments: below the dividers' top, only inside a compartment.
   const comp = half.name === 'base' && plan.compartments;
   if (comp && at(plan.tInside - rb) <= eps && d > comp.top + eps)
-    return d <= floor + eps && comp.cells.some((c) => shapeDistance(c.shape, -rb, px - c.dx, py - c.dy) <= eps);
+    return d <= floor + eps && comp.cells.some((c) => shapeDistance(c.shape, -rb, px - c.dx, py - c.dy) <= (c.shape.kind === 'outline' ? 0.03 : eps));
   if (!solid && at(plan.tInside - rb) <= eps && d <= floor + eps && (d <= floor - rc + eps || at(plan.tInside - rc - rb) <= eps)) return true;
   if (withLip && at(plan.tLip + rb) >= -eps && d <= plan.lipUp + eps) return true;
   // The widened opening, by depth: a sloped lip's only to its floor's
@@ -1616,11 +1616,46 @@ test('compartments: what doesn\'t fit says why', () => {
   said(Object.assign({}, rect, { compartments: { rows: 2, cols: 2, thickness: 0.5 } }), /Divider Thickness must be at least 1 mm/);
   said(Object.assign({}, rect, { compartments: { rows: 2, cols: 2, thickness: 6, height: 40 } }), /Divider Height can be at most/);
   said(Object.assign({}, rect, { bottom: { board: 6.35, step: 2, oversize: 1.5 }, compartments: { rows: 2, cols: 2, thickness: 6 } }), /need the base's own floor/);
-  said({ compartments: { rows: 2, cols: 2, thickness: 6 } }, /only a rectangle/);
+  said({ compartments: { sections: 4, thickness: 6, middle: 50 } }, /too big for the inside/);
+  said({ diameter: 50, compartments: { sections: 12, thickness: 6 } }, /too narrow for the bit/);
+  said({ compartments: { sections: 4, thickness: 6, middle: 2 } }, /Middle compartment must be at least/);
   said(Object.assign({}, rect, { corners: { diameter: 6.35, radius: 3.175 }, compartments: { rows: 2, cols: 2, thickness: 6 } }), /rounded floor corners/);
   assert.equal(boxPlan(Object.assign({}, rect, { compartments: { rows: 1, cols: 1, thickness: 6 } })).compartments, null);
   // An Inside Rim chamfer: full dividers stop below it.
   const ed = boxPlan(Object.assign({}, rect, { edges: { bit: 'v', angle: 90, diameter: 12.7, outside: 0, inside: 0, pocket: 1 }, compartments: { rows: 1, cols: 2, thickness: 6 } }));
   assert.deepEqual(ed.problems, []);
   assert.equal(ed.compartments.top, 1);
+});
+
+test('compartments: wedges and grids in round, oval, polygon and heart boxes', () => {
+  const cases = [
+    { diameter: 100, compartments: { sections: 4, thickness: 5 } },
+    { diameter: 100, lipOn: 'lid', compartments: { sections: 3, thickness: 5, middle: 30 } },
+    { diameter: 90, compartments: { sections: 2, thickness: 6, angle: 30, height: 8 } },
+    { shape: 'oval', length: 140, width: 90, compartments: { sections: 2, thickness: 5 } },
+    { shape: 'poly', sides: 6, flats: 110, cornerRadius: 6, compartments: { sections: 6, thickness: 5 } },
+    { shape: 'heart', length: 120, width: 110, cornerRadius: 8, compartments: { layout: 'grid', rows: 1, cols: 2, thickness: 5 } },
+    { shape: 'rect', length: 150, width: 100, cornerRadius: 10, compartments: { layout: 'wedges', sections: 4, thickness: 6 } },
+    { diameter: 110, finish: 0.3, compartments: { layout: 'grid', rows: 2, cols: 2, thickness: 5 } }
+  ];
+  for (const input of cases) {
+    const { plan, pts } = check(input);
+    const comp = plan.compartments, base = plan.halves.find((h) => h.name === 'base'), rb = plan.o.bit / 2;
+    assert.ok(comp && comp.cells.length >= 2, JSON.stringify(input));
+    const floorZ = -(base.height - plan.o.floor);
+    const deep = pts.filter((p) => Math.abs(p.z - floorZ) < 1e-6);
+    for (const c of comp.cells) {
+      // Where the bit's center can go in it: reached, its floor cleared.
+      for (let qx = -plan.halfX; qx <= plan.halfX; qx += 1.5) for (let qy = -plan.halfY; qy <= plan.halfY; qy += 1.5) {
+        if (shapeDistance(c.shape, -rb, qx - c.dx, qy - c.dy) > -0.3) continue;
+        const x = base.at.x + qx, y = base.at.y + qy;
+        assert.ok(deep.some((p) => Math.hypot(p.x - x, p.y - y) <= rb + 0.3), 'compartment floor left at ' + qx + ',' + qy + ' ' + JSON.stringify(input));
+      }
+    }
+    for (const p of pts) {
+      const px = p.x - base.at.x, py = p.y - base.at.y;
+      if (shapeDistance(plan.shape, plan.tInside, px, py) > 0) continue;
+      if (comp.cells.every((c) => shapeDistance(c.shape, 0, px - c.dx, py - c.dy) > rb + 0.05)) assert.ok(p.z >= -comp.top - 1e-6, 'divider cut at ' + JSON.stringify(p) + ' ' + JSON.stringify(input));
+    }
+  }
 });

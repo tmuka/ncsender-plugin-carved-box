@@ -1912,7 +1912,7 @@ function gridStep(size) { return Math.max(0.15, Math.min(0.4, size / 600), (size
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { outlineDistance: outlineDistance, outlineLoops: outlineLoops, outlineGrid: outlineGrid, inLoop: inLoop,
-    heartShape: heartShape, ovalShape: ovalShape, customShape: customShape, selfCrossing: selfCrossing };
+    heartShape: heartShape, ovalShape: ovalShape, customShape: customShape, selfCrossing: selfCrossing, gridStep: gridStep };
 }
 /* END lib/box-outline.cjs */
 /* BEGIN lib/box-shape.cjs */
@@ -2694,31 +2694,84 @@ function boxPlan(input) {
   // pocket down to their top, then each compartment its own pocket down
   // to the floor. Full: up to where the lid reaches down (the opening's
   // floor, with the lip on the lid), below any Inside Rim chamfer.
+  // A grid (Rows x Columns) or wedges (Sections from the middle, the
+  // first divider to the back turned Angle degrees counterclockwise, a
+  // round Middle compartment if asked). A rectangle's grid: exact rounded
+  // rectangles; the rest: the inside cut by the dividers' lines.
   var comp = null, cp = o.compartments;
-  if (cp && cp.rows * cp.cols > 1) {
-    var cRows = cp.rows, cCols = cp.cols, cThick = cp.thickness, cDepth = baseH - under.base;
+  var cWedge = !!cp && (cp.layout ? cp.layout === 'wedges' : !rect);
+  if (cp && (cWedge ? cp.sections >= 2 : cp.rows * cp.cols > 1)) {
+    var cThick = cp.thickness, cDepth = baseH - under.base, cMinW = o.bit + 1 + 2 * fin0;
     var cFull = (rabbetHalf === 'base' ? rabbetDepth : 0) + (ed && ed.pocket > 0 ? ed.pocket : 0);
-    var cTop = cp.height > 0 ? cDepth - cp.height : cFull;
-    need(rect, 'Compartments: only a rectangle can have them so far');
+    var cTop = cp.height > 0 ? cDepth - cp.height : cFull, cells = [], cSize = null;
     need(!bot, 'Compartments need the base\'s own floor: with a Glued-On Floor the ring\'s inside is cut through, so the dividers would come loose');
     need(!(cn && (cn.radius > 0 || cn.diameter > 0)), 'Compartments: rounded floor corners aren\'t made with them yet: turn Corners off');
-    need(cRows >= 1 && cCols >= 1 && cRows <= 12 && cCols <= 12 && cRows === Math.round(cRows) && cCols === Math.round(cCols), 'Compartments: Rows and Columns must be whole numbers from 1 to 12');
     need(cThick >= 1, 'Compartments: Divider Thickness must be at least 1 mm');
     need(cp.height == null || cp.height > 0, 'Compartments: Divider Height must be more than 0, or empty for full height');
     if (cp.height > 0) need(cTop >= cFull - 1e-9, 'Compartments: Divider Height can be at most ' + down2(cDepth - cFull) + ' mm (' + (rabbetHalf === 'base' ? 'under the lid\'s lip' : 'the base\'s inside') + (ed && ed.pocket > 0 ? ', below the Inside Rim' : '') + ')');
     need(cDepth - cTop >= 1, 'Compartments: no room for dividers: ' + (rabbetHalf === 'base' ? 'the lid\'s lip reaches the base\'s floor; make the Lip Height lower' : 'the base\'s inside is too shallow'));
-    if (rect) {
-      var cHx = S.hx + tInside, cHy = S.hy + tInside, cCr = Math.max(0, S.cr + tInside);
-      var cW = (2 * cHx - (cCols - 1) * cThick) / cCols, cH = (2 * cHy - (cRows - 1) * cThick) / cRows, cMin = o.bit + 1 + 2 * fin0;
-      need(Math.min(cW, cH) >= cMin, 'Compartments: each is ' + down2(cW) + ' x ' + down2(cH) + ' mm, and the bit needs at least ' + down2(cMin) + ' mm: fewer Rows or Columns, or thinner dividers');
-      // A compartment's corners as round as the inside's (its corner in
-      // the box's corner follows the inside's).
-      need(Math.min(cW, cH) >= 2 * cCr - 1e-9, 'Compartments: each is narrower than the inside\'s corners are round (' + down2(2 * cCr) + ' mm): fewer Rows or Columns, or a smaller Corner Radius');
-      var cells = [];
-      for (var cr0 = 0; cr0 < cRows; cr0++) for (var cc0 = 0; cc0 < cCols; cc0++)
-        cells.push({ dx: -cHx + cW / 2 + cc0 * (cW + cThick), dy: -cHy + cH / 2 + cr0 * (cH + cThick), shape: { kind: 'rect', hx: cW / 2, hy: cH / 2, cr: Math.min(cCr, cW / 2, cH / 2) } });
-      comp = { rows: cRows, cols: cCols, thickness: cThick, top: cTop, height: cDepth - cTop, full: cFull, cells: cells, size: { w: cW, h: cH } };
+    var cIn = shapeLoop(S, tInside), cExt = cIn ? loopExtent(cIn) : { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+    if (!cWedge) {
+      var cRows = cp.rows, cCols = cp.cols;
+      need(cRows >= 1 && cCols >= 1 && cRows <= 12 && cCols <= 12 && cRows === Math.round(cRows) && cCols === Math.round(cCols), 'Compartments: Rows and Columns must be whole numbers from 1 to 12');
+      var cW = (cExt.maxX - cExt.minX - (cCols - 1) * cThick) / cCols, cH = (cExt.maxY - cExt.minY - (cRows - 1) * cThick) / cRows;
+      cSize = { w: cW, h: cH };
+      need(Math.min(cW, cH) >= cMinW, 'Compartments: each is ' + down2(cW) + ' x ' + down2(cH) + ' mm, and the bit needs at least ' + down2(cMinW) + ' mm: fewer Rows or Columns, or thinner dividers');
+      if (rect) {
+        // Its corners as round as the inside's (its corner in the box's
+        // corner follows the inside's).
+        var cHx = S.hx + tInside, cHy = S.hy + tInside, cCr = Math.max(0, S.cr + tInside);
+        need(Math.min(cW, cH) >= 2 * cCr - 1e-9, 'Compartments: each is narrower than the inside\'s corners are round (' + down2(2 * cCr) + ' mm): fewer Rows or Columns, or a smaller Corner Radius');
+        for (var cr0 = 0; cr0 < cRows; cr0++) for (var cc0 = 0; cc0 < cCols; cc0++)
+          cells.push({ dx: -cHx + cW / 2 + cc0 * (cW + cThick), dy: -cHy + cH / 2 + cr0 * (cH + cThick), shape: { kind: 'rect', hx: cW / 2, hy: cH / 2, cr: Math.min(cCr, cW / 2, cH / 2) } });
+      } else if (cMinW <= Math.min(cW, cH)) for (var gr = 0; gr < cRows; gr++) for (var gc = 0; gc < cCols; gc++) {
+        var gx0 = cExt.minX + gc * (cW + cThick), gy0 = cExt.minY + gr * (cH + cThick), planes = [];
+        if (gc > 0) planes.push({ nx: -1, ny: 0, c: -gx0 });
+        if (gc < cCols - 1) planes.push({ nx: 1, ny: 0, c: gx0 + cW });
+        if (gr > 0) planes.push({ nx: 0, ny: -1, c: -gy0 });
+        if (gr < cRows - 1) planes.push({ nx: 0, ny: 1, c: gy0 + cH });
+        cells.push({ dx: 0, dy: 0, shape: cellShape(S, tInside, planes, 0, 'grid' + gr + ',' + gc) });
+      }
+    } else {
+      var cN = cp.sections, cMid = cp.middle > 0 ? cp.middle / 2 : 0, cA0 = Math.PI / 2 + (cp.angle || 0) * Math.PI / 180;
+      need(cN >= 2 && cN <= 12 && cN === Math.round(cN), 'Compartments: Sections must be a whole number from 2 to 12');
+      if (cMid > 0) {
+        need(cMid >= cMinW / 2, 'Compartments: the Middle compartment must be at least ' + down2(cMinW) + ' mm across, for the bit');
+        need(shapeDistance(S, tInside, 0, 0) <= -(cMid + cThick + cMinW), 'Compartments: the Middle compartment is too big for the inside: it needs its dividers and room for the bit round it');
+      }
+      if (cN >= 2 && cN <= 12) for (var wk = 0; wk < cN; wk++) {
+        var wa = cA0 + wk * 2 * Math.PI / cN, wb = cA0 + (wk + 1) * 2 * Math.PI / cN;
+        var wd = { x: Math.cos(wa), y: Math.sin(wa) }, we = { x: Math.cos(wb), y: Math.sin(wb) };
+        cells.push({ dx: 0, dy: 0, shape: cellShape(S, tInside, [{ nx: wd.y, ny: -wd.x, c: -cThick / 2 }, { nx: -we.y, ny: we.x, c: -cThick / 2 }], cMid > 0 ? cMid + cThick : 0, 'wedge' + wk + '/' + cN) });
+      }
+      if (cMid > 0) cells.push({ dx: 0, dy: 0, shape: { kind: 'circle', r: cMid }, middle: true });
+      cSize = { angle: 360 / cN, middle: cMid * 2 };
     }
+    // Each compartment: room for the bit (and its finishing pass).
+    var cSmall = cells.filter(function(c) { return c.shape.kind === 'outline' && !(c.shape.deep >= cMinW / 2); }).length;
+    need(!cSmall, 'Compartments: ' + (cSmall === 1 ? 'one is' : cSmall + ' are') + ' too narrow for the bit (it needs ' + down2(cMinW) + ' mm across): fewer ' + (cWedge ? 'Sections' : 'Rows or Columns') + ', thinner dividers' + (cWedge && cMid > 0 ? ' or a smaller Middle' : ''));
+    comp = { layout: cWedge ? 'wedges' : 'grid', thickness: cThick, top: cTop, height: cDepth - cTop, full: cFull, cells: cells, size: cSize };
+  }
+  // A compartment: the inside (S moved t) cut by the dividers' lines
+  // (planes: n.p <= c inside, n a unit normal) and out of the middle
+  // (radius hole). An outline with its own distance: exact inside where
+  // the bit goes (its offsets in are the pieces' offsets in, cut alike).
+  // deep: how far in its middle is, from a 1 mm sampling.
+  function cellShape(S0, t, planes, hole, name) {
+    var sdf = function(x, y) {
+      var d = shapeDistance(S0, t, x, y);
+      for (var i = 0; i < planes.length; i++) d = Math.max(d, planes[i].nx * x + planes[i].ny * y - planes[i].c);
+      return hole > 0 ? Math.max(d, hole - Math.hypot(x, y)) : d;
+    };
+    var e = cExt, bx = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity }, lo = Infinity;
+    for (var x = e.minX; x <= e.maxX + 1e-9; x += 1) for (var y = e.minY; y <= e.maxY + 1e-9; y += 1) {
+      var v = sdf(x, y);
+      if (v < lo) lo = v;
+      if (v <= 1) { bx.minX = Math.min(bx.minX, x - 1); bx.maxX = Math.max(bx.maxX, x + 1); bx.minY = Math.min(bx.minY, y - 1); bx.maxY = Math.max(bx.maxY, y + 1); }
+    }
+    if (!(bx.maxX > bx.minX)) bx = { minX: -1, maxX: 1, minY: -1, maxY: 1 };
+    return { kind: 'outline', sdf: sdf, box: bx, deep: -lo, cr: 0, step: gridStep(Math.max(e.maxX - e.minX, e.maxY - e.minY)),
+      key: 'comp:' + (S0.key || JSON.stringify(S0)) + ':' + t.toFixed(4) + ':' + name + ':' + JSON.stringify(planes) + ':' + hole.toFixed(4) };
   }
 
   // Where the halves go: side by side along X (base first) or Y (base in front).
@@ -3356,7 +3409,7 @@ if (typeof module !== 'undefined' && module.exports) {
   var shapeLoop = shapeLib.shapeLoop, shapeDeepest = shapeLib.shapeDeepest, loopLength = shapeLib.loopLength, loopPoint = shapeLib.loopPoint;
   var loopAt = shapeLib.loopAt, loopNearest = shapeLib.loopNearest, loopExtent = shapeLib.loopExtent, shapeLoops = shapeLib.shapeLoops, shapeDistance = shapeLib.shapeDistance;
   var outlineLib = require('./box-outline.cjs'), heartShape = outlineLib.heartShape, ovalShape = outlineLib.ovalShape;
-  var customShape = outlineLib.customShape, selfCrossing = outlineLib.selfCrossing, outlineLoops = outlineLib.outlineLoops;
+  var customShape = outlineLib.customShape, selfCrossing = outlineLib.selfCrossing, outlineLoops = outlineLib.outlineLoops, gridStep = outlineLib.gridStep;
   module.exports = { lipWidthFor: lipWidthFor, boxPlan: boxPlan, boardsOf: boardsOf, outsideInput: outsideInput, heightCaps: heightCaps, testFitInput: testFitInput, autoSizes: autoSizes, fitOption: fitOption, nestInputs: nestInputs, setPlan: setPlan, finishFor: finishFor, BOX_DEFAULTS: DEFAULTS };
 }
 /* END lib/box-plan.cjs */
