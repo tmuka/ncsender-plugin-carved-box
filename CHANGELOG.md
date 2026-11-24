@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Faster on the Pi:** Auto Sizes and the preview with compartments, a heart or a drawing take a fraction of the time (a drawing with compartments: 35 s to under 2 s on a Pi 5; 8 wedges in a rectangle: about 0.5 s instead of 8). Typing pauses before the preview updates when the last update was slow, so the keys don't lag. The programs are the same.
+
 ## 0.5.0: Compartments
 
 - **Compartments** (a card after Finger Notch): dividers carved into the base, left standing in the same wood, so there's nothing to glue. A **Grid** of Rows and Columns, or **Wedges** out from the middle (Sections, an Angle, and a round Middle compartment if you like), in any shape of box. **Divider Thickness**, and **Divider Height** from the floor (empty: full, under the lid's lip and below an Inside Rim). The top and side views show the dividers; the note under the card gives the count, a grid's compartment size and the dividers' height. In wood, a note when the Divider Thickness is under 2.5 mm. With rounded floor Corners, each compartment's floor is rounded. Not with a Glued-On Floor.

@@ -1563,12 +1563,29 @@ function segDistance(s, x, y) {
 // Inside the outline: an odd count of crossings to the right (arcs as
 // fine chords).
 function insideOutline(segs, x, y) {
-  var c = 0, pts = outlinePoints(segs);
-  for (var i = 0, j = pts.length - 1; i < pts.length; j = i++) {
-    var p = pts[i], q = pts[j];
+  var c = 0, pts = outlinePoints(segs), B = bandsOf(segs, pts);
+  var list = B.at(y);
+  for (var m = 0; m < list.length; m++) {
+    var i = list[m], p = pts[i], q = pts[i === 0 ? pts.length - 1 : i - 1];
     if ((p.y > y) !== (q.y > y) && x < (q.x - p.x) * (y - p.y) / (q.y - p.y) + p.x) c++;
   }
   return c % 2 === 1;
+}
+// The outline's edges sorted into bands across Y (kept), so a point only
+// tries the edges at its height.
+function bandsOf(segs, pts) {
+  if (segs._bands) return segs._bands;
+  var y0 = Infinity, y1 = -Infinity;
+  pts.forEach(function(p) { y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y); });
+  var n = Math.max(1, Math.min(4096, Math.ceil(pts.length / 4))), hb = (y1 - y0) / n || 1, bands = [];
+  for (var k = 0; k < n; k++) bands.push([]);
+  var band = function(y) { return Math.max(0, Math.min(n - 1, Math.floor((y - y0) / hb))); };
+  for (var i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    for (var b = band(Math.min(pts[i].y, pts[j].y)), e = band(Math.max(pts[i].y, pts[j].y)); b <= e; b++) bands[b].push(i);
+  }
+  var none = [];
+  segs._bands = { at: function(y) { return y < y0 || y > y1 ? none : bands[band(y)]; } };
+  return segs._bands;
 }
 // The outline as points: lines' ends, arcs every few degrees (kept).
 function outlinePoints(segs) {
@@ -1648,7 +1665,16 @@ function sweep(segs, x0, y0, h, nx, ny) {
       for (var j = cj - 1; j <= cj + 2; j++) for (var i = ci - 1; i <= ci + 2; i++) if (i >= 0 && j >= 0 && i < nx && j < ny) take(k, i, j);
     }
   });
-  var from = function(i, j, a, b) { if (a >= 0 && b >= 0 && a < nx && b < ny && id[b * nx + a] >= 0 && id[b * nx + a] !== id[j * nx + i]) take(id[b * nx + a], i, j); };
+  // A neighbour's nearest piece is at least its distance less the step
+  // between them from here: no nearer than this point's own, it's skipped
+  // (the same answer, far fewer distances worked out).
+  var hd = h * Math.SQRT2;
+  var from = function(i, j, a, b) {
+    if (a < 0 || b < 0 || a >= nx || b >= ny) return;
+    var n = b * nx + a, c = j * nx + i, k = id[n];
+    if (k < 0 || k === id[c] || d[n] - (a !== i && b !== j ? hd : h) >= d[c]) return;
+    take(k, i, j);
+  };
   for (var j = 0; j < ny; j++) {
     for (var i = 0; i < nx; i++) { from(i, j, i - 1, j); from(i, j, i - 1, j - 1); from(i, j, i, j - 1); from(i, j, i + 1, j - 1); }
     for (i = nx - 1; i >= 0; i--) from(i, j, i + 1, j);
@@ -1663,8 +1689,11 @@ function sweep(segs, x0, y0, h, nx, ny) {
 // an offset further out): made once for
 // each outline (by its key), the inside found a row at a time.
 var PAD = 25, GRIDS = {}, GRID_KEYS = [], GRID_CELLS = 0;
+// How far past the outline its grid goes: PAD, or a shape's own (a
+// compartment's, only ever moved out a little).
+function padOf(S) { return S.pad > 0 ? S.pad : PAD; }
 function outlineGrid(S, pad) {
-  pad = Math.max(PAD, pad || 0);
+  pad = Math.max(padOf(S), pad || 0);
   var key = S.key && S.key + '|' + pad;
   if (key && GRIDS[key]) return GRIDS[key];
   var pts = S.segs ? outlinePoints(S.segs) : [], x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
@@ -1673,7 +1702,7 @@ function outlineGrid(S, pad) {
   var h = S.step || 0.2;
   x0 -= pad; y0 -= pad; x1 += pad; y1 += pad;
   var nx = Math.ceil((x1 - x0) / h) + 1, ny = Math.ceil((y1 - y0) / h) + 1, v = new Float64Array(nx * ny), lo = Infinity;
-  var swept = S.segs && S.segs.length > 40 ? sweep(S.segs, x0, y0, h, nx, ny) : null;
+  var swept = S.segs && S.segs.length > 1 ? sweep(S.segs, x0, y0, h, nx, ny) : null;
   for (var j = 0; j < ny; j++) {
     var y = y0 + j * h, xs = [];
     for (var i = 0, k = pts.length - 1; i < pts.length; k = i++) {
@@ -1708,10 +1737,19 @@ function outlineGrid(S, pad) {
   return grid;
 }
 
+// The distance read off the outline's grid (between its points, a
+// blend of the four round it): quick, and what its contours follow.
+// Past the grid's edge, the exact distance.
+function gridDistance(S, x, y) {
+  var g = outlineGrid(S), fx = (x - g.x0) / g.h, fy = (y - g.y0) / g.h, i = Math.floor(fx), j = Math.floor(fy);
+  if (i < 0 || j < 0 || i >= g.nx - 1 || j >= g.ny - 1) return outlineDistance(S, x, y);
+  var u = fx - i, w = fy - j, k = j * g.nx + i, v = g.v;
+  return (v[k] * (1 - u) + v[k + 1] * u) * (1 - w) + (v[k + g.nx] * (1 - u) + v[k + g.nx + 1] * u) * w;
+}
 // Where the distance is t: closed loops (CCW, lines), by marching squares.
 function outlineLoops(S, t) {
   // Far enough out: a grid with room past t.
-  var g = outlineGrid(S, t > PAD - 3 ? Math.ceil(t + 10) : PAD), nx = g.nx, ny = g.ny, v = g.v, h = g.h;
+  var g = outlineGrid(S, t > padOf(S) - 3 ? Math.ceil(t + 10) : 0), nx = g.nx, ny = g.ny, v = g.v, h = g.h;
   // Contours of a shape are asked for many times: kept by level.
   var memo = g.key ? (MEMO[g.key] = MEMO[g.key] || {}) : null, mk = t.toFixed(6);
   if (memo && memo[mk]) return memo[mk];
@@ -1728,7 +1766,12 @@ function outlineLoops(S, t) {
   // Each cell's pieces: the two edges each joins (no direction yet).
   var adj = {};
   var link = function(p, q) { (adj[p] = adj[p] || []).push(q); (adj[q] = adj[q] || []).push(p); };
-  for (var j = 0; j < ny - 1; j++) for (var i = 0; i < nx - 1; i++) {
+  // Only the cells in blocks the level passes through, row by row.
+  var B = blocksOf(g), bs = B.bs, bx = B.bx;
+  for (var j = 0; j < ny - 1; j++) for (var I = 0, J = (j / bs) | 0; I < bx; I++) {
+    var bk = J * bx + I;
+    if (B.hi[bk] < t || B.lo[bk] >= t) continue;
+    for (var i = I * bs, iEnd = Math.min(nx - 1, i + bs); i < iEnd; i++) {
     var a = v[j * nx + i] < t, b = v[j * nx + i + 1] < t, c = v[(j + 1) * nx + i + 1] < t, d = v[(j + 1) * nx + i] < t;
     var code = (a ? 1 : 0) | (b ? 2 : 0) | (c ? 4 : 0) | (d ? 8 : 0);
     if (code === 0 || code === 15) continue;
@@ -1744,6 +1787,7 @@ function outlineLoops(S, t) {
     var es = [];
     if (a !== b) es.push(Sx()); if (b !== c) es.push(E()); if (c !== d) es.push(N()); if (d !== a) es.push(W());
     link(es[0], es[1]);
+    }
   }
   var loops = [], seen = {};
   Object.keys(adj).forEach(function(k0) {
@@ -1768,6 +1812,21 @@ function outlineLoops(S, t) {
   return loops;
 }
 var MEMO = {};
+// The grid's least and most in blocks of cells (kept on it): a level
+// outside a block's range doesn't cross it.
+function blocksOf(g) {
+  if (g.blocks) return g.blocks;
+  var bs = 8, bx = Math.ceil((g.nx - 1) / bs), by = Math.ceil((g.ny - 1) / bs), lo = new Float64Array(bx * by).fill(Infinity), hi = new Float64Array(bx * by).fill(-Infinity);
+  for (var j = 0; j < g.ny; j++) {
+    // A point on a block's edge is in the blocks either side.
+    var J0 = Math.max(0, Math.ceil(j / bs) - 1), J1 = Math.min(by - 1, (j / bs) | 0);
+    for (var i = 0; i < g.nx; i++) {
+      var val = g.v[j * g.nx + i], I0 = Math.max(0, Math.ceil(i / bs) - 1), I1 = Math.min(bx - 1, (i / bs) | 0);
+      for (var J = J0; J <= J1; J++) for (var I = I0; I <= I1; I++) { var k = J * bx + I; if (val < lo[k]) lo[k] = val; if (val > hi[k]) hi[k] = val; }
+    }
+  }
+  return (g.blocks = { bs: bs, bx: bx, lo: lo, hi: hi });
+}
 function loopArea(loop) {
   return loop.reduce(function(a, s) { return a + (s.x0 * s.y1 - s.x1 * s.y0) / 2; }, 0);
 }
@@ -1963,7 +2022,7 @@ function selfCrossing(pts) {
 function gridStep(size) { return Math.max(0.15, Math.min(0.4, size / 600), (size + 60) / 1200); }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { outlineDistance: outlineDistance, outlineLoops: outlineLoops, outlineGrid: outlineGrid, inLoop: inLoop,
+  module.exports = { outlineDistance: outlineDistance, gridDistance: gridDistance, outlineLoops: outlineLoops, outlineGrid: outlineGrid, inLoop: inLoop,
     heartShape: heartShape, ovalShape: ovalShape, customShape: customShape, selfCrossing: selfCrossing, gridStep: gridStep };
 }
 /* END lib/box-outline.cjs */
@@ -2228,7 +2287,8 @@ if (typeof module !== 'undefined' && module.exports) {
 
 // The settings a plan takes, with their defaults (mm). lidHeight,
 // baseHeight: the box's outside, to the seam; null: as high as the board
-// allows (see boardsOf). magnets, notch, edges: null for none. edges:
+// allows (see boardsOf). quick: a trial plan (Auto Sizes'), for its
+// problems: the compartments' top edges left out. magnets, notch, edges: null for none. edges:
 // { bit: 'v' (angle, degrees across the V; diameter) or 'round' (radius,
 // tip: the diameter of its flat end), outside (the seam), inside (the
 // lead-in: the lip's outer edge, the opening's), pocket (each pocket's
@@ -2834,7 +2894,8 @@ function boxPlan(input) {
         });
         return out;
       };
-      cells.forEach(function(c, i) {
+      // (Not for a trial plan, as Auto Sizes makes: only its problems count.)
+      if (!o.quick) cells.forEach(function(c, i) {
         // The edge as cut: a rectangle's corners as round as the bit;
         // an outline's, the bit's path round it, out by its radius.
         var es = c.shape, at = 0;
@@ -2843,7 +2904,7 @@ function boxPlan(input) {
           var cs = [];
           outlineLoops(es, -rb).forEach(function(l) { cs = cs.concat(l); });
           if (!cs.length) return;
-          es = { kind: 'outline', segs: cs, key: es.key + ':cut', step: es.step };
+          es = { kind: 'outline', segs: cs, key: es.key + ':cut', step: es.step, pad: 10 };
           at = rb;
         }
         var et = at - tip / 2, loop = shapeLoop(es, et);
@@ -2892,8 +2953,10 @@ function boxPlan(input) {
   // the bit goes (its offsets in are the pieces' offsets in, cut alike).
   // deep: how far in its middle is, from a 1 mm sampling.
   function cellShape(S0, t, planes, hole, name) {
+    // An outline's distance off its grid (the inside's contour is too).
+    var g0 = S0.kind === 'outline' ? S0 : null;
     var sdf = function(x, y) {
-      var d = shapeDistance(S0, t, x, y);
+      var d = g0 ? gridDistance(g0, x, y) - t : shapeDistance(S0, t, x, y);
       for (var i = 0; i < planes.length; i++) d = Math.max(d, planes[i].nx * x + planes[i].ny * y - planes[i].c);
       return hole > 0 ? Math.max(d, hole - Math.hypot(x, y)) : d;
     };
@@ -2906,7 +2969,7 @@ function boxPlan(input) {
     if (!(bx.maxX > bx.minX)) bx = { minX: -1, maxX: 1, minY: -1, maxY: 1 };
     // Its deepest point, finer round the best of those.
     if (at) for (var fx = -1; fx <= 1 + 1e-9; fx += 0.1) for (var fy = -1; fy <= 1 + 1e-9; fy += 0.1) lo = Math.min(lo, sdf(at[0] + fx, at[1] + fy));
-    return { kind: 'outline', sdf: sdf, box: bx, deep: -lo, cr: 0, step: gridStep(Math.max(e.maxX - e.minX, e.maxY - e.minY)),
+    return { kind: 'outline', sdf: sdf, box: bx, deep: -lo, cr: 0, pad: 10, step: gridStep(Math.max(e.maxX - e.minX, e.maxY - e.minY)),
       key: 'comp:' + (S0.key || JSON.stringify(S0)) + ':' + t.toFixed(4) + ':' + name + ':' + JSON.stringify(planes) + ':' + hole.toFixed(4) };
   }
 
@@ -3196,7 +3259,7 @@ function testFitInput(input) {
   };
   // A heart or drawing big enough for its inside to stay in one piece at
   // the walls, and a drawing for its corners not to cut it apart.
-  for (var j = 0; j < 12 && (o.shape === 'heart' || custom) && boxPlan(fit(half)).problems.some(function(p) { return /comes apart|cuts the drawing apart|rounds the drawing away/.test(p); }); j++) half *= 1.1;
+  for (var j = 0; j < 12 && (o.shape === 'heart' || custom) && boxPlan(Object.assign(fit(half), { quick: true })).problems.some(function(p) { return /comes apart|cuts the drawing apart|rounds the drawing away/.test(p); }); j++) half *= 1.1;
   return fit(half);
 }
 
@@ -3424,7 +3487,7 @@ function autoSizes(input, material, imperial) {
     if (rect || poly || o.shape === 'heart' || o.shape === 'custom') a.cornerRadius = Math.max(o.cornerRadius || 0, upHalf(a.wall - a.lipWidth - a.clearance + b / 2 + a.lipHeight * slant));
     // A heart's point under its lobes' radius.
     if (o.shape === 'heart') a.cornerRadius = Math.min(a.cornerRadius, Math.max(o.cornerRadius || 0, (o.length || 0) / 2 / 1.72 - 1));
-    plan = boxPlan(Object.assign({}, o, a));
+    plan = boxPlan(Object.assign({}, o, a, { quick: true }));
     if (!plan.problems.length) break;
     // What the sizes can't fix (a hole narrower than the bit, a drill, a
     // hole too deep) is left to say: the rest still fit.
@@ -3460,7 +3523,15 @@ function autoSizes(input, material, imperial) {
     else if (/Gap/.test(p)) a.gap = half(a.gap + 2 * grid(3));
     else if (/ends are too tight/.test(p) && a.wall > 3) a.wall = half(a.wall - grid(3));
     // Only what a thicker wall fixes; anything else is the box's own to say.
-    else if (/Magnet holes too wide|Too many magnets|notch too wide|Wall must be at least|Corner Radius must|^Sloped lip/.test(p) && a.wall < small / 2 - b - 2) a.wall = half(a.wall + grid(3));
+    else if (/Magnet holes too wide|Too many magnets|notch too wide|Wall must be at least|Corner Radius must|^Sloped lip/.test(p) && a.wall < small / 2 - b - 2) {
+      a.wall = half(a.wall + grid(3));
+      // Magnets too wide: straight to the first wall they fit in (the lip
+      // follows it), not a plan for each step on the way.
+      if (/Magnet holes too wide for the wall/.test(p)) {
+        var fits = function() { return a.wall - lipWidthFor(Object.assign({}, o, a), imperial) - a.clearance >= a.magnets.diameter + 1.6 - 1e-9; };
+        while (!fits() && a.wall < small / 2 - b - 2) a.wall = half(a.wall + grid(3));
+      }
+    }
     else break;
   }
   a.problems = plan.problems;
@@ -3504,7 +3575,7 @@ function fitOption(input, imperial, before) {
   var shrink = function(key) { var at = key.split('.'), d = o[at[0]][at[1]]; if (!(d > 0)) return false; put(key, smaller(d)); return true; };
   var plan;
   for (var k = 0; k < 80; k++) {
-    plan = boxPlan(o);
+    plan = boxPlan(Object.assign({}, o, { quick: true }));
     // The first problem one of these changes fixes (the rest are left to say).
     if (!plan.problems.filter(function(p) { return fixable(p) && (before || []).indexOf(p) < 0; }).some(fix)) break;
   }
@@ -3552,7 +3623,7 @@ if (typeof module !== 'undefined' && module.exports) {
   var shapeLoop = shapeLib.shapeLoop, shapeDeepest = shapeLib.shapeDeepest, loopLength = shapeLib.loopLength, loopPoint = shapeLib.loopPoint;
   var loopAt = shapeLib.loopAt, loopPart = shapeLib.loopPart, loopNearest = shapeLib.loopNearest, loopExtent = shapeLib.loopExtent, shapeLoops = shapeLib.shapeLoops, shapeDistance = shapeLib.shapeDistance;
   var outlineLib = require('./box-outline.cjs'), heartShape = outlineLib.heartShape, ovalShape = outlineLib.ovalShape;
-  var customShape = outlineLib.customShape, selfCrossing = outlineLib.selfCrossing, outlineLoops = outlineLib.outlineLoops, gridStep = outlineLib.gridStep;
+  var customShape = outlineLib.customShape, selfCrossing = outlineLib.selfCrossing, outlineLoops = outlineLib.outlineLoops, gridStep = outlineLib.gridStep, gridDistance = outlineLib.gridDistance;
   module.exports = { lipWidthFor: lipWidthFor, boxPlan: boxPlan, boardsOf: boardsOf, outsideInput: outsideInput, heightCaps: heightCaps, testFitInput: testFitInput, autoSizes: autoSizes, fitOption: fitOption, nestInputs: nestInputs, setPlan: setPlan, finishFor: finishFor, BOX_DEFAULTS: DEFAULTS };
 }
 /* END lib/box-plan.cjs */
@@ -5622,13 +5693,15 @@ if (typeof module !== 'undefined' && module.exports) {
       });
     });
     var FEED_IDS = ['cb-feed', 'cb-plunge', 'cb-doc', 'cb-stepover', 'cb-rpm'];
-    // An oval's, heart's or drawing's outline takes a moment to work out: after a
-    // pause in the typing.
-    var later = null;
+    // An oval's, heart's or drawing's outline takes a moment to work out,
+    // as do compartments on a slow computer (the Pi): after a pause in the
+    // typing, when the last update took a while.
+    var later = null, lastMs = 0;
+    var timed = function () { var t0 = performance.now(); update(true); lastMs = performance.now() - t0; };
     var soon = function () {
       var shp = ROOT.querySelector('#cb-shape button.on');
-      if (shp && (shp.dataset.v === 'oval' || shp.dataset.v === 'heart' || shp.dataset.v === 'custom')) { clearTimeout(later); later = setTimeout(function () { update(true); }, 350); }
-      else update(true);
+      if (lastMs > 40 || (shp && (shp.dataset.v === 'oval' || shp.dataset.v === 'heart' || shp.dataset.v === 'custom'))) { clearTimeout(later); later = setTimeout(timed, 350); }
+      else timed();
     };
     FIELDS.forEach(function (f) {
       $(f[0]).addEventListener('input', function (e) {
