@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.0: Compartments
 
 - **Compartments** (a card after Finger Notch): dividers carved into the base, left standing in the same wood, so there's nothing to glue. A **Grid** of Rows and Columns, or **Wedges** out from the middle (Sections, an Angle, and a round Middle compartment if you like), in any shape of box. **Divider Thickness**, and **Divider Height** from the floor (empty: full, under the lid's lip and below an Inside Rim). The top and side views show the dividers; the note under the card gives the count, a grid's compartment size and the dividers' height. In wood, a note when the Divider Thickness is under 2.5 mm. With rounded floor Corners, each compartment's floor is rounded. Not with a Glued-On Floor.
 - **Edges' Inside Rim** also chamfers (or rounds over) each compartment's top edge, along the dividers; it stops short where the edge bit's cone would reach the box's wall above them.
