@@ -1,4 +1,4 @@
-# Compartments: plan (steps 1 and 2 built, in the plan only; no dialog yet)
+# Compartments: plan (steps 1 to 3 built: the plan and the dialog; side view, corners and Guided Setup to come)
 
 Dividers carved into the base, so the inside is split into separate spaces: a ring box with a slot section, a keepsake box with a grid, a round box cut into wedges. The dividers are left standing in the solid wood, the same way the walls are, so there's nothing to glue.
 
