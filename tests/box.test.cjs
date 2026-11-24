@@ -328,9 +328,10 @@ function checkEdges(plan, gcode) {
     assert.ok(!p.rapid, 'a rapid below the stock top');
     // An outline's loops are straight lines kept to 0.02 mm of its curve.
     const tol = (e) => e.shape.kind === 'outline' ? 0.03 : 0.005;
-    const on = all.filter(({ h, e }) => Math.abs(shapeDistance(e.shape, e.t, p.x - h.at.x, p.y - h.at.y)) < tol(e) && p.z >= e.z0 - e.depth - 1e-6);
+    const X = (h, e) => p.x - h.at.x - (e.dx || 0), Y = (h, e) => p.y - h.at.y - (e.dy || 0);
+    const on = all.filter(({ h, e }) => Math.abs(shapeDistance(e.shape, e.t, X(h, e), Y(h, e))) < tol(e) && p.z >= e.z0 - e.depth - 1e-6);
     // Above an edge's top, going down to it in the air.
-    const above = all.some(({ h, e }) => Math.abs(shapeDistance(e.shape, e.t, p.x - h.at.x, p.y - h.at.y)) < tol(e) && p.z >= e.z0 - 1e-6);
+    const above = all.some(({ h, e }) => Math.abs(shapeDistance(e.shape, e.t, X(h, e), Y(h, e))) < tol(e) && p.z >= e.z0 - 1e-6);
     assert.ok(on.length || above, 'edge bit off its edges: ' + JSON.stringify(p) + ' ' + plan.o.lipOn + ' ' + plan.o.shape + ' ' + JSON.stringify(plan.o.edges));
     // Below an edge's top, the bit's bottom stays on the air side: a
     // V-bit's point on the edge (or out by its shift, as much deeper), a
@@ -340,13 +341,13 @@ function checkEdges(plan, gcode) {
       if (p.z >= e.z0 - 1e-6) continue;
       const half = e.u * (e.t - e.at);
       assert.ok(half >= tipHalf - 1e-9 && Math.abs(e.depth - e.chamfer - (half - tipHalf) / Math.tan((ed.angle || 90) * Math.PI / 360)) < 1e-9 || ed.bit === 'round');
-      const out = e.u * shapeDistance(e.shape, e.at, p.x - h.at.x, p.y - h.at.y);
+      const out = e.u * shapeDistance(e.shape, e.at, X(h, e), Y(h, e));
       assert.ok(Math.abs(out - half) < tol(e) + 0.005, h.name + ' ' + e.what + ': bit ' + out.toFixed(3) + ' off the edge, not ' + half);
     }
   }
   for (const { h, e } of all) {
     const t = e.shape.kind === 'outline' ? 0.03 : 0.005;
-    assert.ok(pts.some((p) => Math.abs(p.z - (e.z0 - e.depth)) < 1e-6 && Math.abs(shapeDistance(e.shape, e.t, p.x - h.at.x, p.y - h.at.y)) < t), h.name + ' ' + e.what + ' not cut');
+    assert.ok(pts.some((p) => Math.abs(p.z - (e.z0 - e.depth)) < 1e-6 && Math.abs(shapeDistance(e.shape, e.t, p.x - h.at.x - (e.dx || 0), p.y - h.at.y - (e.dy || 0))) < t), h.name + ' ' + e.what + ' not cut');
   }
 }
 
@@ -1693,4 +1694,32 @@ test('under the widened opening, the inside starts at its floor, not in the air 
     const rb = plan.o.bit / 2, near = pts.filter((p) => p.g === 1 && shapeDistance(plan.shape, plan.tInside - rb - 0.5, p.x - half.at.x, p.y - half.at.y) < 0 && p.z < -1e-6);
     assert.ok(near.every((p) => p.z <= top + 1e-6 || p.z >= -open.depth + fin - 1e-6), 'air pass');
   }
+});
+
+test('compartments: the Inside Rim chamfers each one\'s top edge, clear of the wall', () => {
+  const EF = { toolNumber: 7, feed: 1200, plunge: 300, rpm: 16000, delay: 2, doc: 2 };
+  const V = { bit: 'v', angle: 90, diameter: 12.7, vtip: 0.3, outside: 0, inside: 0, pocket: 0.8 };
+  for (const input of [
+    { shape: 'rect', length: 150, width: 100, cornerRadius: 12, edges: V, compartments: { rows: 2, cols: 3, thickness: 6 } },
+    { shape: 'rect', length: 150, width: 100, cornerRadius: 12, lipOn: 'lid', edges: { ...V, angle: 60, diameter: 6.35 }, compartments: { rows: 1, cols: 2, thickness: 6 } },
+    { diameter: 110, lipOn: 'lid', edges: V, compartments: { sections: 3, thickness: 6, middle: 34 } },
+    { shape: 'oval', length: 150, width: 100, edges: { bit: 'round', radius: 3.175, tip: 3, outside: 0, inside: 0, pocket: 1 }, compartments: { sections: 2, thickness: 7 } }]) {
+    const plan = boxPlan(input);
+    assert.deepEqual(plan.problems, [], JSON.stringify(input));
+    const comp = plan.compartments, edges = plan.edges.base.filter((e) => /^compartment/.test(e.what));
+    assert.ok(edges.length >= comp.cells.length, JSON.stringify(input));
+    const gcode = boxProgram(plan, Object.assign({}, FEEDS, { edges: EF }), 'edges').gcode;
+    checkEdges(plan, gcode);
+    // Below the dividers' top, the edge bit's cone stays off the wall.
+    const ed = plan.o.edges, base = plan.halves.find((h) => h.name === 'base'), tan = Math.tan((ed.angle || 90) * Math.PI / 360);
+    // Each stretch it goes along: far enough from the wall that the cone,
+    // as high as the wall, stays off it.
+    const r = ed.bit === 'round' ? ed.tip / 2 + ed.radius : Math.min(ed.vtip / 2 + (comp.top + ed.pocket) * tan, ed.diameter / 2);
+    for (const e of edges) for (const sg of e.loop) for (const f of [0, 0.5, 1]) {
+      const x = sg.type === 'line' ? sg.x0 + (sg.x1 - sg.x0) * f : sg.cx + sg.r * Math.cos(sg.a0 + (sg.a1 - sg.a0) * f), y = sg.type === 'line' ? sg.y0 + (sg.y1 - sg.y0) * f : sg.cy + sg.r * Math.sin(sg.a0 + (sg.a1 - sg.a0) * f);
+      assert.ok(shapeDistance(plan.shape, plan.tInside, x + e.dx, y + e.dy) <= -r, e.what + ' at the wall: ' + x.toFixed(2) + ',' + y.toFixed(2));
+    }
+  }
+  const said = (o, re) => assert.ok(boxPlan(o).problems.some((p) => re.test(p)), JSON.stringify(o) + ' ' + boxPlan(o).problems);
+  said({ shape: 'rect', length: 150, width: 100, cornerRadius: 12, edges: { bit: 'v', angle: 90, diameter: 12.7, vtip: 0.3, outside: 0, inside: 0, pocket: 2 }, compartments: { rows: 1, cols: 2, thickness: 4 } }, /Inside Rim too big for the dividers/);
 });

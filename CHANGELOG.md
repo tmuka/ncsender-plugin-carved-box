@@ -3,6 +3,7 @@
 ## Unreleased
 
 - **Compartments** (a card after Finger Notch): dividers carved into the base, left standing in the same wood, so there's nothing to glue. A **Grid** of Rows and Columns, or **Wedges** out from the middle (Sections, an Angle, and a round Middle compartment if you like), in any shape of box. **Divider Thickness**, and **Divider Height** from the floor (empty: full, under the lid's lip and below an Inside Rim). The top and side views show the dividers; the note under the card gives the count, each one's size and the dividers' height. With rounded floor Corners, each compartment's floor is rounded. Not with a Glued-On Floor.
+- **Edges' Inside Rim** also chamfers (or rounds over) each compartment's top edge, along the dividers; it stops short where the edge bit's cone would reach the box's wall above them.
 - **Guided Setup** asks what goes inside: one open space, two compartments, a grid, or wedges.
 - Fixed: under the opening widened for the lip, the inside's pocket started at the top of the board, so its first pass or two cut only air (the opening had cleared it). It now starts at the opening's floor: a few minutes less, and no passes in the air.
 
