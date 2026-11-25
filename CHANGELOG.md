@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.3: Guided Setup buttons
+
+- **Guided Setup:** the Shape buttons are as tall as the ones in the main dialog (they were squashed to the height of their text).
+
 ## 0.5.2: Uneven compartments
 
 - **Compartments: uneven sizes.** A grid's **Row Sizes** and **Column Sizes** set each row's and column's share instead of equal: `1 2 1` makes the middle column twice as wide as the two beside it, `2 1` makes the front row twice as deep as the back. One number for each; empty is equal. The note under the card lists each column's width and row's depth.
