@@ -492,8 +492,8 @@
           <div class="cb-field"><label for="cb-comp-cols">Columns</label><input class="cb-input" id="cb-comp-cols" title="Compartments left to right, 1 to 12."></div>
         </div>
         <div class="cb-row" id="cb-comp-sizes">
-          <div class="cb-field"><label for="cb-comp-rsz">Row Sizes</label><input class="cb-input" id="cb-comp-rsz" placeholder="equal" title="Each row's share, front to back: 2 1 makes the front row twice as deep as the back. One number for each row. Empty: all the same."></div>
-          <div class="cb-field"><label for="cb-comp-csz">Column Sizes</label><input class="cb-input" id="cb-comp-csz" placeholder="equal" title="Each column's share, left to right: 1 2 1 makes the middle column twice as wide as the others. One number for each column. Empty: all the same."></div>
+          <div class="cb-field"><label for="cb-comp-rsz">Row Sizes</label><input class="cb-input" id="cb-comp-rsz" placeholder="equal" title="Each row's share, front to back: 2 1 makes the front row twice as deep as the back. Rows follows how many numbers you type. Empty: all the same."></div>
+          <div class="cb-field"><label for="cb-comp-csz">Column Sizes</label><input class="cb-input" id="cb-comp-csz" placeholder="equal" title="Each column's share, left to right: 1 2 1 makes the middle column twice as wide as the others. Columns follows how many numbers you type. Empty: all the same."></div>
         </div>
         <div class="cb-row" id="cb-comp-wedge">
           <div class="cb-field"><label for="cb-comp-n">Sections</label><input class="cb-input" id="cb-comp-n" title="Wedges round the middle, 2 to 12."></div>
@@ -501,7 +501,7 @@
           <div class="cb-field"><label for="cb-comp-mid">Middle</label><input class="cb-input" id="cb-comp-mid" data-unit="length" placeholder="none" title="A round compartment in the middle, this wide across, with a divider round it. Empty: the wedges meet in the middle."></div>
         </div>
         <div class="cb-row" id="cb-comp-wsizes">
-          <div class="cb-field"><label for="cb-comp-wsz">Section Sizes</label><input class="cb-input" id="cb-comp-wsz" placeholder="equal" title="Each section's share of the way round, counterclockwise from the first divider: 1 2 1 makes the second section a half and the others a quarter each. One number for each section. Empty: all the same."></div>
+          <div class="cb-field"><label for="cb-comp-wsz">Section Sizes</label><input class="cb-input" id="cb-comp-wsz" placeholder="equal" title="Each section's share of the way round, counterclockwise from the first divider: 1 2 1 makes the second section a half and the others a quarter each. Sections follows how many numbers you type. Empty: all the same."></div>
         </div>
         <div class="cb-row">
           <div class="cb-field"><label for="cb-comp-t">Divider Thickness</label><input class="cb-input" id="cb-comp-t" data-unit="length" title="How thick each divider is. In wood, 1/4&quot; (6 mm) is sturdy; under 2.5 mm can split along the grain."></div>
@@ -5766,6 +5766,9 @@ if (typeof module !== 'undefined' && module.exports) {
         if (e.isTrusted && FEED_IDS.indexOf(f[0]) >= 0) state.feedsAuto = false;
         if (e.isTrusted && f[0] === 'cb-bit') $('cb-tool').value = '';
         if (e.isTrusted && AUTO.some(function (x) { return x[0] === f[0]; })) state.autoSizes = false;
+        // Sizes typed: as many sections (rows, columns) as numbers.
+        var follows = { 'cb-comp-wsz': ['cb-comp-n', 2], 'cb-comp-rsz': ['cb-comp-rows', 1], 'cb-comp-csz': ['cb-comp-cols', 1] }[f[0]];
+        if (e.isTrusted && follows) { var sl = read(f[0], 'shares'); if (Array.isArray(sl) && sl.length >= follows[1] && sl.length <= 12) show(follows[0], sl.length, 'count'); }
         if (e.isTrusted && f[0] === 'cb-corner') { var cr = read('cb-corner', 'length'); if (cr != null && !isNaN(cr)) state.cornerOwn = cr; }
         // A height typed as high as it goes follows the boards, as an empty one does.
         // Lip Thickness typed: yours (half typed too), unless it's what the wall gives; empty links it again.
