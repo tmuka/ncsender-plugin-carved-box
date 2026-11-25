@@ -1765,3 +1765,117 @@ test('compartments: uneven wedges, each section its share of the way round', () 
   said({ diameter: 110, compartments: { sections: 3, thickness: 5, sizes: [1, 2] } }, /Section Sizes has 2 numbers, and there are 3 Sections/);
   said({ diameter: 60, compartments: { sections: 3, thickness: 5, sizes: [1, 60, 1] } }, /too narrow for the bit.*sizes closer to equal/);
 });
+
+// A Lid Tray: the Lid Top program (the board turned over) bores the pin
+// holes and the dish, nothing else; the box's program is as it was.
+function checkTop(input, extra) {
+  const plan = boxPlan(Object.assign({}, input, { cut: 'top' }));
+  assert.deepEqual(plan.problems, [], JSON.stringify(input));
+  const tr = plan.tray, h = plan.halves[0], o = plan.o, rb = o.bit / 2, S = h.shape;
+  assert.equal(plan.halves.length, 1);
+  assert.equal(h.name, 'top');
+  const { gcode } = boxProgram(plan, Object.assign({}, FEEDS, extra || {}));
+  for (const l of gcode.split('\n')) { assert.ok(l.length <= 79, l); assert.doesNotMatch(l, /[!?~]/, l); }
+  const pts = simulate(gcode).filter((p) => p.z < -1e-6);
+  const trc = input.tray.rounded && o.corners ? o.corners.radius : 0;
+  for (const p of pts) {
+    assert.ok(!p.rapid, 'a rapid below the top');
+    const pin = tr.pins.find((q) => Math.hypot(p.x - q.x, p.y - q.y) <= tr.pin / 2 - rb + 0.06);
+    if (pin) { assert.ok(p.z >= -(o.stock + 3) - 1e-6, 'pin hole too deep'); continue; }
+    const d = shapeDistance(S, -tr.rim - rb, p.x - h.at.x, p.y - h.at.y);
+    assert.ok(d <= 0.03, 'cut outside the dish: ' + JSON.stringify(p));
+    assert.ok(p.z >= -tr.depth - 1e-6, 'below the dish floor: ' + JSON.stringify(p));
+    // Short of the floor near the wall, for the corner bit's cove.
+    if (trc) assert.ok(p.z >= -(tr.depth - trc) - 1e-6 || shapeDistance(S, -tr.rim - trc - rb, p.x - h.at.x, p.y - h.at.y) <= 0.03, 'into the cove: ' + JSON.stringify(p));
+  }
+  // Both holes bored through, the dish down to its floor all over.
+  for (const q of tr.pins) assert.ok(pts.some((p) => Math.hypot(p.x - q.x, p.y - q.y) < tr.pin / 2 && Math.abs(p.z + o.stock + 3) < 1e-6), 'a pin hole not through');
+  const floor = pts.filter((p) => Math.abs(p.z + tr.depth) < 1e-6 || (trc && Math.abs(p.z + tr.depth - trc) < 1e-6));
+  const inner = shapeLoop(S, -tr.rim - o.bit - trc);
+  if (inner) for (let k = 0; k < 24; k++) {
+    const q = loopPoint(inner, loopLength(inner) * k / 24);
+    assert.ok(floor.some((p) => Math.hypot(p.x - h.at.x - q.x, p.y - h.at.y - q.y) < rb), 'dish floor not cleared at ' + JSON.stringify(q));
+  }
+  return { plan, gcode, pts };
+}
+
+test('a lid tray: pin holes and the dish with the board turned over, then the box as before', () => {
+  for (const layout of ['x', 'y']) for (const origin of ['front-left', 'center']) for (const shape of [{}, { shape: 'rect', length: 130, width: 90, cornerRadius: 12 }, { shape: 'heart', length: 110, width: 100, cornerRadius: 6 }, { shape: 'poly', sides: 5, flats: 90, cornerRadius: 8 }]) {
+    const input = Object.assign({ layout, origin, top: 9, lidHeight: 16, tray: { depth: 5 } }, shape);
+    const { plan } = check(input);
+    const { plan: tp } = checkTop(input);
+    // The same pins and board in both programs.
+    assert.deepEqual(tp.tray.pins, plan.tray.pins);
+    assert.deepEqual(tp.stock, plan.stock);
+    // The pins on the line the board turns over on, clear of the parts' outlines.
+    const ax = layout === 'y' ? 'y' : 'x';
+    for (const q of plan.tray.pins) {
+      assert.ok(Math.abs(q[ax] - plan.tray.line) < 1e-9);
+      for (const hh of plan.halves) assert.ok(shapeDistance(hh.shape, 0, q.x - hh.at.x, q.y - hh.at.y) > plan.tray.pin / 2 + o0(plan).bit + 2, 'pin too near the ' + hh.name);
+      assert.ok(q.x - plan.tray.pin / 2 >= plan.stock.x0 + 1 && q.x + plan.tray.pin / 2 <= plan.stock.x0 + plan.stock.w - 1 && q.y - plan.tray.pin / 2 >= plan.stock.y0 + 1 && q.y + plan.tray.pin / 2 <= plan.stock.y0 + plan.stock.h - 1, 'pin off the board');
+    }
+    // Turned over end for end, the dish lands in the lid: mirrored about the pin line.
+    const lid = plan.halves.find((x) => x.name === 'lid'), m = (p) => ax === 'x' ? { x: 2 * plan.tray.line - p.x, y: p.y } : { x: p.x, y: 2 * plan.tray.line - p.y };
+    const c = m(tp.tray.at);
+    assert.ok(Math.hypot(c.x - lid.at.x, c.y - lid.at.y) < 1e-9, 'the dish isn\'t over the lid');
+    const rim = shapeLoop(tp.halves[0].shape, -tp.tray.rim);
+    for (let k = 0; k < 32; k++) {
+      const q = loopPoint(rim, loopLength(rim) * k / 32), w = m({ x: tp.tray.at.x + q.x, y: tp.tray.at.y + q.y });
+      assert.ok(Math.abs(shapeDistance(lid.shape, -tp.tray.rim, w.x - lid.at.x, w.y - lid.at.y)) < (lid.shape.kind === 'outline' ? 0.1 : 0.005), 'the dish\'s edge isn\'t the rim in from the lid\'s');
+    }
+    // The box's program: the same cuts as without the tray, moved for the bigger board.
+    assert.match(boxProgram(plan, FEEDS).gcode, /run Lid Top first/);
+  }
+});
+
+function o0(plan) { return plan.o; }
+
+test('a lid tray on a drawing: the dish matches the lid it lands in', () => {
+  const { svgOutline } = require('../lib/box-drawing.cjs');
+  const outline = { name: 'lopsided.svg', pts: svgOutline(LOPSIDED).pts };
+  for (const layout of ['x', 'y']) {
+    const input = { shape: 'custom', outline, length: 120, width: 90, cornerRadius: 8, layout, top: 9, lidHeight: 16, tray: { depth: 5, rim: 8 } };
+    const { plan } = check(input);
+    const { plan: tp } = checkTop(input);
+    const lid = plan.halves.find((x) => x.name === 'lid'), ax = layout === 'y' ? 'y' : 'x';
+    const m = (p) => ax === 'x' ? { x: 2 * plan.tray.line - p.x, y: p.y } : { x: p.x, y: 2 * plan.tray.line - p.y };
+    const rim = shapeLoop(tp.halves[0].shape, -8);
+    for (let k = 0; k < 40; k++) {
+      const q = loopPoint(rim, loopLength(rim) * k / 40), w = m({ x: tp.tray.at.x + q.x, y: tp.tray.at.y + q.y });
+      assert.ok(Math.abs(shapeDistance(lid.shape, -8, w.x - lid.at.x, w.y - lid.at.y)) < 0.1, layout + ': the dish\'s edge isn\'t the rim in from the lid\'s');
+    }
+  }
+});
+
+test('a lid tray: rounded floor and edges after a tool change, each on its loop', () => {
+  const CF = { toolNumber: 8, feed: 1200, plunge: 300, rpm: 16000, doc: 1.5 }, EF = { toolNumber: 7, feed: 1200, plunge: 300, rpm: 16000, doc: 2 };
+  for (const edges of [{ bit: 'v', angle: 90, diameter: 12.7, outside: 1, inside: 0.5, pocket: 0 }, { bit: 'round', radius: 3.175, tip: 6, outside: 1, inside: 1, pocket: 0 }]) {
+    const input = { stock: 25.4, gap: 20, top: 10, lidHeight: 22, wall: 10, corners: { diameter: 6.35, radius: 3.175 }, edges, tray: { depth: 6, rounded: true, edge: 1.5 } };
+    check(input);
+    const { plan } = checkTop(input);
+    const h = plan.halves[0];
+    assert.equal(plan.corners.top.length, 1);
+    assert.equal(plan.edges.top.length, 2);
+    const all = boxProgram(plan, Object.assign({}, FEEDS, { corners: CF, edges: EF })).gcode;
+    const c = all.indexOf('M6 T8'), e = all.indexOf('M6 T7');
+    assert.ok(c > 0 && e > c, 'corner bit, then edge bit');
+    const ok = (k, p) => Math.abs(shapeDistance(k.shape, k.t, p.x - h.at.x, p.y - h.at.y)) < 0.01 && p.z >= k.z0 - k.depth - 1e-6;
+    for (const p of simulate(all.slice(c, e)).filter((p) => p.z < 0)) assert.ok(plan.corners.top.some((k) => ok(k, p)), 'corner bit off its loop');
+    for (const p of simulate(all.slice(e)).filter((p) => p.z < 0)) assert.ok(plan.edges.top.some((k) => ok(k, p)), 'edge bit off its loop');
+    // The dish's floor corners: the cove's radius from the wall.
+    assert.ok(Math.abs(plan.corners.top[0].t + 6.35 / 2 + plan.tray.rim) < 1e-9);
+  }
+});
+
+test('a lid tray that can\'t be cut says why', () => {
+  const said = (o, re) => assert.ok(boxPlan(o).problems.some((p) => re.test(p)), JSON.stringify(o) + ' ' + boxPlan(o).problems);
+  said({ top: 4, tray: { depth: 3 } }, /at least 3 mm more than the Tray Depth/);
+  said({ top: 9, tray: { depth: 5, rim: 2 } }, /Tray Rim must be at least 3 mm/);
+  said({ top: 9, tray: { depth: 5, rim: 39 } }, /dish is too small for the bit/);
+  said({ top: 9, bit: 8, tray: { depth: 5, pin: 6.35 } }, /no wider than the Pin Diameter/);
+  said({ top: 9, cut: 'lid', tray: { depth: 5 } }, /both halves on one board/);
+  said({ top: 9, cut: 'top' }, /Lid Top needs the Lid Tray on/);
+  said({ top: 9, grain: true, cut: 'lid', tray: { depth: 5 } }, /Grain Match/);
+  said({ lipOn: 'lid', top: 9, magnets: { count: 4, diameter: 6, depth: 10 }, wall: 12, tray: { depth: 6, rim: 3 } }, /within 2 mm of the lid's magnet holes/);
+  assert.deepEqual(boxPlan({ top: 9, tray: { depth: 5 } }).problems, []);
+});
