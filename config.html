@@ -2558,7 +2558,17 @@ function boxPlan(input) {
   } else if (!drop) need(o.top > 0 && o.top < lidH, 'Lid Top must be between 0 and the lid height');
   // A Lid Tray: the dish in the lid's top, from the board's underside.
   var tr = o.tray && o.tray.depth > 0 ? o.tray : null, trayRim = tr ? (tr.rim > 0 ? tr.rim : w) : 0, trayPin = tr ? (tr.pin > 0 ? tr.pin : 6.35) : 0;
-  var trayWood = tr ? (plugLid ? lidH : o.top) - tr.depth : 0;
+  // The wood under it: the thinnest of the lid where the dish reaches
+  // over it from the other face, its inside (the Lid Top, or a solid
+  // lid's plug), the lip, the shoulder round it (cut the lip's height
+  // down) or the widened opening, each ring the dish comes within 1 mm of.
+  var trayWood = 0;
+  if (tr) {
+    var dishTo = -trayRim, zones = [[-Infinity, plugLid ? lidH : o.top]];
+    if (lipOnLid) zones.push([plugLid ? -Infinity : tInside, lidH], [tLip, lidH - lipUp]);
+    else zones.push([tInside, lidH - rabbetDepth], [tRabbet, lidH]);
+    trayWood = Math.min.apply(null, zones.filter(function(z) { return z[0] < dishTo + 1; }).map(function(z) { return z[1]; })) - tr.depth;
+  }
   if (o.tray && !(o.tray.depth > 0)) need(false, 'Lid Tray: give its Tray Depth');
   if (o.cut === 'top') need(!!tr, 'Cut Tray (Turned Over) needs the Lid Tray on');
   if (tr) {
@@ -2567,7 +2577,7 @@ function boxPlan(input) {
     need(!o.grain, 'A Lid Tray isn\'t for Grain Match: the lid is on its own board');
     need(!inset, 'A Lid Tray isn\'t for an Inset Floor: its ring is turned over too');
     need(!(tr.rim < 0), 'Tray Rim can\'t be negative');
-    if (!drop) need(trayWood >= 3 - 1e-9, 'Lid Tray: ' + (plugLid ? 'the lid' : 'the Lid Top') + ' must be at least 3 mm more than the Tray Depth, for the wood under the dish (it\'s ' + Math.max(0, trayWood).toFixed(2) + ' mm): make the Tray Depth less' + (plugLid ? '' : ', or the Lid Top thicker'));
+    if (!drop) need(trayWood >= 3 - 1e-9, 'Lid Tray: the wood under the dish must be at least 3 mm (it\'s ' + Math.max(0, trayWood).toFixed(2) + ' mm' + (!plugLid && trayWood + tr.depth >= o.top - 1e-9 ? ', the Lid Top less the Tray Depth' : ', where the dish reaches over the lid\'s rim') + '): make the Tray Depth less' + (!plugLid && trayWood + tr.depth >= o.top - 1e-9 ? ', or the Lid Top thicker' : ', or the Tray Rim wider'));
     need(trayRim >= 3, 'Tray Rim must be at least 3 mm');
     need(o.bit <= trayPin + 1e-9, 'Lid Tray: the bit must be no wider than the Pin Diameter, to bore the pin holes');
     need(trayPin <= 20, 'Pin Diameter must be 20 mm or less');
@@ -2643,7 +2653,7 @@ function boxPlan(input) {
   }
   // The dish over the lid's magnet holes (from its other face): 2 mm of
   // wood between.
-  if (tr && magnetAt.length && trayRim < -tRabbet / 2 + o.magnets.diameter / 2 + 1)
+  if (tr && magnetAt.length && trayRim < -tRabbet / 2 + o.magnets.diameter / 2 + 2)
     need(height.lid - meet.lid - o.magnets.depth - tr.depth >= 2 - 1e-9, 'Lid Tray: the dish comes within 2 mm of the lid\'s magnet holes: make the Tray Rim wider, the Tray Depth less, or the holes shallower');
   // The dish: wider than the bit, a mm to spare.
   if (tr) need(shapeDeepest(SL) - trayRim > rb + 0.5, 'Lid Tray: the dish is too small for the bit: make the Tray Rim narrower');
@@ -3297,6 +3307,9 @@ function boxPlan(input) {
       if (!tv) need(td <= te.radius + 1e-9, 'Lid Tray: a roundover can\'t go deeper than the bit\'s radius');
       if (tv) need(tW + tTip / 2 <= te.diameter / 2 + 1e-9, 'Lid Tray: the V-bit is too small for its edges');
       need(td < tr.depth - 0.2, 'Lid Tray: its edges must be less deep than the Tray Depth');
+      // The lid's top edge is where the outline's tabs are, cut later from
+      // the other face: 1 mm of each tab left under the chamfer.
+      if (o.tabs) need(td <= o.tabs.height - 1 + 1e-9, 'Lid Tray: its edges must be at least 1 mm less deep than the Tab Height, so the tabs still hold the lid: make Tray Edges ' + Math.max(0, o.tabs.height - 1).toFixed(2) + ' mm or less, or the tabs higher');
       need(2 * tW <= trayRim - 0.5, 'Lid Tray: its edges are too big for the Tray Rim');
       edgeAt.top.push({ op: 'edge', shape: S, t: tTip / 2, u: 1, at: 0, z0: 0, depth: td, air: 0, chamfer: td, width: tW, what: 'lid\'s top edge' });
       edgeAt.top.push({ op: 'edge', shape: cornered ? Object.assign({}, S, { cr: Math.max(S.cr, rb + trayRim) }) : S, t: -trayRim - tTip / 2, u: -1, at: -trayRim, z0: 0, depth: td, air: 0, chamfer: td, width: tW, what: 'tray\'s edge' });
@@ -6190,7 +6203,7 @@ if (typeof module !== 'undefined' && module.exports) {
     inp.classList.remove('cb-flash'); void inp.offsetWidth; inp.classList.add('cb-flash');
   }
   // The field a problem is about, from the names it uses.
-  var PROBLEM_FIELDS = [[/^The drawing|^Open a drawing/, 'cb-drawing-btn'], [/^Lid Tray: (the Lid Top|the lid) must|^Lid Tray: give/, 'cb-tray-d'], [/^Tray Rim|^Lid Tray: the dish is too small|^Lid Tray: the dish comes within/, 'cb-tray-rim'], [/^Pin Diameter|^Lid Tray: the bit must/, 'cb-tray-pin'], [/^Lid Tray: (its edges|the V-bit|a roundover)/, 'cb-tray-edge'], [/^Lid Tray: the corner bit/, 'cb-tray-round'], [/^A Lid Tray|^Cut Tray/, 'cb-tray-on'], [/^Compartments: Rows/, 'cb-comp-rows'], [/^Compartments: Section Sizes/, 'cb-comp-wsz'], [/^Compartments: Row Sizes|^Compartments: the smallest[^,]*deep/, 'cb-comp-rsz'], [/^Compartments: Column Sizes|^Compartments: the smallest/, 'cb-comp-csz'], [/^Compartments: Sections/, 'cb-comp-n'], [/^Compartments: the Middle/, 'cb-comp-mid'], [/^Compartments: Divider Height|^Compartments: no room/, 'cb-comp-h'], [/^Compartments need/, 'cb-comp-on'], [/^Compartments/, 'cb-comp-t'], [/^Sloped lip/, 'cb-lip-w'], [/^Slope Height/, 'cb-eslope'], [/^Edges: the V-bit.s angle/, 'cb-eangle'], [/^Edges: (give the V-bit.s diameter|the V-bit is too small)/, 'cb-ediam'],
+  var PROBLEM_FIELDS = [[/^The drawing|^Open a drawing/, 'cb-drawing-btn'], [/^Lid Tray: the wood under[^:]*Lid Top less|^Lid Tray: give/, 'cb-tray-d'], [/^Lid Tray: the wood under/, 'cb-tray-rim'], [/^Lid Tray: its edges must be at least/, 'cb-tray-edge'], [/^Tray Rim|^Lid Tray: the dish is too small|^Lid Tray: the dish comes within/, 'cb-tray-rim'], [/^Pin Diameter|^Lid Tray: the bit must/, 'cb-tray-pin'], [/^Lid Tray: (its edges|the V-bit|a roundover)/, 'cb-tray-edge'], [/^Lid Tray: the corner bit/, 'cb-tray-round'], [/^A Lid Tray|^Cut Tray/, 'cb-tray-on'], [/^Compartments: Rows/, 'cb-comp-rows'], [/^Compartments: Section Sizes/, 'cb-comp-wsz'], [/^Compartments: Row Sizes|^Compartments: the smallest[^,]*deep/, 'cb-comp-rsz'], [/^Compartments: Column Sizes|^Compartments: the smallest/, 'cb-comp-csz'], [/^Compartments: Sections/, 'cb-comp-n'], [/^Compartments: the Middle/, 'cb-comp-mid'], [/^Compartments: Divider Height|^Compartments: no room/, 'cb-comp-h'], [/^Compartments need/, 'cb-comp-on'], [/^Compartments/, 'cb-comp-t'], [/^Sloped lip/, 'cb-lip-w'], [/^Slope Height/, 'cb-eslope'], [/^Edges: the V-bit.s angle/, 'cb-eangle'], [/^Edges: (give the V-bit.s diameter|the V-bit is too small)/, 'cb-ediam'],
     [/^Edges: the tip diameter/, 'cb-evtip'], [/^Edges: (give the roundover|a roundover)/, 'cb-erad'], [/^Edges:|^T\d+ is(n\u2019t)? a V-bit/, 'cb-etool-row'],
     [/^Finger notch depth/, 'cb-notch-d'], [/^Only \d+ boxes fit|^No box fits/, 'cb-nest-n'],
     [/^Magnets: the count|even number of magnets|^Too many magnets/, 'cb-mag-n'], [/^Magnet hole depth|^Magnet holes too deep/, 'cb-mag-depth'],

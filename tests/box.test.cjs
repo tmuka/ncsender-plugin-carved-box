@@ -1850,7 +1850,7 @@ test('a lid tray on a drawing: the dish matches the lid it lands in', () => {
 test('a lid tray: rounded floor and edges after a tool change, each on its loop', () => {
   const CF = { toolNumber: 8, feed: 1200, plunge: 300, rpm: 16000, doc: 1.5 }, EF = { toolNumber: 7, feed: 1200, plunge: 300, rpm: 16000, doc: 2 };
   for (const edges of [{ bit: 'v', angle: 90, diameter: 12.7, outside: 1, inside: 0.5, pocket: 0 }, { bit: 'round', radius: 3.175, tip: 6, outside: 1, inside: 1, pocket: 0 }]) {
-    const input = { stock: 25.4, gap: 20, top: 10, lidHeight: 22, wall: 10, corners: { diameter: 6.35, radius: 3.175 }, edges, tray: { depth: 6, rounded: true, edge: 1.5 } };
+    const input = { stock: 25.4, gap: 20, top: 10, lidHeight: 22, wall: 10, corners: { diameter: 6.35, radius: 3.175 }, edges, tray: { depth: 6, rounded: true, edge: 1.5 }, tabs: { count: 4, width: 6, height: 2.5 } };
     check(input);
     const { plan } = checkTop(input);
     const h = plan.halves[0];
@@ -1869,7 +1869,14 @@ test('a lid tray: rounded floor and edges after a tool change, each on its loop'
 
 test('a lid tray that can\'t be cut says why', () => {
   const said = (o, re) => assert.ok(boxPlan(o).problems.some((p) => re.test(p)), JSON.stringify(o) + ' ' + boxPlan(o).problems);
-  said({ top: 4, tray: { depth: 3 } }, /at least 3 mm more than the Tray Depth/);
+  said({ top: 4, tray: { depth: 3 } }, /wood under the dish must be at least 3 mm.*the Lid Top less/);
+  // A solid lid: over the shoulder round its plug, the lip's height thinner.
+  said({ lidStyle: 'plug', lipOn: 'lid', lidHeight: 8, lipHeight: 5, tray: { depth: 9, rim: 3 } }, /where the dish reaches over the lid's rim/);
+  assert.deepEqual(boxPlan({ lidStyle: 'plug', lipOn: 'lid', lidHeight: 8, lipHeight: 5, tray: { depth: 9 } }).problems, []);
+  // Tray Edges down to the tabs: the lid would come loose.
+  said({ stock: 25.4, gap: 20, top: 10, lidHeight: 22, wall: 10, edges: { bit: 'v', angle: 90, diameter: 12.7, outside: 1, inside: 0.5, pocket: 0 }, tray: { depth: 6, edge: 2 }, tabs: { count: 4, width: 6, height: 1.5 } }, /less deep than the Tab Height/);
+  // 2 mm beside a magnet hole, not 1.
+  said({ top: 9, lidHeight: 16, wall: 12, magnets: { count: 4, diameter: 6, depth: 9 }, tray: { depth: 6, rim: 8.41 } }, /within 2 mm of the lid's magnet holes/);
   said({ top: 9, tray: { depth: 5, rim: 2 } }, /Tray Rim must be at least 3 mm/);
   said({ top: 9, tray: { depth: 5, rim: 39 } }, /dish is too small for the bit/);
   said({ top: 9, bit: 8, tray: { depth: 5, pin: 6.35 } }, /no wider than the Pin Diameter/);
