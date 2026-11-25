@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased: Lid Tray
+## 0.6.0: Lid Tray
 
 - **Lid Tray:** a dish carved in the lid's top, so the closed box works as a tray. It's carved first with the board turned over: **Cut: Tray (Turned Over)** bores two pin holes on the line between the halves and carves the dish; then turn the board over end for end onto two dowel pins and cut **Both, Side by Side** without zeroing X and Y again. **Tray Depth**, **Tray Rim**, **Pin Diameter**, **Tray Edges** (the lid's top edge and the dish's, with the Edge Bit) and a **Rounded Floor** (with the Corner Bit). Auto Sizes makes the Lid Top 3 mm more than the dish.
 - **Presets** pair the options that suit each box: a jewelry box with 6 compartments and rounded floors, a trinket box in 3 wedges, a valet box with a lid tray, a tea box with 3 compartments and a sloped lip, an oval with a solid lid, a business card box with a drop-in lid, and the ring, keepsake, hexagon, heart, big box and nested set with more of their options together.
