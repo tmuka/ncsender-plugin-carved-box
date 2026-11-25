@@ -1824,7 +1824,7 @@ test('a lid tray: pin holes and the dish with the board turned over, then the bo
       assert.ok(Math.abs(shapeDistance(lid.shape, -tp.tray.rim, w.x - lid.at.x, w.y - lid.at.y)) < (lid.shape.kind === 'outline' ? 0.1 : 0.005), 'the dish\'s edge isn\'t the rim in from the lid\'s');
     }
     // The box's program: the same cuts as without the tray, moved for the bigger board.
-    assert.match(boxProgram(plan, FEEDS).gcode, /run Lid Top first/);
+    assert.match(boxProgram(plan, FEEDS).gcode, /run Tray, Turned Over first/);
   }
 });
 
@@ -1874,7 +1874,7 @@ test('a lid tray that can\'t be cut says why', () => {
   said({ top: 9, tray: { depth: 5, rim: 39 } }, /dish is too small for the bit/);
   said({ top: 9, bit: 8, tray: { depth: 5, pin: 6.35 } }, /no wider than the Pin Diameter/);
   said({ top: 9, cut: 'lid', tray: { depth: 5 } }, /both halves on one board/);
-  said({ top: 9, cut: 'top' }, /Lid Top needs the Lid Tray on/);
+  said({ top: 9, cut: 'top' }, /Tray \(Turned Over\) needs the Lid Tray on/);
   said({ top: 9, grain: true, cut: 'lid', tray: { depth: 5 } }, /Grain Match/);
   said({ lipOn: 'lid', top: 9, magnets: { count: 4, diameter: 6, depth: 10 }, wall: 12, tray: { depth: 6, rim: 3 } }, /within 2 mm of the lid's magnet holes/);
   assert.deepEqual(boxPlan({ top: 9, tray: { depth: 5 } }).problems, []);

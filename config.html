@@ -143,6 +143,8 @@
   .cb-wood { fill: #d9bc8c; }
   .cb-wood-dark { fill: #b9955f; }
   .cb-cut { fill: #3b2f20; }
+  .cb-pin { fill: #9aa4ad; stroke: #3b2f20; stroke-width: 0.3; }
+  .cb-turn { stroke: #9aa4ad; stroke-width: 0.35; stroke-dasharray: 1.2 1; }
   .cb-divider line, .cb-divider circle { stroke: #b9955f; fill: none; }
   .cb-divider-far { fill: #b9955f; opacity: 0.45; }
   .cb-line { fill: none; stroke: var(--color-text-primary); stroke-width: 0.5; opacity: 0.55; }
@@ -414,7 +416,7 @@
       </div>
       <div class="cb-field"><label>Cut</label>
         <div class="cb-seg" id="cb-cut" role="radiogroup" aria-label="Cut">
-          <button type="button" role="radio" data-v="both">Both, Side by Side</button><button type="button" role="radio" data-v="base">Base Only</button><button type="button" role="radio" data-v="lid">Lid Only</button><button type="button" role="radio" data-v="bottom" id="cb-cut-bottom">Floor Only</button>
+          <button type="button" role="radio" data-v="both">Both, Side by Side</button><button type="button" role="radio" data-v="base">Base Only</button><button type="button" role="radio" data-v="lid">Lid Only</button><button type="button" role="radio" data-v="bottom" id="cb-cut-bottom">Floor Only</button><button type="button" role="radio" data-v="top" id="cb-cut-top" title="The board's underside up, before the box: the pin holes and the dish. Then turn the board over end for end onto the pins and Cut Both, Side by Side, without zeroing X and Y again.">Tray (Turned Over)</button>
         </div>
       </div>
       <div class="cb-row cb-row-2" id="cb-sep-fields">
@@ -509,6 +511,21 @@
         </div>
       </div>
       <p class="cb-hint" id="cb-comp-note">Dividers left standing in the base, carved from the same wood: nothing to glue. Not with a Glued-On Floor.</p>
+    </div>
+    <div class="cb-card">
+      <h3><span class="cb-grow">Lid Tray</span><label class="cb-switch"><input type="checkbox" id="cb-tray-on" aria-label="Lid tray"><span></span></label></h3>
+      <div id="cb-tray-fields">
+        <div class="cb-row">
+          <div class="cb-field"><label for="cb-tray-d">Tray Depth</label><input class="cb-input" id="cb-tray-d" data-unit="length" title="How deep the dish is, down from the lid's top. The Lid Top must be at least 3 mm (1/8&quot;) more, for the wood under it."></div>
+          <div class="cb-field"><label for="cb-tray-rim">Tray Rim</label><input class="cb-input" id="cb-tray-rim" data-unit="length" placeholder="= wall" title="How wide the flat rim round the dish is, in from the lid's outside edge. Empty: as wide as the Wall Thickness."></div>
+          <div class="cb-field"><label for="cb-tray-pin">Pin Diameter</label><input class="cb-input" id="cb-tray-pin" data-unit="length" title="The two dowel pins the board turns over on. The holes are bored with the box's bit, so it must be no wider than the pins; a bit as wide as them plunges straight down."></div>
+        </div>
+        <div class="cb-row">
+          <div class="cb-field"><label for="cb-tray-edge">Tray Edges</label><input class="cb-input" id="cb-tray-edge" data-unit="length" placeholder="none" title="How far down the Edge Bit chamfers or rounds the lid's top edge and the dish's edge, with the board turned over. Needs Edges on. Empty: left square."></div>
+          <div class="cb-field"><label for="cb-tray-round">Rounded Floor</label><div class="cb-grain-row"><label class="cb-switch" title="The dish's floor corners rounded with the Corner Bit, as the inside's are. Needs Floor Corners on."><input type="checkbox" id="cb-tray-round" aria-label="Rounded tray floor"><span></span></label><span class="cb-hint">With the Corner Bit</span></div></div>
+        </div>
+      </div>
+      <p class="cb-hint" id="cb-tray-note">A dish in the lid's top. That's the board's underside, so it's carved first with the board turned over: Cut Tray (Turned Over), then turn the board over end for end onto two dowel pins and Cut Both, Side by Side.</p>
     </div>
     <div class="cb-card">
       <h3><span class="cb-grow">Glued-On Floor</span><label class="cb-switch"><input type="checkbox" id="cb-bot-on" aria-label="Glued-on floor"><span></span></label></h3>
@@ -681,6 +698,24 @@
         <li>The note under the card gives each compartment's size, or each section's angle. Each one has to be wider than the bit; if one isn't, a problem says so.</li>
         <li>With <b>Floor Corners</b> on, each compartment's floor is rounded. With an <b>Edges</b> Inside Rim, each compartment's top edge is chamfered or rounded along the dividers, stopping short where the edge bit would hit the wall.</li>
         <li>Not with a <b>Glued-On Floor</b> or a <b>Drop-In</b> lid (the ring is cut through, so the dividers would come loose), or a <b>Nested Set</b> (the smaller boxes fill the inside).</li>
+      </ul>
+    </div>
+    <div class="cb-card">
+      <h3>Lid Tray</h3>
+      <p>Turn on <b>Lid Tray</b> for a dish in the lid's top, so the closed box works as a tray for keys, rings or coins. The lid's top is the board's underside while the box is carved, so the dish is carved first, with the board turned over. Two dowel pins put the board back in exactly the right place for the box.</p>
+      <ol>
+        <li>Put the board on the table <b>underside up</b>, zero X and Y on its front-left corner and Z on its top, and run <b>Cut: Tray (Turned Over)</b>. It bores two pin holes through the board and 3 mm into the spoilboard, on the line between the halves, then carves the dish where the lid will be.</li>
+        <li>Turn the board over <b>end for end</b>, across that line, the way the lid turns over onto the base. Drop a dowel pin through each hole into the spoilboard.</li>
+        <li><b>Don't zero X and Y again.</b> Zero Z on the new top, and run <b>Cut: Both, Side by Side</b>. The box is carved and cut out as usual, the lid right over the dish.</li>
+      </ol>
+      <ul>
+        <li><b>Tray Depth:</b> how deep the dish is. The <b>Lid Top</b> must be at least 3 mm (1/8") more, for the wood under the dish; Auto Sizes makes it thicker when the lid has room.</li>
+        <li><b>Tray Rim:</b> the flat rim round the dish, in from the lid's edge. Empty is as wide as the Wall.</li>
+        <li><b>Pin Diameter:</b> the pins, such as 1/4" steel dowel pins. The holes are bored with the box's bit, so it must be no wider than the pins; a 1/4" bit for 1/4" pins plunges straight down for a snug fit.</li>
+        <li><b>Tray Edges</b> (with <b>Edges</b> on): the Edge Bit chamfers or rounds the lid's top edge and the dish's edge, after a tool change. Without it, the closed box's top edge is left square.</li>
+        <li><b>Rounded Floor</b> (with <b>Floor Corners</b> on): the dish's floor corners rounded with the Corner Bit.</li>
+        <li>The board is a little bigger, for the pins past the parts. The top view shows them, and with Tray (Turned Over) it shows the board as it lies turned over.</li>
+        <li>Not with a <b>Drop-In</b> lid, <b>Grain Match</b> or a lid on its own board, an <b>Inset</b> floor, or a <b>Nested Set</b>.</li>
       </ul>
     </div>
     <div class="cb-card">
@@ -2346,7 +2381,7 @@ if (typeof module !== 'undefined' && module.exports) {
 // (the dowel pins' diameter), rounded (its floor rounded with the corner
 // bit), edge (how far down the Edge Bit takes the lid's top edge and the
 // dish's, 0 for none) }, or null. With it, two pin holes on the line the
-// board turns over on, end for end, and cut 'top': the program for the
+// board turns over on, end for end, and cut 'top' (Tray, Turned Over): the program for the
 // board turned over (pin holes, then the dish), before the box.
 var DEFAULTS = {
   shape: 'circle', diameter: 80, length: 120, width: 80, cornerRadius: 10, sides: 6, flats: 80, outline: null,
@@ -2525,10 +2560,10 @@ function boxPlan(input) {
   var tr = o.tray && o.tray.depth > 0 ? o.tray : null, trayRim = tr ? (tr.rim > 0 ? tr.rim : w) : 0, trayPin = tr ? (tr.pin > 0 ? tr.pin : 6.35) : 0;
   var trayWood = tr ? (plugLid ? lidH : o.top) - tr.depth : 0;
   if (o.tray && !(o.tray.depth > 0)) need(false, 'Lid Tray: give its Tray Depth');
-  if (o.cut === 'top') need(!!tr, 'Lid Top needs the Lid Tray on');
+  if (o.cut === 'top') need(!!tr, 'Cut Tray (Turned Over) needs the Lid Tray on');
   if (tr) {
     need(!drop, 'A Lid Tray isn\'t for a Drop-In Lid: the lid is a panel from the Floor Board');
-    need(!B.sep, 'A Lid Tray needs both halves on one board: Program For Both Halves, and Lid Top for the tray');
+    need(!B.sep, 'A Lid Tray needs both halves on one board: Cut Both, Side by Side, after Tray (Turned Over)');
     need(!o.grain, 'A Lid Tray isn\'t for Grain Match: the lid is on its own board');
     need(!inset, 'A Lid Tray isn\'t for an Inset Floor: its ring is turned over too');
     need(!(tr.rim < 0), 'Tray Rim can\'t be negative');
@@ -3232,7 +3267,7 @@ function boxPlan(input) {
       if (drop && h.name === 'lid') return o.cut === 'bottom';
       return B.sep ? h.name === o.cut : h.name !== 'bottom' || onBoard;
     });
-  // Lid Top: the board turned over end for end onto the pins, the lid's
+  // The tray's program: the board turned over end for end onto the pins, the lid's
   // top up where the lid's mirrored about the pin line. The pin holes
   // bored through into the spoilboard, then the dish (its floor short of
   // the corners for a ball or bowl bit to round), then the Edge Bit round
@@ -3243,7 +3278,7 @@ function boxPlan(input) {
   if (tr && pins) {
     trayAt = o.layout === 'y' ? { x: lid.x, y: 2 * pinLine - lid.y } : { x: 2 * pinLine - lid.x, y: lid.y };
     var tc = [], trc = tr.rounded && o.corners && o.corners.radius > 0 ? o.corners.radius : 0;
-    if (tr.rounded && !trc) notes.push('Lid Tray: a rounded floor needs Rounded Floor Corners on, for its bit.');
+    if (tr.rounded && !trc) notes.push('Lid Tray: a rounded floor needs Floor Corners on, for its bit.');
     if (trc) need(trc <= tr.depth - 0.5, 'Lid Tray: the corner bit\'s radius is too big for the Tray Depth: it needs the radius + 0.5 mm');
     if (trc) need(shapeDeepest(S) - trayRim > o.corners.diameter / 2 + 0.5, 'Lid Tray: the dish is too small for the corner bit');
     pins.forEach(function(p, i) {
@@ -3595,7 +3630,10 @@ function autoSizes(input, material, imperial) {
   a.floor = half(clamp(T * 0.2, 2, 6));
   a.top = half(clamp(lidH * 0.2, 2, 6));
   // A Lid Tray: 3 mm of wood under its dish.
-  if (o.tray && o.tray.depth > 0 && o.lidStyle !== 'plug') a.top = Math.max(a.top, upHalf(o.tray.depth + 3));
+  // (When the lid has room for it and an inside: else the plan says the
+  // dish is too deep.)
+  var trayTop = o.tray && o.tray.depth > 0 && o.lidStyle !== 'plug' ? upHalf(o.tray.depth + 3) : 0;
+  if (trayTop > a.top && trayTop <= lidH - 4) a.top = trayTop;
   // In wood, at least 6 mm (1/4"), so the lip and the wall outside it
   // are each about 3 mm: thinner splits along the grain.
   a.wall = half(clamp(small * 0.08, WOOD[material] ? 6 : 4, 15));
@@ -4104,14 +4142,14 @@ function boxProgram(plan, f, only) {
   else if (!B.sep && plan.bottom && plan.bottom.own && o.cut !== 'top') comment('The floor' + (drop ? ' and the lid are' : ' is') + ' not in this program: cut ' + (drop ? 'them' : 'it') + ' from the Floor Board with ' + (drop ? 'Floor and Lid' : 'Floor Only'));
   var tray = plan.tray, top = o.cut === 'top' && tray;
   if (top) {
-    comment('Lid Top: the board\'s underside up, first, before the box:');
+    comment('Tray, Turned Over: the board\'s underside up, first, before the box:');
     comment('1. This program: the pin holes and the tray in the lid\'s top');
     comment('2. Turn the board over end for end, onto 2 dowel pins in the holes');
-    comment('3. Both Halves: X0 Y0 as here, not zeroed again; Z0 on the new top');
+    comment('3. Both, Side by Side: X0 Y0 as here, not zeroed again; Z0 on top');
   } else if (tray) {
-    comment('Lid Tray: run Lid Top first, then this with the board turned over');
-    comment('end for end on its 2 dowel pins. X0 Y0 as for Lid Top: don\'t zero');
-    comment('X and Y again, only Z, on the top');
+    comment('Lid Tray: run Tray, Turned Over first, then this with the board');
+    comment('turned over end for end on its 2 dowel pins. X0 Y0 as for the tray:');
+    comment('don\'t zero X and Y again, only Z, on the top');
   }
   if (tray) comment('Tray ' + mm3(tray.depth) + unit + ' deep, its rim ' + mm3(tray.rim) + unit + ' wide, ' + mm3(tray.wood) + unit + ' of wood under it; pins ' + mm3(tray.pin) + unit);
   comment((B.sep ? cap(o.cut) + '\'s board ' : 'Stock ') + mm3(plan.stock.thick || o.stock) + unit + ' thick, at least ' + n3(plan.stock.w) + ' x ' + n3(plan.stock.h) + unit);
@@ -4137,10 +4175,12 @@ function boxProgram(plan, f, only) {
   else if (plan.magnetAt.length && !(o.magnets.bit > 0)) comment('Magnets: ' + plan.magnetAt.length + ' holes ' + mm3(o.magnets.diameter) + unit + ' wide, ' + mm3(o.magnets.depth) + unit + ' deep, both halves');
   if (plan.notch && !plan.set) comment((plan.notches.length > 1 ? plan.notches.length + ' finger notches' : 'Finger notch') + ' in the base, ' + mm3(o.notch.width) + unit + ' wide, ' + mm3(o.notch.depth) + unit + ' deep');
   comment('Closed ' + n3(plan.closedHeight) + unit + ' high, ' + n3(plan.insideHeight) + unit + ' inside' + (insideSize(plan, mm3, unit) ? '; inside ' + insideSize(plan, mm3, unit) : ''));
-  if (top && o.origin !== 'center') comment('Origin: the stock\'s front-left corner, as it lies now'); else comment('Origin: ' + (plan.originSay || (o.origin === 'center' ? 'the middle of the pair' : 'the stock\'s front-left corner')));
+  if (top && o.origin !== 'center') comment('Origin: the stock\'s front-left corner, as it lies now');
+  else if (tray && !top) comment('Origin: X0 Y0 as for the tray, not zeroed again');
+  else comment('Origin: ' + (plan.originSay || (o.origin === 'center' ? 'the middle of the pair' : 'the stock\'s front-left corner')));
   comment('Z0: top of the ' + (B.sep ? 'board' : 'stock'));
   if (!only) comment('Bit ' + mm3(o.bit) + unit + ', feed ' + Math.round(f.feed) + ', plunge ' + Math.round(f.plunge) + unit + '/min, ' + n3(doc) + unit + ' a pass');
-  if (o.tabs) comment('Tabs: ' + o.tabs.count + ' x ' + mm3(o.tabs.width) + unit + ' wide, ' + mm3(o.tabs.height) + unit + ' high');
+  if (o.tabs && !top) comment('Tabs: ' + o.tabs.count + ' x ' + mm3(o.tabs.width) + unit + ' wide, ' + mm3(o.tabs.height) + unit + ' high');
   // The bits after the box's: a smaller one for the magnet holes, a ball
   // or bowl bit for the floor corners, then the edge bit; each after a
   // tool change (M6), or (only) on its own.
@@ -4291,7 +4331,7 @@ function guidedSettings(answers) {
   var a = Object.assign(guidedDefaults(answers && answers.kind), answers || {});
   var said = [], inset = a.look === 'inset', glued = inset || a.look === 'plug';
   var v = {
-    autoSizes: true, lipOwn: false, measure: 'outside', cut: 'both', grain: false, nestOn: false, tabsOn: true,
+    autoSizes: true, lipOwn: false, measure: 'outside', cut: 'both', grain: false, nestOn: false, tabsOn: true, trayOn: false,
     height: null, lidHeight: null, shape: a.shape, lipOn: 'base', lidStyle: 'carved', slope: false, slopeHeight: null,
     botOn: glued, bottomStyle: inset ? 'inset' : 'plug', bottomBoard: glued ? (a.bottomBoard > 0 ? a.bottomBoard : 6.35) : null,
     bottomStep: 2, bottomOversize: inset ? 0 : 1.5, bottomRabbet: 4, bottomRecess: 0.5,
@@ -4422,6 +4462,7 @@ if (typeof module !== 'undefined' && module.exports) {
     ['cb-comp-rows', 'compRows', 'count', 1], ['cb-comp-cols', 'compCols', 'count', 2], ['cb-comp-n', 'compSections', 'count', 4], ['cb-comp-a', 'compAngle', 'count', 0],
     ['cb-comp-mid', 'compMiddle', 'length', null, true], ['cb-comp-t', 'compThick', 'length', 6.35], ['cb-comp-h', 'compHeight', 'length', null, true],
     ['cb-comp-rsz', 'compRowSizes', 'shares', null, true], ['cb-comp-csz', 'compColSizes', 'shares', null, true], ['cb-comp-wsz', 'compSizes', 'shares', null, true],
+    ['cb-tray-d', 'trayDepth', 'length', 6.35], ['cb-tray-rim', 'trayRim', 'length', null, true], ['cb-tray-pin', 'trayPin', 'length', 6.35], ['cb-tray-edge', 'trayEdge', 'length', null, true],
     ['cb-bot-t', 'bottomBoard', 'length', null, true], ['cb-bot-step', 'bottomStep', 'length', 2], ['cb-bot-over', 'bottomOversize', 'length', 0],
     ['cb-bot-rab', 'bottomRabbet', 'length', 4], ['cb-bot-rec', 'bottomRecess', 'length', 0.5],
     ['cb-bit', 'bit', 'length', 3.175], ['cb-feed', 'feed', 'feed', 1500], ['cb-plunge', 'plunge', 'feed', 400],
@@ -4490,7 +4531,7 @@ if (typeof module !== 'undefined' && module.exports) {
     if (v.shape !== 'circle' && a.cornerRadius != null && Math.abs(a.cornerRadius - v.cornerRadius) > 1e-6) show('cb-corner', a.cornerRadius, 'length');
   }
   // Fields under a switch, and the switch.
-  var GROUPS = [['cb-tab-fields', 'cb-tabs-on'], ['cb-mag-fields', 'cb-mag-on'], ['cb-notch-fields', 'cb-notch-on'], ['cb-comp-fields', 'cb-comp-on'], ['cb-corner-fields', 'cb-corners-on'], ['cb-edge-fields', 'cb-edges-on'], ['cb-nest-fields', 'cb-nest-on'], ['cb-bot-fields', 'cb-bot-on']];
+  var GROUPS = [['cb-tab-fields', 'cb-tabs-on'], ['cb-mag-fields', 'cb-mag-on'], ['cb-notch-fields', 'cb-notch-on'], ['cb-comp-fields', 'cb-comp-on'], ['cb-tray-fields', 'cb-tray-on'], ['cb-corner-fields', 'cb-corners-on'], ['cb-edge-fields', 'cb-edges-on'], ['cb-nest-fields', 'cb-nest-on'], ['cb-bot-fields', 'cb-bot-on']];
   // Feeds that must be in range: [field, ok, what's wrong].
   var RANGES = [
     ['cb-feed', function (x) { return x >= 25; }, 'must be at least 25 mm/min (1 in/min)'], ['cb-plunge', function (x) { return x >= 10; }, 'must be at least 10 mm/min (0.4 in/min)'],
@@ -4550,6 +4591,9 @@ if (typeof module !== 'undefined' && module.exports) {
     SEGS.forEach(function (s) { var on = ROOT.querySelector('#' + s[0] + ' button.on'); v[s[1]] = on ? on.dataset.v : s[2]; });
     RANGES.forEach(function (r) { var id = r[0], key = FIELDS.filter(function (f) { return f[0] === id; })[0][1]; if (!errs[id] && !off(id) && !r[1](v[key])) errs[id] = r[2]; });
     v.tabsOn = $('cb-tabs-on').checked; v.magOn = $('cb-mag-on').checked; v.notchOn = $('cb-notch-on').checked; v.compOn = $('cb-comp-on').checked;
+    v.trayOn = $('cb-tray-on').checked; v.trayRound = $('cb-tray-round').checked;
+    // The tray's program, without a tray: both.
+    if (v.cut === 'top' && !v.trayOn) v.cut = 'both';
     // Floor Only, without a bottom to cut: both.
     v.botOn = $('cb-bot-on').checked;
     if (v.cut === 'bottom' && !v.botOn) v.cut = 'both';
@@ -4623,7 +4667,8 @@ if (typeof module !== 'undefined' && module.exports) {
       corners: v.cornersOn ? { diameter: v.cornerDiameter, radius: v.cornerBitRadius } : null,
       finish: v.finishAllow, finishDir: v.finishDir,
       cut: v.nestOn ? 'both' : v.cut, lidStock: v.lidStock, grain: (v.cut === 'base' || v.cut === 'lid') && v.grain,
-      bottom: v.botOn && !v.nestOn ? bottomOf(v) : null, lidStyle: v.lidStyle === 'plug' || v.lidStyle === 'drop' ? v.lidStyle : null
+      bottom: v.botOn && !v.nestOn ? bottomOf(v) : null, lidStyle: v.lidStyle === 'plug' || v.lidStyle === 'drop' ? v.lidStyle : null,
+      tray: v.trayOn && !v.nestOn ? { depth: v.trayDepth, rim: v.trayRim, pin: v.trayPin, rounded: v.trayRound, edge: v.trayEdge || 0 } : null
     });
   }
   // A glued-on floor: on a plug, or inset into a rabbet from below.
@@ -4691,6 +4736,16 @@ if (typeof module !== 'undefined' && module.exports) {
         }
         return t;
       };
+      // The tray's program, the board turned over: the lid's outline (cut
+      // later, from the other side), the dish in it.
+      if (h.name === 'top') {
+        out += '<path class="cb-trim" d="' + shapePath(S, 0, cx, cy, s) + '"/>' + path('cb-cut', -plan.tray.rim, cx, cy);
+        plan.corners.top.forEach(function (k) { out += '<path class="cb-edge" stroke-width="' + Math.max(0.4, o.corners.radius * s).toFixed(2) + '" d="' + shapePath(k.shape, k.t + o.corners.diameter / 2 - o.corners.radius / 2, cx, cy, s) + '"/>'; });
+        plan.edges.top.forEach(function (e) { out += '<path class="cb-edge" stroke-width="' + Math.max(0.4, e.width * s).toFixed(2) + '" d="' + shapePath(S, e.at - e.u * e.width / 2, cx, cy, s) + '"/>'; });
+        var fsT = Math.min(4, Math.max(1.6, 2 * plan.halfX * s / 6));
+        out += '<text class="cb-label" data-field="cb-tray-d" style="font-size:' + fsT.toFixed(2) + 'px" x="' + cx + '" y="' + (cy + fsT * 0.35) + '">Tray</text>';
+        return;
+      }
       out += path('cb-cut', ov + o.bit, cx, cy) + path('cb-wood', ov, cx, cy);
       // A glued-on floor: the step round its edge (lower), the plug; the
       // box's outline on it, where it's trimmed flush to.
@@ -4757,6 +4812,15 @@ if (typeof module !== 'undefined' && module.exports) {
       out += '<text class="cb-tag" data-field="cb-gap" text-anchor="middle" x="' + X((a.x + b.x) / 2).toFixed(2) + '" y="' + (Y((a.y + b.y) / 2) + 0.9).toFixed(2) + '">Gap</text>';
     }
     out += '<text class="cb-tag" data-field="cb-margin" x="' + (pad + 1) + '" y="' + (pad + 3.4) + '">Margin</text>';
+    // A Lid Tray's pins, on the line the board turns over on.
+    if (!plan.set && plan.tray && plan.tray.pins) {
+      var tp = plan.tray, alongX = tp.along !== 'y';
+      out += alongX ? '<line class="cb-turn" x1="' + X(tp.line).toFixed(2) + '" y1="' + pad + '" x2="' + X(tp.line).toFixed(2) + '" y2="' + (pad + H).toFixed(2) + '"/>'
+        : '<line class="cb-turn" x1="' + pad + '" y1="' + Y(tp.line).toFixed(2) + '" x2="' + (pad + W).toFixed(2) + '" y2="' + Y(tp.line).toFixed(2) + '"/>';
+      tp.pins.forEach(function (q) { out += '<circle class="cb-pin" data-field="cb-tray-pin" cx="' + X(q.x).toFixed(2) + '" cy="' + Y(q.y).toFixed(2) + '" r="' + Math.max(0.8, tp.pin / 2 * s).toFixed(2) + '"/>'; });
+      var q0 = tp.pins[1];
+      out += '<text class="cb-tag" data-field="cb-tray-pin" text-anchor="middle" x="' + (X(q0.x) + (alongX ? 0 : -6)).toFixed(2) + '" y="' + (Y(q0.y) + (alongX ? -tp.pin / 2 * s - 0.8 : 0.9)).toFixed(2) + '">Pins</text>';
+    }
     // The base's first magnet hole and its finger notch, labelled beside them.
     var baseH0 = !plan.set && plan.halves.filter(function (h) { return h.name === 'base'; })[0];
     if (baseH0) {
@@ -4836,6 +4900,13 @@ if (typeof module !== 'undefined' && module.exports) {
     // note says; drawn whole, it would fold the section over).
     var cove = function (wall) { var r = Math.max(0, Math.min(fl.R, wall)); return r > 1e-6 ? { depth: r, width: r, R: r } : null; };
     var eLipOut = edgeOf(lipH, 'lip\'s outer edge'), eLipIn = edgeOf(lipH, 'lip\'s inner edge'), eStep = edgeOf(rabH, 'step\'s inner edge');
+    // A Lid Tray: the dish down in the lid's top, its edges and its floor's cove.
+    var tray = plan.tray, eTop = tray && plan.edges.top ? edgeOf('top', 'lid\'s top edge') : null, eDish = tray && plan.edges.top ? edgeOf('top', 'tray\'s edge') : null;
+    var dishCove = tray && plan.corners.top && plan.corners.top.length ? { depth: o.corners.radius, width: o.corners.radius, R: o.corners.radius } : null;
+    var lidTop = function (f, y) {
+      if (!tray) return [[f(R), y], [0, y]];
+      return [[f(R), y, eTop], [f(R - tray.rim), y, eDish], [f(R - tray.rim), y - tray.depth, dishCove], [0, y - tray.depth]];
+    };
     var out = '';
     [1, -1].forEach(function (side) {
       var f = function (x) { return side * x; };
@@ -4856,7 +4927,7 @@ if (typeof module !== 'undefined' && module.exports) {
         out += poly(foot(side, [[f(Ri), o.floor, flB], [f(Ri), shoulder + lipUpTo, lipUpTo < up ? null : eLipIn], [f(lipTopX), shoulder + lipUpTo, eLipOut]].concat(bendL ? [[f(Ri + o.lipWidth), shoulder + st]] : []).concat([[f(Ri + o.lipWidth), shoulder], [f(R), shoulder, eSeamL], [f(R), 0], [0, 0], [0, o.floor]])), 'cb-wood');
         // The lid, upside down on the shoulder: its rabbet round the lip.
         var top = lidRim + LH, rab = Ri + o.lipWidth + c, oD = Math.min(openTo(rab), LH - o.top);
-        out += poly([[f(Ri), top - o.top, fl && cove(top - o.top - (lidRim + oD))], [f(Ri), lidRim + oD, oD < up + c ? null : eStep], [f(rab - (oD - st) * sl), lidRim + oD]].concat(bendO ? [[f(rab), lidRim + st]] : []).concat([[f(rab), lidRim, eOpen], [f(R), lidRim, eSeamR], [f(R), top], [0, top], [0, top - o.top]]), 'cb-wood-dark');
+        out += poly([[f(Ri), top - o.top, fl && cove(top - o.top - (lidRim + oD))], [f(Ri), lidRim + oD, oD < up + c ? null : eStep], [f(rab - (oD - st) * sl), lidRim + oD]].concat(bendO ? [[f(rab), lidRim + st]] : []).concat([[f(rab), lidRim, eOpen], [f(R), lidRim, eSeamR]].concat(lidTop(f, top)).concat([[0, top - o.top]])), 'cb-wood-dark');
       } else {
         // Lip on the lid: the base's opening is widened; the lid's lip hangs down into it.
         var dropL = plan.lidStyle === 'drop', rabB = Ri + o.lipWidth + c, rimB = T, oB = dropL ? plan.rabbetDepth : Math.min(openTo(rabB), T - (bt ? bt.height - bt.up : o.floor));
@@ -4868,7 +4939,7 @@ if (typeof module !== 'undefined' && module.exports) {
         // A drop-in lid: a panel flush in the rabbet. A solid lid: solid, its lip a plug under the top.
         if (dropL) out += poly([[0, rimB - up], [f(Ri + o.lipWidth), rimB - up], [f(Ri + o.lipWidth), rimB], [0, rimB]], 'cb-wood-dark');
         else out += poly((plugL ? [[0, rimB - lipUpTo], [f(lipTopX), rimB - lipUpTo, eLipOut]] : [[f(Ri), top2 - o.top, fl], [f(Ri), rimB - lipUpTo, lipUpTo < up ? null : eLipIn], [f(lipTopX), rimB - lipUpTo, eLipOut]])
-          .concat(bendL ? [[f(Ri + o.lipWidth), rimB - st]] : []).concat([[f(Ri + o.lipWidth), rimB], [f(R), rimB, eSeamL], [f(R), top2], [0, top2]]).concat(plugL ? [] : [[0, top2 - o.top]]), 'cb-wood-dark');
+          .concat(bendL ? [[f(Ri + o.lipWidth), rimB - st]] : []).concat([[f(Ri + o.lipWidth), rimB], [f(R), rimB, eSeamL]]).concat(lidTop(f, top2)).concat(plugL ? [] : [[0, top2 - o.top]]), 'cb-wood-dark');
       }
       // The bottom: the step round its edge, the plug up inside the ring.
       // An inset floor's panel, up in the rabbet by its Recess.
@@ -5189,7 +5260,7 @@ if (typeof module !== 'undefined' && module.exports) {
     FIELDS.forEach(function (f) { $(f[0]).classList.toggle('cb-error', !!c.errs[f[0]]); });
     var note = $('cb-note'), errKeys = Object.keys(c.errs);
     $('cb-stock-need').textContent = stockSay(plan, v);
-    $('cb-top-title').textContent = 'Top view · ' + (plan.set ? 'the set on the stock' : plan.boxOf ? 'box ' + plan.boxOf.k + ' on its board' : plan.drop && v.cut === 'bottom' ? 'the floor and the drop-in lid on their board' : !v.nestOn && v.cut !== 'both' ? 'the ' + partName(v.cut, v) + ' on its board'
+    $('cb-top-title').textContent = 'Top view · ' + (plan.set ? 'the set on the stock' : plan.boxOf ? 'box ' + plan.boxOf.k + ' on its board' : plan.drop && v.cut === 'bottom' ? 'the floor and the drop-in lid on their board' : !v.nestOn && v.cut === 'top' ? 'the board turned over, the lid\u2019s top up' : !v.nestOn && v.cut !== 'both' ? 'the ' + partName(v.cut, v) + ' on its board'
       : plan.drop ? 'the ring on the stock (the lid with Floor and Lid)' : plan.halves.length === 3 ? 'the ring, lid and floor on the stock' : plan.bottom ? 'the ring and lid on the stock' : 'both halves on the stock');
     var sep = !v.nestOn && (v.cut === 'base' || v.cut === 'lid');
     $('cb-sep-fields').hidden = !sep;
@@ -5214,6 +5285,8 @@ if (typeof module !== 'undefined' && module.exports) {
     var across = /^(circle|rect|poly)$/.test(v.shape) && v.measure === 'inside';
     $('cb-size-h').textContent = across ? 'Inside size' : 'Outside size';
     $('cb-cut-bottom').hidden = !v.botOn;
+    $('cb-cut-top').hidden = !v.trayOn || v.nestOn;
+    if ((!v.trayOn || v.nestOn) && $('cb-cut-top').classList.contains('on')) setSeg('cb-cut', 'both');
     // A glued-on floor: the base is a ring; with a drop-in lid, the floor's board has the lid too.
     var ringed = v.botOn && !v.nestOn;
     $('cb-cut-bottom').textContent = ringed && v.lidStyle === 'drop' ? 'Floor and Lid' : 'Floor Only';
@@ -5294,6 +5367,13 @@ if (typeof module !== 'undefined' && module.exports) {
       : v.nestOn ? 'Not for a nested set: the boxes inside are its compartments.'
       : !pc ? (v.compLayout === 'wedges' ? 'Two or more Sections make compartments.' : 'More than one Row or Column makes compartments.')
       : pc.cells.length + ' compartments' + (pc.layout === 'grid' ? compSizes(pc.size) : pc.size.angles.some(function (a) { return Math.abs(a - pc.size.angle) > 0.05; }) ? ': sections ' + pc.size.angles.map(function (a) { return +a.toFixed(1) + '\u00b0'; }).join(', ') + ' round, counterclockwise from the first divider' : '') + '; dividers ' + fmt(pc.height) + ' ' + unit() + ' high' + (v.compHeight > 0 ? '' : ' (full: ' + (pc.full > 0 ? 'their top ' + fmt(pc.full) + ' ' + unit() + ' under the ' + (v.lipOn === 'lid' ? 'rim, for the lid\u2019s lip' : 'lip\u2019s top') + ')' : 'up to the lip\u2019s top)')) + '.';
+    var pt = plan.tray, TRAY0 = 'A dish in the lid\u2019s top. That\u2019s the board\u2019s underside, so it\u2019s carved first with the board turned over: Cut Tray (Turned Over), then turn the board over end for end onto two dowel pins and Cut Both, Side by Side.';
+    $('cb-tray-note').textContent = !v.trayOn ? TRAY0
+      : v.nestOn ? 'Not for a nested set.'
+      : !pt ? TRAY0
+      : 'The dish ' + fmt(pt.depth) + ' ' + unit() + ' deep' + (pt.wood >= 3 ? ', ' + fmt(pt.wood) + ' ' + unit() + ' of wood under it' : '') + '; pins ' + fmt(pt.pin) + ' ' + unit() + ' on the line between the halves. '
+        + (v.cut === 'top' ? 'This program: the board\u2019s underside up, zeroed on its front-left corner. Then turn it over end for end onto the pins, and Cut Both, Side by Side without zeroing X and Y again.'
+          : 'First Cut Tray (Turned Over), with the board\u2019s underside up; then turn it over end for end onto the pins for this program, X and Y as they were.');
     $('cb-ein').closest('.cb-field').hidden = v.slope && v.edgeBit !== 'round';
     $('cb-eslope').closest('.cb-field').hidden = !(v.slope && v.edgeBit !== 'round');
     $('cb-generate').disabled = !!(errKeys.length || probs.length || tooBig);
@@ -5337,6 +5417,8 @@ if (typeof module !== 'undefined' && module.exports) {
     if (v.cut === 'bottom') return 'Floor Board: at least ' + size + '. ' + (plan.bottom.own ? 'The ring and the lid with Both, Side by Side.'
       : 'Both, Side by Side cuts it too, with the ring and the lid: use one or the other.');
     if ((v.cut === 'both' || v.nestOn) && plan.bottom && plan.bottom.own) return 'Stock needed: at least ' + size + '. Then the floor' + (plan.drop ? ' and the lid with Floor and Lid' : ' with Floor Only') + ', from a board ' + fmt(plan.bottom.height) + ' ' + unit() + ' thick.';
+    if (v.cut === 'top') return 'Stock needed: at least ' + size + ', its underside up for the tray. Then the box with Both, Side by Side, the board turned over onto the pins.';
+    if (v.cut === 'both' && plan.tray) return 'Stock needed: at least ' + size + '. The tray first, with Tray (Turned Over).';
     if (v.cut === 'both' || v.nestOn) return 'Stock needed: at least ' + size + '.';
     var other = v.cut === 'base' ? 'lid' : 'base', otherT = v.cut === 'base' ? lidBoard(v) : v.stock;
     var s = cap(partName(v.cut, v)) + '\u2019s board: at least ' + size + '. Then the ' + partName(other, v) + ' with ' + cap(partName(other, v)) + ' Only, on a board ' + fmt(otherT) + ' ' + unit() + ' thick.';
@@ -5664,7 +5746,7 @@ if (typeof module !== 'undefined' && module.exports) {
   // ---------- Start: presets, and your own saved settings ----------
   // A preset sets the box and its options (Auto Sizes fills in the rest
   // for your stock, bit and material); saved settings bring back all.
-  var PRESET_BASE = { autoSizes: true, lipOn: 'base', cut: 'both', grain: false, nestOn: false, tabsOn: true, magOn: false, notchOn: false, compOn: false, compHeight: null, compMiddle: null, compRowSizes: null, compColSizes: null, compSizes: null, edgesOn: false, slope: false, cornersOn: false, botOn: false, measure: 'outside', height: null, lidHeight: null,
+  var PRESET_BASE = { autoSizes: true, lipOn: 'base', cut: 'both', grain: false, nestOn: false, tabsOn: true, magOn: false, notchOn: false, compOn: false, compHeight: null, compMiddle: null, compRowSizes: null, compColSizes: null, compSizes: null, trayOn: false, trayRound: false, trayRim: null, trayEdge: null, edgesOn: false, slope: false, cornersOn: false, botOn: false, measure: 'outside', height: null, lidHeight: null,
     notchCount: 1, notchAngle: 0, slopeHeight: null, bottomBoard: null, bottomStep: null, bottomOversize: null, lidStyle: 'carved', bottomStyle: 'plug', bottomRabbet: null, bottomRecess: null };
   // Each shows off an option or two.
   var PRESETS = [
@@ -5766,7 +5848,7 @@ if (typeof module !== 'undefined' && module.exports) {
         : corners ? boxProgram(plan, Object.assign(feedsOf(v), { corners: cornerFeeds(v), label: 'Carved Box corners' }), 'corners')
         : boxProgram(plan, Object.assign(feedsOf(v), { label: test ? 'Test fit' : 'Carved Box' }));
     } catch (e) { alert('Carved Box: ' + e.message + '.'); return; }
-    var name = 'CarvedBox-' + (test ? 'TestFit-' : edges ? 'Edges-' : corners ? 'Corners-' : '') + (test ? '' : v.shape === 'rect' ? round(v.length / K(), 2) + 'x' + round(v.width / K(), 2) + '-' : v.shape === 'poly' ? v.sides + 'gon' + round(v.flats / K(), 2) + '-' : v.shape === 'oval' ? 'Oval' + round(v.length / K(), 2) + 'x' + round(v.width / K(), 2) + '-' : v.shape === 'heart' ? 'Heart' + round(v.length / K(), 2) + 'x' + round(v.width / K(), 2) + '-' : v.shape === 'custom' ? (v.outline ? v.outline.name.replace(/\.(svg|dxf)$/i, '').replace(/[^\w-]+/g, '').slice(0, 24) || 'Drawing' : 'Drawing') + round(v.length / K(), 2) + 'x' + round(v.width / K(), 2) + '-' : 'D' + round(v.diameter / K(), 2) + '-') + (test ? '' : lastPlan.plan.set ? 'Set' + lastPlan.plan.set.length + '-' : lastPlan.plan.boxOf ? 'Box' + lastPlan.plan.boxOf.k + 'of' + lastPlan.plan.boxOf.of + '-' : v.cut !== 'both' ? cap(v.cut) + '-' : '')
+    var name = 'CarvedBox-' + (test ? 'TestFit-' : edges ? 'Edges-' : corners ? 'Corners-' : '') + (test ? '' : v.shape === 'rect' ? round(v.length / K(), 2) + 'x' + round(v.width / K(), 2) + '-' : v.shape === 'poly' ? v.sides + 'gon' + round(v.flats / K(), 2) + '-' : v.shape === 'oval' ? 'Oval' + round(v.length / K(), 2) + 'x' + round(v.width / K(), 2) + '-' : v.shape === 'heart' ? 'Heart' + round(v.length / K(), 2) + 'x' + round(v.width / K(), 2) + '-' : v.shape === 'custom' ? (v.outline ? v.outline.name.replace(/\.(svg|dxf)$/i, '').replace(/[^\w-]+/g, '').slice(0, 24) || 'Drawing' : 'Drawing') + round(v.length / K(), 2) + 'x' + round(v.width / K(), 2) + '-' : 'D' + round(v.diameter / K(), 2) + '-') + (test ? '' : lastPlan.plan.set ? 'Set' + lastPlan.plan.set.length + '-' : lastPlan.plan.boxOf ? 'Box' + lastPlan.plan.boxOf.k + 'of' + lastPlan.plan.boxOf.of + '-' : v.cut === 'top' ? 'Tray-' : v.cut !== 'both' ? cap(v.cut) + '-' : '')
       + 'T' + round(plan.stock.thick / K(), 2) + '-' + unit() + '.nc';
     btn.disabled = true; btn.textContent = 'Generating\u2026';
     try {
@@ -5800,6 +5882,7 @@ if (typeof module !== 'undefined' && module.exports) {
     if (saved.nestOn && saved.nestCut > 0) $('cb-nest-cut').innerHTML = '<option value="0">The whole set</option><option value="' + saved.nestCut + '">Box ' + saved.nestCut + ' on its own</option>';
     $('cb-nest-cut').value = String(saved.nestOn && saved.nestCut > 0 ? saved.nestCut : 0);
     $('cb-mag-on').checked = !!saved.magOn; $('cb-notch-on').checked = !!saved.notchOn; $('cb-comp-on').checked = !!saved.compOn;
+    $('cb-tray-on').checked = !!saved.trayOn; $('cb-tray-round').checked = !!saved.trayRound;
     if (saved.material) $('cb-material').value = saved.material;
     $('cb-style').value = saved.style || 'average';
     if (saved.flutes) $('cb-flutes').value = String(saved.flutes); else $('cb-flutes').value = '2';
@@ -5906,7 +5989,7 @@ if (typeof module !== 'undefined' && module.exports) {
       else state.lipOwn = !state.lipOwn;
       update(true);
     });
-    ['cb-tabs-on', 'cb-mag-on', 'cb-notch-on', 'cb-corners-on', 'cb-edges-on', 'cb-nest-on', 'cb-bot-on'].forEach(function (id) { $(id).addEventListener('change', function () { fitSwitched(id); update(true); }); });
+    ['cb-tabs-on', 'cb-mag-on', 'cb-notch-on', 'cb-corners-on', 'cb-edges-on', 'cb-nest-on', 'cb-bot-on', 'cb-tray-on', 'cb-tray-round'].forEach(function (id) { $(id).addEventListener('change', function () { fitSwitched(id); update(true); }); });
     // Turned on: a grid in a rectangle, wedges in the rest.
     $('cb-comp-on').addEventListener('change', function () {
       if ($('cb-comp-on').checked) {
@@ -6107,7 +6190,7 @@ if (typeof module !== 'undefined' && module.exports) {
     inp.classList.remove('cb-flash'); void inp.offsetWidth; inp.classList.add('cb-flash');
   }
   // The field a problem is about, from the names it uses.
-  var PROBLEM_FIELDS = [[/^The drawing|^Open a drawing/, 'cb-drawing-btn'], [/^Compartments: Rows/, 'cb-comp-rows'], [/^Compartments: Section Sizes/, 'cb-comp-wsz'], [/^Compartments: Row Sizes|^Compartments: the smallest[^,]*deep/, 'cb-comp-rsz'], [/^Compartments: Column Sizes|^Compartments: the smallest/, 'cb-comp-csz'], [/^Compartments: Sections/, 'cb-comp-n'], [/^Compartments: the Middle/, 'cb-comp-mid'], [/^Compartments: Divider Height|^Compartments: no room/, 'cb-comp-h'], [/^Compartments need/, 'cb-comp-on'], [/^Compartments/, 'cb-comp-t'], [/^Sloped lip/, 'cb-lip-w'], [/^Slope Height/, 'cb-eslope'], [/^Edges: the V-bit.s angle/, 'cb-eangle'], [/^Edges: (give the V-bit.s diameter|the V-bit is too small)/, 'cb-ediam'],
+  var PROBLEM_FIELDS = [[/^The drawing|^Open a drawing/, 'cb-drawing-btn'], [/^Lid Tray: (the Lid Top|the lid) must|^Lid Tray: give/, 'cb-tray-d'], [/^Tray Rim|^Lid Tray: the dish is too small|^Lid Tray: the dish comes within/, 'cb-tray-rim'], [/^Pin Diameter|^Lid Tray: the bit must/, 'cb-tray-pin'], [/^Lid Tray: (its edges|the V-bit|a roundover)/, 'cb-tray-edge'], [/^Lid Tray: the corner bit/, 'cb-tray-round'], [/^A Lid Tray|^Cut Tray/, 'cb-tray-on'], [/^Compartments: Rows/, 'cb-comp-rows'], [/^Compartments: Section Sizes/, 'cb-comp-wsz'], [/^Compartments: Row Sizes|^Compartments: the smallest[^,]*deep/, 'cb-comp-rsz'], [/^Compartments: Column Sizes|^Compartments: the smallest/, 'cb-comp-csz'], [/^Compartments: Sections/, 'cb-comp-n'], [/^Compartments: the Middle/, 'cb-comp-mid'], [/^Compartments: Divider Height|^Compartments: no room/, 'cb-comp-h'], [/^Compartments need/, 'cb-comp-on'], [/^Compartments/, 'cb-comp-t'], [/^Sloped lip/, 'cb-lip-w'], [/^Slope Height/, 'cb-eslope'], [/^Edges: the V-bit.s angle/, 'cb-eangle'], [/^Edges: (give the V-bit.s diameter|the V-bit is too small)/, 'cb-ediam'],
     [/^Edges: the tip diameter/, 'cb-evtip'], [/^Edges: (give the roundover|a roundover)/, 'cb-erad'], [/^Edges:|^T\d+ is(n\u2019t)? a V-bit/, 'cb-etool-row'],
     [/^Finger notch depth/, 'cb-notch-d'], [/^Only \d+ boxes fit|^No box fits/, 'cb-nest-n'],
     [/^Magnets: the count|even number of magnets|^Too many magnets/, 'cb-mag-n'], [/^Magnet hole depth|^Magnet holes too deep/, 'cb-mag-depth'],

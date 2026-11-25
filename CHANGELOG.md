@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased: Lid Tray
+
+- **Lid Tray:** a dish carved in the lid's top, so the closed box works as a tray. It's carved first with the board turned over: **Cut: Tray (Turned Over)** bores two pin holes on the line between the halves and carves the dish; then turn the board over end for end onto two dowel pins and cut **Both, Side by Side** without zeroing X and Y again. **Tray Depth**, **Tray Rim**, **Pin Diameter**, **Tray Edges** (the lid's top edge and the dish's, with the Edge Bit) and a **Rounded Floor** (with the Corner Bit). Auto Sizes makes the Lid Top 3 mm more than the dish.
+
 ## 0.5.3: Guided Setup buttons
 
 - **Guided Setup:** the Shape buttons are as tall as the ones in the main dialog (they were squashed to the height of their text).
