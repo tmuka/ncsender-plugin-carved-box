@@ -5763,16 +5763,18 @@ if (typeof module !== 'undefined' && module.exports) {
     notchCount: 1, notchAngle: 0, slopeHeight: null, bottomBoard: null, bottomStep: null, bottomOversize: null, lidStyle: 'carved', bottomStyle: 'plug', bottomRabbet: null, bottomRecess: null };
   // Each shows off an option or two.
   var PRESETS = [
-    { name: 'Ring box, round 2", finger notch', v: { shape: 'circle', diameter: 50.8, notchOn: true } },
-    { name: 'Trinket box, round 3", lip on the lid', v: { shape: 'circle', diameter: 76.2, lipOn: 'lid' } },
-    { name: 'Keepsake box, 6" \u00d7 4", magnets', v: { shape: 'rect', length: 152.4, width: 101.6, cornerRadius: 12.7, magOn: true, magCount: 4, magDiameter: 8, magDepth: 3.2, notchOn: true } },
-    { name: 'Hexagon box, 4", chamfered edges', v: { shape: 'poly', sides: 6, flats: 101.6, cornerRadius: 6.35, edgesOn: true, edgeBit: 'v' } },
-    { name: 'Oval box, 6" \u00d7 4", notches both sides', v: { shape: 'oval', length: 152.4, width: 101.6, notchOn: true, notchCount: 2 } },
-    { name: 'Heart box, 5", rounded edges', v: { shape: 'heart', length: 127, width: 120, cornerRadius: 12.7, edgesOn: true, edgeBit: 'round' } },
-    { name: 'Tea box, 8" \u00d7 5", sloped lip', v: { shape: 'rect', length: 203.2, width: 127, cornerRadius: 15.875, edgesOn: true, edgeBit: 'v', slope: true, slopeHeight: null } },
-    { name: 'Jewelry box, 7" \u00d7 5", rounded floor corners', v: { shape: 'rect', length: 177.8, width: 127, cornerRadius: 12.7, cornersOn: true, notchOn: true } },
-    { name: 'Big box, 10" \u00d7 7", glued-on floor', v: { shape: 'rect', length: 254, width: 177.8, cornerRadius: 19.05, botOn: true, bottomBoard: 6.35, bottomStep: 2, bottomOversize: 1.5, magOn: true, magCount: 4, magDiameter: 10, magDepth: 3.2 } },
-    { name: 'Nested set of 3, round 5"', v: { shape: 'circle', diameter: 127, nestOn: true, nestCount: 3, nestGap: 1.5, nestCut: 0 } }
+    { name: 'Ring box, round 2\", finger notch, rounded floor', v: { shape: 'circle', diameter: 50.8, lipOn: 'lid', notchOn: true, notchCount: 1, cornersOn: true } },
+    { name: 'Trinket box, round 3\", 3 wedge compartments', v: { shape: 'circle', diameter: 76.2, compOn: true, compLayout: 'wedges', compSections: 3, compAngle: 0, edgesOn: true, edgeBit: 'v' } },
+    { name: 'Keepsake box, 6\" \u00d7 4\", magnets, chamfered edges', v: { shape: 'rect', length: 152.4, width: 101.6, cornerRadius: 12.7, magOn: true, magCount: 4, magDiameter: 8, magDepth: 3.2, notchOn: true, notchCount: 1, edgesOn: true, edgeBit: 'v' } },
+    { name: 'Jewelry box, 7\" \u00d7 5\", 6 compartments, rounded floors', v: { shape: 'rect', length: 177.8, width: 127, cornerRadius: 12.7, compOn: true, compLayout: 'grid', compRows: 2, compCols: 3, cornersOn: true, magOn: true, magCount: 4, magDiameter: 8, magDepth: 3.2, notchOn: true, notchCount: 1 } },
+    { name: 'Valet tray box, 6\" \u00d7 4\", lid tray, magnets', v: { shape: 'rect', length: 152.4, width: 101.6, cornerRadius: 15.875, trayOn: true, trayDepth: 6.35, trayPin: 6.35, magOn: true, magCount: 4, magDiameter: 8, magDepth: 3.2, edgesOn: true, edgeBit: 'v', trayEdge: 0.5 } },
+    { name: 'Tea box, 8\" \u00d7 5\", 3 compartments, sloped lip', v: { shape: 'rect', length: 203.2, width: 127, cornerRadius: 15.875, compOn: true, compLayout: 'grid', compRows: 1, compCols: 3, edgesOn: true, edgeBit: 'v', slope: true, slopeHeight: null, notchOn: true, notchCount: 2 } },
+    { name: 'Hexagon box, 4\", sloped lip, chamfered edges', v: { shape: 'poly', sides: 6, flats: 101.6, cornerRadius: 6.35, edgesOn: true, edgeBit: 'v', slope: true, slopeHeight: null } },
+    { name: 'Oval box, 6\" \u00d7 4\", solid lid, notches both sides', v: { shape: 'oval', length: 152.4, width: 101.6, lipOn: 'lid', lidStyle: 'plug', notchOn: true, notchCount: 2 } },
+    { name: 'Heart box, 5\", rounded edges, rounded floor', v: { shape: 'heart', length: 127, width: 120, cornerRadius: 12.7, edgesOn: true, edgeBit: 'round', cornersOn: true } },
+    { name: 'Business card box, 4\u00bd\" \u00d7 3\", drop-in lid', v: { shape: 'rect', length: 114.3, width: 76.2, cornerRadius: 9.525, lipOn: 'lid', lidStyle: 'drop', botOn: true, bottomStyle: 'plug', bottomBoard: 6.35, bottomStep: 2, notchOn: true, notchCount: 1 } },
+    { name: 'Big box, 10\" \u00d7 7\", glued-on floor, magnets', v: { shape: 'rect', length: 254, width: 177.8, cornerRadius: 19.05, botOn: true, bottomBoard: 6.35, bottomStep: 2, bottomOversize: 1.5, magOn: true, magCount: 4, magDiameter: 10, magDepth: 3.2 } },
+    { name: 'Nested set of 3, round 5\"', v: { shape: 'circle', diameter: 127, nestOn: true, nestCount: 3, nestGap: 1.5, nestCut: 0 } }
   ];
   function renderStart(pick) {
     var sel = $('cb-preset'), esc = function (t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); };

@@ -10,7 +10,7 @@ Lid styles: **Carved**, **Solid**, or **Drop-In**, a flat panel flush in a rabbe
 
 **Guided Setup**, in the Start card, asks six questions about the box (including what goes inside) and sets it up with Auto Sizes on, then lists the job: the board, the programs in order (by whether ncSender has a tool change set up), and the assembly.
 
-1. For a quick start, pick a preset in the **Start** card (a ring box, a trinket box, a keepsake box with magnets, a hexagon, an oval, a heart, a nested set): it loads right away and sets the box's shape, size and options, keeping your stock, bit and feeds. **Save** your own settings there under a name to load again later, everything included.
+1. For a quick start, pick a preset in the **Start** card (each one pairs the options that suit it: a ring box with a notch and rounded floor, a trinket box in wedges, a keepsake box with magnets and chamfers, a jewelry box with 6 compartments, a valet box with a lid tray, a tea box with a sloped lip, a hexagon, an oval with a solid lid, a heart, a business card box with a drop-in lid, a big box on a glued-on floor, a nested set): it loads right away and sets the box's shape, size and options, keeping your stock, bit and feeds. **Save** your own settings there under a name to load again later, everything included.
 1. Measure your board and type its **Stock Thickness** (or tap **Stock** beside it, with Spoilboard Toolbox).
 2. Pick the **Shape** and type its outside size.
 3. In **Tool & Feeds**, pick the bit from the Tool Library and the **Material**; the feeds fill in.
