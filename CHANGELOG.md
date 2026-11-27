@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.1: New icon
 
 - New icon: a maple box with its lid lifted.
 
