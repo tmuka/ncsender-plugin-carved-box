@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **- / + buttons** on the number fields, for the touch screen (ncsender-unit-input 0.1.6): a press steps to the next whole step, holding repeats, and the Up / Down keys step too. Stepping a size Auto Sizes fills in turns Auto Sizes off, as typing it does.
+
 ## 0.6.1: New icon
 
 - New icon: a maple box with its lid lifted.

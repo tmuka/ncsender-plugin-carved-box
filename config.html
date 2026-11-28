@@ -58,6 +58,9 @@
   .cb-input { text-align: right; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; }
   .cb-input:focus, .cb-select:focus { outline: none; border-color: var(--color-accent); }
   .cb-input.cb-error { border-color: #d32f2f; }
+  /* - value + steppers: ncsender-unit-input's wireSteppers (its STEPPER_CSS); the plugin's field look inside the frame. */
+  .nc-step:has(.cb-error) { border-color: #d32f2f; }
+  .nc-step > .cb-input { flex: 1 1 0; min-width: 0; height: 100%; border: 0 !important; border-radius: 0; background: transparent; padding: 0 4px; text-align: center; }
   /* Buttons in a card, as QuickCut's: filled with the darker plugin
      background, with an outline that shows in dark mode too (ncSender's
      --color-border is nearly invisible there). */
@@ -1012,6 +1015,7 @@ function wireUnitFields(root, opts) {
     if (!el || el.disabled || el.readOnly) return;
     if (evt.key === 'Enter') { normalize(el); return; }
     if (opts.arrows === false || (evt.key !== 'ArrowUp' && evt.key !== 'ArrowDown')) return;
+    if (el.parentNode && el.parentNode.classList && el.parentNode.classList.contains('nc-step')) return; // wireSteppers steps it
     var imp = imperial();
     var current = parseUnitValue(el.value, imp, el.getAttribute('data-unit'));
     if (current == null || !isFinite(current)) current = 0;
@@ -1038,7 +1042,153 @@ function wireUnitFields(root, opts) {
   };
 }
 
-return { MM_PER_INCH: MM_PER_INCH, parseUnitValue: parseUnitValue, unitValueProblem: unitValueProblem, unitMmPer: unitMmPer, parseUnitMath: parseUnitMath, parseUnitQuantity: parseUnitQuantity, roundDisplay: roundDisplay, mmToDisplay: mmToDisplay, displayToMm: displayToMm, formatMm: formatMm, textToMm: textToMm, roundInches: roundInches, wireUnitFields: wireUnitFields };
+// The stepper's look, as ncSender's probe dialog (ProbeStepper): the frame is
+// the field, the input inside it between the - and + buttons. ncSender's dialog
+// rules beat plugin classes, hence !important on the buttons. wireSteppers adds
+// it once to the page (opts.css false to style it yourself).
+var STEPPER_CSS = '.nc-step{display:flex;align-items:stretch;width:100%;height:36px;box-sizing:border-box;' +
+  'border:1px solid var(--color-border,#888);border-radius:var(--radius-small,4px);background:var(--color-surface,#fff);overflow:hidden}' +
+  '.nc-step:focus-within{border-color:var(--color-accent,#1abc9c)}' +
+  '.nc-step:has([aria-invalid="true"]){border-color:#d32f2f}' +
+  '.nc-step.is-disabled{opacity:.55}' +
+  '.nc-step>input{flex:1 1 0;min-width:0;width:auto;height:100%;margin:0;border:0 !important;border-radius:0;' +
+  'background:transparent;padding:0 4px;text-align:center;box-shadow:none !important;outline:none}' +
+  '.nc-step-btn{flex:0 0 34px;border:0 !important;padding:0 !important;margin:0;border-radius:0 !important;min-width:0 !important;' +
+  'background:color-mix(in srgb,var(--color-text-secondary,#888) 20%,var(--color-surface,#fff)) !important;' +
+  'color:var(--color-text-primary,#222) !important;font-family:inherit;font-size:1.25rem !important;font-weight:700;line-height:1;' +
+  'cursor:pointer;touch-action:manipulation;user-select:none;-webkit-user-select:none}' +
+  '.nc-step-btn:active:not(:disabled){background:color-mix(in srgb,var(--color-accent,#1abc9c) 35%,var(--color-surface,#fff)) !important}' +
+  '.nc-step-btn:disabled{opacity:.4;cursor:default}';
+
+/**
+ * - value + buttons around number fields, for a touch screen (as ncSender's
+ * probe dialog). For every field matching opts.selector (default
+ * 'input[data-unit], input[data-step]') under root:
+ *   - the buttons take no keyboard focus (tabindex -1): Tab still goes from
+ *     field to field;
+ *   - a press steps to the next whole step (4.3 + 1 -> 5), holding repeats
+ *     faster; Up / Down step too (Shift x10);
+ *   - each step fires `input` on the field, the end of a press `change`.
+ * Step, min and max: opts.stepOf(el, imperial) -> { step, min, max } in the
+ * units shown, else the field's data-step (or step), data-min (or min) and
+ * data-max (or max); step 1 when none. Typed units are read first (data-unit).
+ * Wire wireUnitFields too for typed units: it leaves the arrows to this.
+ * Returns { refresh, unwire }: refresh() after changing a field's value,
+ * disabled or limits from code (input and change events refresh by themselves).
+ */
+function wireSteppers(root, opts) {
+  opts = opts || {};
+  var doc = root.ownerDocument || document;
+  function imperial() {
+    return typeof opts.imperial === 'function' ? !!opts.imperial() : !!opts.imperial;
+  }
+  function attrNum(el, a, b) {
+    var t = el.getAttribute(a) != null ? el.getAttribute(a) : el.getAttribute(b);
+    var v = t == null || t === '' ? NaN : parseFloat(t);
+    return isFinite(v) ? v : null;
+  }
+  function spec(el) {
+    var s = (opts.stepOf && opts.stepOf(el, imperial())) ||
+      { step: attrNum(el, 'data-step', 'step'), min: attrNum(el, 'data-min', 'min'), max: attrNum(el, 'data-max', 'max') };
+    return { step: s.step > 0 ? s.step : 1, min: s.min == null ? -Infinity : s.min, max: s.max == null ? Infinity : s.max };
+  }
+  function valueOf(el) {
+    var t = el.value.trim();
+    if (!t) return null;
+    var v = el.getAttribute('data-unit') ? parseUnitValue(t, imperial(), el.getAttribute('data-unit')) : Number(t.replace(',', '.'));
+    return v == null || !isFinite(v) ? null : v;
+  }
+  function decimals(step) {
+    var s = String(step);
+    return s.indexOf('.') < 0 ? 0 : s.length - s.indexOf('.') - 1;
+  }
+  function fire(el, type) {
+    el.dispatchEvent(new Event(type, { bubbles: true }));
+  }
+  function bump(el, dir, times) {
+    if (el.disabled || el.readOnly) return false;
+    var s = spec(el), step = s.step * (times || 1), cur = valueOf(el);
+    var next = cur == null ? (dir > 0 ? Math.max(step, s.min) : s.min) :
+      (dir > 0 ? Math.floor(cur / step + 1e-6) + 1 : Math.ceil(cur / step - 1e-6) - 1) * step;
+    if (!isFinite(next)) return false;
+    next = Math.min(s.max, Math.max(s.min, next));
+    var text = String(Number(next.toFixed(decimals(s.step) + 2)));
+    if (text === el.value.trim()) return false;
+    el.value = text;
+    fire(el, 'input');
+    return true;
+  }
+  function refresh(box) {
+    var el = box.input, s = spec(el), v = valueOf(el);
+    box.minus.disabled = el.disabled || (v != null && v <= s.min + 1e-9);
+    box.plus.disabled = el.disabled || (v != null && v >= s.max - 1e-9);
+    box.el.classList.toggle('is-disabled', !!el.disabled);
+  }
+  var timer = null, held = null;
+  function release() {
+    if (timer) { clearTimeout(timer); timer = null; }
+    if (held) { var el = held; held = null; fire(el, 'change'); }
+  }
+  function button(text, dir, el) {
+    var b = doc.createElement('button');
+    b.type = 'button'; b.className = 'nc-step-btn'; b.textContent = text; b.tabIndex = -1;
+    b.setAttribute('aria-label', (dir > 0 ? 'Increase ' : 'Decrease ') + (el.getAttribute('aria-label') || el.id || 'value'));
+    b.addEventListener('pointerdown', function (e) {
+      if (e.button !== 0 || b.disabled) return;
+      e.preventDefault(); release(); held = el; bump(el, dir);
+      var delay = 400;
+      var again = function () {
+        if (!bump(el, dir)) return release();
+        delay = Math.max(50, delay * 0.8); timer = setTimeout(again, delay);
+      };
+      timer = setTimeout(again, delay);
+    });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (t) { b.addEventListener(t, release); });
+    b.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    // A click with no pointer press (a screen reader, a keyboard on the button): one step.
+    b.addEventListener('click', function (e) { if (e.detail === 0 && bump(el, dir)) fire(el, 'change'); });
+    return b;
+  }
+  function onKey(e) {
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+    e.preventDefault();
+    if (bump(e.target, e.key === 'ArrowUp' ? 1 : -1, e.shiftKey ? 10 : 1)) fire(e.target, 'change');
+  }
+  if (opts.css !== false && doc.head && !doc.getElementById('nc-step-css')) {
+    var style = doc.createElement('style');
+    style.id = 'nc-step-css'; style.textContent = STEPPER_CSS;
+    doc.head.appendChild(style);
+  }
+  var boxes = [];
+  Array.prototype.forEach.call(root.querySelectorAll(opts.selector || 'input[data-unit], input[data-step]'), function (el) {
+    if (el.parentNode && el.parentNode.classList && el.parentNode.classList.contains('nc-step')) return; // wired already
+    var box = { el: doc.createElement('div'), input: el, minus: button('−', -1, el), plus: button('+', 1, el) };
+    box.el.className = 'nc-step';
+    el.parentNode.insertBefore(box.el, el);
+    box.el.appendChild(box.minus); box.el.appendChild(el); box.el.appendChild(box.plus);
+    el.addEventListener('keydown', onKey);
+    boxes.push(box);
+  });
+  // Disabled and at-the-limit states follow the fields, however they change.
+  function sync() { boxes.forEach(refresh); }
+  root.addEventListener('input', sync); root.addEventListener('change', sync);
+  sync();
+  return {
+    refresh: sync,
+    unwire: function () {
+      release();
+      root.removeEventListener('input', sync); root.removeEventListener('change', sync);
+      boxes.forEach(function (box) {
+        box.input.removeEventListener('keydown', onKey);
+        box.el.parentNode.insertBefore(box.input, box.el);
+        box.el.parentNode.removeChild(box.el);
+      });
+      boxes = [];
+    }
+  };
+}
+
+return { MM_PER_INCH: MM_PER_INCH, parseUnitValue: parseUnitValue, unitValueProblem: unitValueProblem, unitMmPer: unitMmPer, parseUnitMath: parseUnitMath, parseUnitQuantity: parseUnitQuantity, roundDisplay: roundDisplay, mmToDisplay: mmToDisplay, displayToMm: displayToMm, formatMm: formatMm, textToMm: textToMm, roundInches: roundInches, wireUnitFields: wireUnitFields, STEPPER_CSS: STEPPER_CSS, wireSteppers: wireSteppers };
 })();
 if (typeof window !== 'undefined') window.NcUnitInput = NcUnitInput;
 /* END ncsender-unit-input */
@@ -5417,6 +5567,7 @@ if (typeof module !== 'undefined' && module.exports) {
     });
     ['cb-sides', 'cb-flats'].forEach(function (id) { $(id).closest('.cb-field').hidden = v.shape !== 'poly'; });
     showPickers();
+    if (state.steppers) state.steppers.refresh();
     if (save) { clearTimeout(saveTimer); saveTimer = setTimeout(persist, 400); }
   }
   // The stock needed, and how a board on its own is set up.
@@ -5929,15 +6080,27 @@ if (typeof module !== 'undefined' && module.exports) {
     full = fullOut(collect().v);
     state.heightOwn = h != null && !(Math.abs(h - full.height) < 0.03);
   }
+  // The - / + buttons' step and limits, in the units shown.
+  function stepOf(el, imp) {
+    var f = FIELDS.filter(function (x) { return x[0] === el.id; })[0], kind = f ? f[2] : 'length';
+    if (kind === 'feed') return { step: imp ? 5 : 100, min: imp ? 5 : 100 };
+    if (el.id === 'cb-sides') return { step: 1, min: 3, max: 12 };
+    if (el.id === 'cb-stepover') return { step: 5, min: 1, max: 100 };
+    if (el.id === 'cb-rpm' || el.id === 'cb-erpm' || el.id === 'cb-crpm') return { step: 1000, min: 1000 };
+    if (el.id === 'cb-notch-a' || el.id === 'cb-comp-a') return { step: 15, min: 0, max: 360 };
+    if (el.id === 'cb-eangle') return { step: 5, min: 1, max: 179 };
+    if (kind === 'count') return { step: 1, min: el.id === 'cb-delay' || el.id === 'cb-notch-n' ? 0 : 1 };
+    return { step: imp ? 0.05 : 1, min: 0 };
+  }
   function wire() {
     // Lengths and feeds in any unit (1/4", 6.35mm, 60ipm, 12mm + 1/8in):
     // shown in the shop's units on Enter or leaving the field; Up / Down
     // step them.
     wirePickers();
-    NcUnitInput.wireUnitFields(ROOT, { imperial: function () { return state.imperial; }, onStep: function (el) {
-      followProportion(el.id);
-      if (state.autoSizes && AUTO.some(function (x) { return x[0] === el.id; })) { state.autoSizes = false; update(true); }
-    } });
+    // Arrows step through the - / + steppers (by the field's step), so not here too.
+    NcUnitInput.wireUnitFields(ROOT, { imperial: function () { return state.imperial; }, arrows: false });
+    var ids = FIELDS.filter(function (f) { return f[2] !== 'shares'; }).map(function (f) { return '#' + f[0]; });
+    state.steppers = NcUnitInput.wireSteppers(ROOT, { selector: ids.join(',') + ',input[data-unit]', imperial: function () { return state.imperial; }, stepOf: stepOf });
     SEGS.forEach(function (s) {
       ROOT.querySelectorAll('#' + s[0] + ' button').forEach(function (b) {
         b.addEventListener('click', function () {
@@ -5976,22 +6139,24 @@ if (typeof module !== 'undefined' && module.exports) {
     };
     FIELDS.forEach(function (f) {
       $(f[0]).addEventListener('input', function (e) {
-        if (e.isTrusted) state.fitSay = '';
-        if (e.isTrusted && FEED_IDS.indexOf(f[0]) >= 0) state.feedsAuto = false;
-        if (e.isTrusted && f[0] === 'cb-bit') $('cb-tool').value = '';
-        if (e.isTrusted && AUTO.some(function (x) { return x[0] === f[0]; })) state.autoSizes = false;
+        // Typed, or stepped by the - / + buttons (their events aren't trusted).
+        var human = e.isTrusted || !!(e.target.parentNode && e.target.parentNode.classList.contains('nc-step'));
+        if (human) state.fitSay = '';
+        if (human && FEED_IDS.indexOf(f[0]) >= 0) state.feedsAuto = false;
+        if (human && f[0] === 'cb-bit') $('cb-tool').value = '';
+        if (human && AUTO.some(function (x) { return x[0] === f[0]; })) state.autoSizes = false;
         // Sizes typed: as many sections (rows, columns) as numbers.
         var follows = { 'cb-comp-wsz': ['cb-comp-n', 2], 'cb-comp-rsz': ['cb-comp-rows', 1], 'cb-comp-csz': ['cb-comp-cols', 1] }[f[0]];
-        if (e.isTrusted && follows) { var sl = read(f[0], 'shares'); if (Array.isArray(sl) && sl.length >= follows[1] && sl.length <= 12) show(follows[0], sl.length, 'count'); }
-        if (e.isTrusted && f[0] === 'cb-corner') { var cr = read('cb-corner', 'length'); if (cr != null && !isNaN(cr)) state.cornerOwn = cr; }
+        if (human && follows) { var sl = read(f[0], 'shares'); if (Array.isArray(sl) && sl.length >= follows[1] && sl.length <= 12) show(follows[0], sl.length, 'count'); }
+        if (human && f[0] === 'cb-corner') { var cr = read('cb-corner', 'length'); if (cr != null && !isNaN(cr)) state.cornerOwn = cr; }
         // A height typed as high as it goes follows the boards, as an empty one does.
         // Lip Thickness typed: yours (half typed too), unless it's what the wall gives; empty links it again.
-        if (e.isTrusted && f[0] === 'cb-lip-w') { var lw0 = read('cb-lip-w', 'length'); state.lipOwn = lw0 != null && (isNaN(lw0) || Math.abs(lw0 - lipWidthFor(inputOf(collect().v), state.imperial)) > 0.03); }
+        if (human && f[0] === 'cb-lip-w') { var lw0 = read('cb-lip-w', 'length'); state.lipOwn = lw0 != null && (isNaN(lw0) || Math.abs(lw0 - lipWidthFor(inputOf(collect().v), state.imperial)) > 0.03); }
         // Half typed (3/ on the way to 3/16"): yours already, not the boards'.
-        if (e.isTrusted && f[0] === 'cb-lid-h') { state.lidOwn = false; var lv = read('cb-lid-h', 'length'); state.lidOwn = lv != null && (isNaN(lv) || Math.abs(lv - fullOut(collect().v).lid) > 0.03); }
-        if (e.isTrusted && f[0] === 'cb-height') { var hv = read('cb-height', 'length'); state.heightOwn = hv != null && (isNaN(hv) || Math.abs(hv - fullOut(collect().v).height) > 0.03); }
+        if (human && f[0] === 'cb-lid-h') { state.lidOwn = false; var lv = read('cb-lid-h', 'length'); state.lidOwn = lv != null && (isNaN(lv) || Math.abs(lv - fullOut(collect().v).lid) > 0.03); }
+        if (human && f[0] === 'cb-height') { var hv = read('cb-height', 'length'); state.heightOwn = hv != null && (isNaN(hv) || Math.abs(hv - fullOut(collect().v).height) > 0.03); }
         // A drawing kept in proportion: the other way follows.
-        if (e.isTrusted) followProportion(f[0]);
+        if (human) followProportion(f[0]);
         soon();
       });
       $(f[0]).addEventListener('change', function () { if (f[0] === 'cb-bit' && state.feedsAuto) { fillFeeds(); update(true); } });
